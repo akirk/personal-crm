@@ -1057,7 +1057,6 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                         $original_section = $alumni_member['original_section'] ?? 'team_members'; // Default to team_members for legacy data
                                         $display_name = $original_section === 'leadership' ? 'Leadership' : 'Team Member';
                                         ?>
-                                        <span style="color: #666; font-size: 12px; margin-right: 8px;">Originally: <?php echo $display_name; ?></span>
                                         <button type="submit" class="btn" onclick="return confirm('Are you sure you want to restore this person to their original position (<?php echo $display_name; ?>)?')">Restore to <?php echo $display_name; ?></button>
                                     </form>
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this alumni member?')">
