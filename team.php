@@ -230,7 +230,8 @@ function load_team_config() {
 	}
 	
 	return array(
-		'team_name' => $config['team_name'],
+		'activity_url_prefix' => $config['activity_url_prefix'],
+        'team_name' => $config['team_name'],
 		'team_members' => $team_members,
 		'leadership' => $leadership,
 		'events' => $config['events'] ?? array(),

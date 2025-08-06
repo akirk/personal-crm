@@ -1,0 +1,47 @@
+{
+  "activity_url_prefix": "https://example.com/team-activity/?params",
+  "team_name": "Your Team Name",
+  "team_members": {
+    "username1": {
+      "name": "Full Name",
+      "github": "github-username",
+      "linear": "linear-username",
+      "town": "City, Country",
+      "one_on_one": "https://docs.google.com/document/d/YOUR_DOCUMENT_ID/edit",
+      "hr_feedback": "https://drive.google.com/open?id=YOUR_DRIVE_ID",
+      "birthday": "YYYY-MM-DD",
+      "company_anniversary": "YYYY-MM-DD",
+      "kids": [
+        {
+          "name": "Child Name",
+          "birth_year": 2020
+        }
+      ],
+      "notes": "Additional personal notes"
+    }
+  },
+  "leadership": {
+    "leader-username": {
+      "name": "Leader Name",
+      "github": "github-username",
+      "linear": "linear-username", 
+      "town": "City, Country",
+      "role": "Team Lead",
+      "one_on_one": "https://docs.google.com/document/d/YOUR_DOCUMENT_ID/edit",
+      "birthday": "YYYY-MM-DD",
+      "company_anniversary": "YYYY-MM-DD",
+      "kids": [],
+      "notes": ""
+    }
+  },
+  "events": [
+    {
+      "name": "Team Event Name",
+      "start_date": "YYYY-MM-DD", 
+      "end_date": "YYYY-MM-DD",
+      "type": "team",
+      "location": "Event Location",
+      "description": "Event description"
+    }
+  ]
+}
