@@ -9,7 +9,12 @@
 ini_set( 'display_errors', 1 );
 error_reporting( E_ALL );
 
-$config_file = __DIR__ . '/team.json';
+// Get current team from URL parameter or session
+session_start();
+$current_team = $_GET['team'] ?? $_SESSION['current_team'] ?? 'team';
+$_SESSION['current_team'] = $current_team;
+
+$config_file = __DIR__ . '/' . $current_team . '.json';
 $action = $_POST['action'] ?? $_GET['action'] ?? 'dashboard';
 
 // Determine active tab and privacy mode
@@ -75,6 +80,39 @@ function load_or_create_config( $file_path ) {
 		'alumni' => array(),
 		'events' => array()
 	);
+}
+
+/**
+ * Get all available team files (excluding backup files)
+ */
+function get_available_teams() {
+	$teams = array();
+	$json_files = glob( __DIR__ . '/*.json' );
+	
+	foreach ( $json_files as $file ) {
+		$basename = basename( $file, '.json' );
+		// Skip backup files
+		if ( strpos( $basename, '.bak' ) === false && strpos( $basename, 'bak-' ) === false ) {
+			$teams[] = $basename;
+		}
+	}
+	
+	sort( $teams );
+	return $teams;
+}
+
+/**
+ * Get team name from config file
+ */
+function get_team_name_from_file( $team_slug ) {
+	$file_path = __DIR__ . '/' . $team_slug . '.json';
+	if ( file_exists( $file_path ) ) {
+		$config = json_decode( file_get_contents( $file_path ), true );
+		if ( json_last_error() === JSON_ERROR_NONE && isset( $config['team_name'] ) ) {
+			return $config['team_name'];
+		}
+	}
+	return ucfirst( str_replace( '_', ' ', $team_slug ) );
 }
 
 /**
@@ -287,6 +325,48 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				} else {
 					$error = 'Failed to delete event.';
 				}
+			}
+			break;
+
+		case 'create_team':
+			$new_team_slug = sanitize_text_field( $_POST['new_team_slug'] ?? '' );
+			$new_team_name = sanitize_text_field( $_POST['new_team_name'] ?? '' );
+			
+			if ( empty( $new_team_slug ) || empty( $new_team_name ) ) {
+				$error = 'Team slug and name are required.';
+				break;
+			}
+			
+			// Validate slug format
+			if ( ! preg_match( '/^[a-z0-9_-]+$/', $new_team_slug ) ) {
+				$error = 'Team slug can only contain lowercase letters, numbers, hyphens and underscores.';
+				break;
+			}
+			
+			$new_team_file = __DIR__ . '/' . $new_team_slug . '.json';
+			
+			if ( file_exists( $new_team_file ) ) {
+				$error = 'Team with this slug already exists.';
+				break;
+			}
+			
+			$new_config = array(
+				'activity_url_prefix' => '',
+				'team_name' => $new_team_name,
+				'team_members' => array(),
+				'leadership' => array(),
+				'alumni' => array(),
+				'events' => array()
+			);
+			
+			if ( save_config( $new_config, $new_team_file ) ) {
+				$message = 'Team created successfully!';
+				// Switch to the new team
+				$_SESSION['current_team'] = $new_team_slug;
+				header( 'Location: admin.php?team=' . urlencode( $new_team_slug ) );
+				exit;
+			} else {
+				$error = 'Failed to create team.';
 			}
 			break;
 	}
@@ -936,6 +1016,36 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         .timezone-suggestion:last-child {
             border-bottom: none;
         }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 400px;
+            border-radius: 8px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+        }
     </style>
 </head>
 <body>
@@ -946,6 +1056,21 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <p>Manage your team configuration file</p>
             </div>
             <div class="navigation">
+                <!-- Team Switcher -->
+                <div class="team-switcher" style="display: inline-block; margin-right: 10px;">
+                    <select id="team-selector" onchange="switchTeam()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                        <?php
+                        $available_teams = get_available_teams();
+                        foreach ( $available_teams as $team_slug ) {
+                            $team_display_name = get_team_name_from_file( $team_slug );
+                            $selected = $team_slug === $current_team ? 'selected' : '';
+                            echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
+                        }
+                        ?>
+                    </select>
+                    <button onclick="showCreateTeamModal()" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Team</button>
+                </div>
+                
                 <?php
                 $current_params = $_GET;
                 if ( $privacy_mode ) {
@@ -956,7 +1081,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     echo '<a href="?' . http_build_query( $current_params ) . '" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>';
                 }
                 ?>
-                <a href="index.php" class="nav-link">📊 Team Overview</a>
+                <a href="index.php<?php echo $current_team !== 'team' ? '?team=' . urlencode( $current_team ) : ''; ?>" class="nav-link">📊 Team Overview</a>
             </div>
         </div>
 
@@ -1249,8 +1374,32 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <pre style="background: #f8f8f8; padding: 20px; border-radius: 4px; overflow-x: auto;"><?php echo htmlspecialchars( json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ); ?></pre>
             
             <p style="margin-top: 20px;">
-                <a href="team.php" class="btn" target="_blank">View Team Dashboard</a>
+                <a href="index.php<?php echo $current_team !== 'team' ? '?team=' . urlencode( $current_team ) : ''; ?>" class="btn" target="_blank">View Team Dashboard</a>
             </p>
+        </div>
+    </div>
+
+    <!-- Create Team Modal -->
+    <div id="createTeamModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="hideCreateTeamModal()">&times;</span>
+            <h3>Create New Team</h3>
+            <form method="post" id="create-team-form">
+                <input type="hidden" name="action" value="create_team">
+                <div class="form-group">
+                    <label for="new_team_name">Team Name *</label>
+                    <input type="text" id="new_team_name" name="new_team_name" required placeholder="e.g., Marketing Team">
+                </div>
+                <div class="form-group">
+                    <label for="new_team_slug">Team Slug *</label>
+                    <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing-team" pattern="[a-z0-9_-]+">
+                    <small style="color: #666; font-size: 12px;">Only lowercase letters, numbers, hyphens, and underscores allowed. This will be used as the filename.</small>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button type="submit" class="btn">Create Team</button>
+                    <button type="button" onclick="hideCreateTeamModal()" class="btn" style="background: #6c757d; margin-left: 10px;">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1419,6 +1568,43 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 });
             });
         }
+        
+        // Team switching functionality
+        function switchTeam() {
+            const selector = document.getElementById('team-selector');
+            const selectedTeam = selector.value;
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.set('team', selectedTeam);
+            window.location = currentUrl.toString();
+        }
+        
+        function showCreateTeamModal() {
+            document.getElementById('createTeamModal').style.display = 'block';
+        }
+        
+        function hideCreateTeamModal() {
+            document.getElementById('createTeamModal').style.display = 'none';
+            document.getElementById('create-team-form').reset();
+        }
+        
+        // Auto-generate slug from team name
+        document.addEventListener('DOMContentLoaded', function() {
+            const teamNameInput = document.getElementById('new_team_name');
+            const teamSlugInput = document.getElementById('new_team_slug');
+            
+            if (teamNameInput && teamSlugInput) {
+                teamNameInput.addEventListener('input', function() {
+                    // Auto-generate slug if slug field is empty or matches previous auto-generated value
+                    let slug = this.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
+                        .replace(/\s+/g, '-') // Replace spaces with hyphens
+                        .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+                        .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+                    teamSlugInput.value = slug;
+                });
+            }
+        });
         
         // Initialize timezone autocomplete when page loads
         document.addEventListener('DOMContentLoaded', initTimezoneAutocomplete);

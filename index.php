@@ -306,13 +306,46 @@ class Person {
 }
 
 /**
+ * Get all available team files (excluding backup files)
+ */
+function get_available_teams() {
+	$teams = array();
+	$json_files = glob( __DIR__ . '/*.json' );
+	
+	foreach ( $json_files as $file ) {
+		$basename = basename( $file, '.json' );
+		// Skip backup files
+		if ( strpos( $basename, '.bak' ) === false && strpos( $basename, 'bak-' ) === false ) {
+			$teams[] = $basename;
+		}
+	}
+	
+	sort( $teams );
+	return $teams;
+}
+
+/**
+ * Get team name from config file
+ */
+function get_team_name_from_file( $team_slug ) {
+	$file_path = __DIR__ . '/' . $team_slug . '.json';
+	if ( file_exists( $file_path ) ) {
+		$config = json_decode( file_get_contents( $file_path ), true );
+		if ( json_last_error() === JSON_ERROR_NONE && isset( $config['team_name'] ) ) {
+			return $config['team_name'];
+		}
+	}
+	return ucfirst( str_replace( '_', ' ', $team_slug ) );
+}
+
+/**
  * Load team configuration from JSON file
  */
-function load_team_config() {
-	$config_file = __DIR__ . '/team.json';
+function load_team_config( $team_slug = 'team' ) {
+	$config_file = __DIR__ . '/' . $team_slug . '.json';
 	
 	if ( ! file_exists( $config_file ) ) {
-		die( 'Error: team.json file not found. Please create the configuration file from the template.' );
+		die( 'Error: ' . $team_slug . '.json file not found. Please create the configuration file from the admin panel.' );
 	}
 	
 	$json_content = file_get_contents( $config_file );
@@ -399,8 +432,11 @@ function load_team_config() {
 	);
 }
 
+// Get current team from URL parameter
+$current_team = $_GET['team'] ?? 'team';
+
 // Load team configuration
-$team_data = load_team_config();
+$team_data = load_team_config( $current_team );
 
 /**
  * Get all upcoming events (personal + team/company) - within next 3 months
@@ -526,6 +562,9 @@ function mask_event_description( $description, $privacy_mode, $all_people ) {
 $person = $_GET['person'] ?? null;
 $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 $action = $person ? 'person' : 'overview';
+
+// Get available teams for switcher
+$available_teams = get_available_teams();
 
 ?>
 <!DOCTYPE html>
@@ -792,14 +831,27 @@ $action = $person ? 'person' : 'overview';
     <div class="container">
         <?php if ( $action === 'overview' ) : ?>
             <div class="header">
-                <h1><a href="index.php" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Overview</a></h1>
-                <div class="navigation">
+                <div style="flex-grow: 1;">
+                    <h1><a href="index.php<?php echo $current_team !== 'team' ? '?team=' . urlencode( $current_team ) : ''; ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Overview</a></h1>
+                </div>
+                <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
+                    <!-- Team Switcher -->
+                    <select id="team-selector" onchange="switchTeam()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                        <?php
+                        foreach ( $available_teams as $team_slug ) {
+                            $team_display_name = get_team_name_from_file( $team_slug );
+                            $selected = $team_slug === $current_team ? 'selected' : '';
+                            echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
+                        }
+                        ?>
+                    </select>
+                    
                     <?php if ( $privacy_mode ) : ?>
-                        <a href="?privacy=0" class="nav-link" style="background: #28a745;">🔒 Privacy Mode ON</a>
+                        <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" class="nav-link" style="background: #28a745;">🔒 Privacy Mode ON</a>
                     <?php else : ?>
-                        <a href="?privacy=1" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
+                        <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
                     <?php endif; ?>
-                    <a href="admin.php" class="nav-link">⚙️ Admin Panel</a>
+                    <a href="admin.php<?php echo $current_team !== 'team' ? '?team=' . urlencode( $current_team ) : ''; ?>" class="nav-link">⚙️ Admin Panel</a>
                 </div>
             </div>
 
@@ -811,7 +863,7 @@ $action = $person ? 'person' : 'overview';
                             <?php foreach ( $team_data['team_members'] as $username => $member ) : ?>
                                 <li>
                                     <div class="person-row-container">
-                                        <a href="?person=<?php echo htmlspecialchars( $username ); ?><?php echo $privacy_mode ? '&privacy=1' : ''; ?>" class="person-row">
+                                        <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ) ); ?>" class="person-row">
                                             <div class="person-info">
                                                 <div class="person-name"><?php echo htmlspecialchars( mask_name( $member->name, $privacy_mode ) ); ?></div>
                                                 <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
@@ -833,7 +885,7 @@ $action = $person ? 'person' : 'overview';
                             <?php foreach ( $team_data['leadership'] as $username => $leader ) : ?>
                                 <li>
                                     <div class="person-row-container">
-                                        <a href="?person=<?php echo htmlspecialchars( $username ); ?><?php echo $privacy_mode ? '&privacy=1' : ''; ?>" class="person-row">
+                                        <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ) ); ?>" class="person-row">
                                             <div class="person-info">
                                                 <div class="person-name"><?php echo htmlspecialchars( mask_name( $leader->name, $privacy_mode ) ); ?> <span style="color: #666; font-weight: normal;">(<?php echo htmlspecialchars( $leader->role ); ?>)</span></div>
                                                 <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
@@ -855,7 +907,7 @@ $action = $person ? 'person' : 'overview';
                                 <?php foreach ( $team_data['alumni'] as $username => $alumnus ) : ?>
                                     <li>
                                         <div class="person-row-container">
-                                            <a href="?person=<?php echo htmlspecialchars( $username ); ?><?php echo $privacy_mode ? '&privacy=1' : ''; ?>" class="person-row">
+                                            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ) ); ?>" class="person-row">
                                                 <div class="person-info">
                                                     <div class="person-name"><?php echo htmlspecialchars( mask_name( $alumnus->name, $privacy_mode ) ); ?> <span style="color: #999; font-weight: normal;">(Alumni)</span></div>
                                                     <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
@@ -924,12 +976,12 @@ $action = $person ? 'person' : 'overview';
             } else {
             ?>
                 <div class="back-link">
-                    <a href="?">← Back to Team Overview</a>
+                    <a href="?<?php echo $current_team !== 'team' ? 'team=' . urlencode( $current_team ) : ''; ?>">← Back to Team Overview</a>
                 </div>
 
                 <div class="header" style="flex-wrap: wrap;">
                     <div>
-                        <h1><a href="index.php" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( mask_name( $person_data->name, $privacy_mode ) ); ?></a> 
+                        <h1><a href="index.php<?php echo $current_team !== 'team' ? '?team=' . urlencode( $current_team ) : ''; ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( mask_name( $person_data->name, $privacy_mode ) ); ?></a> 
                             <?php if ( $is_alumni ) : ?>
                                 <span style="color: #999; font-size: 18px; font-weight: normal;">(Alumni)</span>
                             <?php endif; ?>
@@ -941,9 +993,9 @@ $action = $person ? 'person' : 'overview';
                     </div>
                     <div class="navigation" style="margin-top: 10px;">
                         <?php if ( $privacy_mode ) : ?>
-                            <a href="?person=<?php echo htmlspecialchars( $person ); ?>&privacy=0" class="nav-link" style="background: #28a745;">🔒 Privacy Mode ON</a>
+                            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" class="nav-link" style="background: #28a745;">🔒 Privacy Mode ON</a>
                         <?php else : ?>
-                            <a href="?person=<?php echo htmlspecialchars( $person ); ?>&privacy=1" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
+                            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -951,7 +1003,7 @@ $action = $person ? 'person' : 'overview';
                 <div class="section">
                     <h2>Quick Links</h2>
                     <div class="links">
-                        <a href="admin.php?edit_member=<?php echo htmlspecialchars( $person ); ?>" target="_blank">✏️ Edit Person</a>
+                        <a href="admin.php?edit_member=<?php echo htmlspecialchars( $person ); ?><?php echo $current_team !== 'team' ? '&team=' . urlencode( $current_team ) : ''; ?>" target="_blank">✏️ Edit Person</a>
                         <?php if ( ! empty( $person_data->one_on_one ) ) : ?>
                             <a href="<?php echo htmlspecialchars( $person_data->one_on_one ); ?>" target="_blank">📄 1:1 Document</a>
                         <?php endif; ?>
@@ -1066,7 +1118,7 @@ $action = $person ? 'person' : 'overview';
         <?php else : ?>
             <div class="header">
                 <h1>Page Not Found</h1>
-                <p><a href="?">← Back to Team Overview</a></p>
+                <p><a href="?<?php echo $current_team !== 'team' ? 'team=' . urlencode( $current_team ) : ''; ?>">← Back to Team Overview</a></p>
             </div>
         <?php endif; ?>
     </div>
@@ -1115,5 +1167,18 @@ $action = $person ? 'person' : 'overview';
         setInterval(updateTime, 60000);
     </script>
     <?php endif; ?>
+    
+    <script>
+        // Team switching functionality
+        function switchTeam() {
+            const selector = document.getElementById('team-selector');
+            const selectedTeam = selector.value;
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.set('team', selectedTeam);
+            // Remove person parameter when switching teams
+            currentUrl.searchParams.delete('person');
+            window.location = currentUrl.toString();
+        }
+    </script>
 </body>
 </html>
