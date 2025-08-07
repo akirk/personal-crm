@@ -85,7 +85,7 @@ function create_backup( $file_path ) {
 		return true; // No file to backup
 	}
 
-	$backup_path = substr( $file_path, 0, -4 ) . date( '-Y-m-d-H-i-s' ) . '.json';
+	$backup_path = substr( $file_path, 0, -4 ) . 'bak' . date( '-Y-m-d-H-i-s' ) . '.json';
 	return copy( $file_path, $backup_path );
 }
 
