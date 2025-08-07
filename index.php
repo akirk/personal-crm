@@ -446,8 +446,85 @@ function get_all_upcoming_events( $team_data ) {
 	return $all_events;
 }
 
-// Get current action
+/**
+ * Privacy mode helper functions
+ */
+function mask_name( $full_name, $privacy_mode ) {
+	if ( ! $privacy_mode ) {
+		return $full_name;
+	}
+	
+	$parts = explode( ' ', trim( $full_name ) );
+	if ( count( $parts ) <= 1 ) {
+		return $full_name; // Only first name, no masking needed
+	}
+	
+	// Return first name + masked last name
+	$first_name = $parts[0];
+	$last_name_initial = isset( $parts[ count( $parts ) - 1 ] ) ? substr( $parts[ count( $parts ) - 1 ], 0, 1 ) . '.' : '';
+	
+	return $first_name . ' ' . $last_name_initial;
+}
+
+function mask_username( $username, $privacy_mode ) {
+	if ( ! $privacy_mode ) {
+		return $username;
+	}
+	
+	if ( strlen( $username ) <= 3 ) {
+		return $username; // Too short to mask meaningfully
+	}
+	
+	return substr( $username, 0, 3 ) . '...';
+}
+
+function mask_date( $date, $privacy_mode, $show_year = false ) {
+	if ( ! $privacy_mode || empty( $date ) ) {
+		return $date;
+	}
+	
+	if ( $show_year ) {
+		// For birthdays, show just the year
+		if ( preg_match( '/^(\d{4})-\d{2}-\d{2}$/', $date, $matches ) ) {
+			return $matches[1];
+		}
+	}
+	
+	return '****-**-**';
+}
+
+function mask_birthday_display( $person, $privacy_mode ) {
+	if ( ! $privacy_mode || empty( $person->birthday ) ) {
+		return $person->get_birthday_display();
+	}
+	
+	// Show only age if full birthday is available
+	$age = $person->get_age();
+	if ( $age !== null ) {
+		return 'Age ' . $age;
+	}
+	
+	return '[Hidden]';
+}
+
+function mask_event_description( $description, $privacy_mode, $all_people ) {
+	if ( ! $privacy_mode ) {
+		return $description;
+	}
+	
+	// Mask names in event descriptions
+	foreach ( $all_people as $person ) {
+		$full_name = $person->name;
+		$masked_name = mask_name( $full_name, true );
+		$description = str_replace( $full_name, $masked_name, $description );
+	}
+	
+	return $description;
+}
+
+// Get current action and privacy mode
 $person = $_GET['person'] ?? null;
+$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 $action = $person ? 'person' : 'overview';
 
 ?>
@@ -717,6 +794,11 @@ $action = $person ? 'person' : 'overview';
             <div class="header">
                 <h1><a href="index.php" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Overview</a></h1>
                 <div class="navigation">
+                    <?php if ( $privacy_mode ) : ?>
+                        <a href="?privacy=0" class="nav-link" style="background: #28a745;">🔒 Privacy Mode ON</a>
+                    <?php else : ?>
+                        <a href="?privacy=1" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
+                    <?php endif; ?>
                     <a href="admin.php" class="nav-link">⚙️ Admin Panel</a>
                 </div>
             </div>
@@ -729,10 +811,10 @@ $action = $person ? 'person' : 'overview';
                             <?php foreach ( $team_data['team_members'] as $username => $member ) : ?>
                                 <li>
                                     <div class="person-row-container">
-                                        <a href="?person=<?php echo htmlspecialchars( $username ); ?>" class="person-row">
+                                        <a href="?person=<?php echo htmlspecialchars( $username ); ?><?php echo $privacy_mode ? '&privacy=1' : ''; ?>" class="person-row">
                                             <div class="person-info">
-                                                <div class="person-name"><?php echo htmlspecialchars( $member->name ); ?></div>
-                                                <div class="person-username">@<?php echo htmlspecialchars( $username ); ?></div>
+                                                <div class="person-name"><?php echo htmlspecialchars( mask_name( $member->name, $privacy_mode ) ); ?></div>
+                                                <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
                                             </div>
                                         </a>
                                         <div class="person-links">
@@ -751,10 +833,10 @@ $action = $person ? 'person' : 'overview';
                             <?php foreach ( $team_data['leadership'] as $username => $leader ) : ?>
                                 <li>
                                     <div class="person-row-container">
-                                        <a href="?person=<?php echo htmlspecialchars( $username ); ?>" class="person-row">
+                                        <a href="?person=<?php echo htmlspecialchars( $username ); ?><?php echo $privacy_mode ? '&privacy=1' : ''; ?>" class="person-row">
                                             <div class="person-info">
-                                                <div class="person-name"><?php echo htmlspecialchars( $leader->name ); ?> <span style="color: #666; font-weight: normal;">(<?php echo htmlspecialchars( $leader->role ); ?>)</span></div>
-                                                <div class="person-username">@<?php echo htmlspecialchars( $username ); ?></div>
+                                                <div class="person-name"><?php echo htmlspecialchars( mask_name( $leader->name, $privacy_mode ) ); ?> <span style="color: #666; font-weight: normal;">(<?php echo htmlspecialchars( $leader->role ); ?>)</span></div>
+                                                <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
                                             </div>
                                         </a>
                                         <div class="person-links">
@@ -773,10 +855,10 @@ $action = $person ? 'person' : 'overview';
                                 <?php foreach ( $team_data['alumni'] as $username => $alumnus ) : ?>
                                     <li>
                                         <div class="person-row-container">
-                                            <a href="?person=<?php echo htmlspecialchars( $username ); ?>" class="person-row">
+                                            <a href="?person=<?php echo htmlspecialchars( $username ); ?><?php echo $privacy_mode ? '&privacy=1' : ''; ?>" class="person-row">
                                                 <div class="person-info">
-                                                    <div class="person-name"><?php echo htmlspecialchars( $alumnus->name ); ?> <span style="color: #999; font-weight: normal;">(Alumni)</span></div>
-                                                    <div class="person-username">@<?php echo htmlspecialchars( $username ); ?></div>
+                                                    <div class="person-name"><?php echo htmlspecialchars( mask_name( $alumnus->name, $privacy_mode ) ); ?> <span style="color: #999; font-weight: normal;">(Alumni)</span></div>
+                                                    <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
                                                 </div>
                                             </a>
                                             <div class="person-links">
@@ -800,11 +882,12 @@ $action = $person ? 'person' : 'overview';
                     $upcoming_events = get_all_upcoming_events( $team_data );
                     if ( ! empty( $upcoming_events ) ) :
                         $displayed_events = array_slice( $upcoming_events, 0, 10 ); // Show first 10 events
+                        $all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['alumni'] );
                         foreach ( $displayed_events as $event ) :
                     ?>
                         <div class="event-item">
-                            <div class="event-date"><?php echo $event['date']->format( 'M j, Y' ); ?></div>
-                            <div class="event-description"><?php echo htmlspecialchars( $event['description'] ); ?></div>
+                            <div class="event-date"><?php echo $privacy_mode && in_array( $event['type'], array( 'birthday', 'anniversary' ) ) ? '[Hidden]' : $event['date']->format( 'M j, Y' ); ?></div>
+                            <div class="event-description"><?php echo htmlspecialchars( mask_event_description( $event['description'], $privacy_mode, $all_people ) ); ?></div>
                             <span class="event-type <?php echo htmlspecialchars( $event['type'] ); ?>"><?php echo ucfirst( $event['type'] ); ?></span>
                             <?php if ( ! empty( $event['location'] ) ) : ?>
                                 <div style="font-size: 12px; color: #666; margin-top: 4px;">📍 <?php echo htmlspecialchars( $event['location'] ); ?></div>
@@ -844,16 +927,25 @@ $action = $person ? 'person' : 'overview';
                     <a href="?">← Back to Team Overview</a>
                 </div>
 
-                <div class="header">
-                    <h1><a href="index.php" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $person_data->name ); ?></a> 
-                        <?php if ( $is_alumni ) : ?>
-                            <span style="color: #999; font-size: 18px; font-weight: normal;">(Alumni)</span>
+                <div class="header" style="flex-wrap: wrap;">
+                    <div>
+                        <h1><a href="index.php" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( mask_name( $person_data->name, $privacy_mode ) ); ?></a> 
+                            <?php if ( $is_alumni ) : ?>
+                                <span style="color: #999; font-size: 18px; font-weight: normal;">(Alumni)</span>
+                            <?php endif; ?>
+                        </h1>
+                        <p style="color: #666;">@<?php echo htmlspecialchars( mask_username( $person_data->username, $privacy_mode ) ); ?></p>
+                        <?php if ( ! empty( $person_data->role ) ) : ?>
+                            <p><strong><?php echo htmlspecialchars( $person_data->role ); ?></strong></p>
                         <?php endif; ?>
-                    </h1>
-                    <p style="color: #666;">@<?php echo htmlspecialchars( $person_data->username ); ?></p>
-                    <?php if ( ! empty( $person_data->role ) ) : ?>
-                        <p><strong><?php echo htmlspecialchars( $person_data->role ); ?></strong></p>
-                    <?php endif; ?>
+                    </div>
+                    <div class="navigation" style="margin-top: 10px;">
+                        <?php if ( $privacy_mode ) : ?>
+                            <a href="?person=<?php echo htmlspecialchars( $person ); ?>&privacy=0" class="nav-link" style="background: #28a745;">🔒 Privacy Mode ON</a>
+                        <?php else : ?>
+                            <a href="?person=<?php echo htmlspecialchars( $person ); ?>&privacy=1" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
+                        <?php endif; ?>
+                    </div>
                 </div>
 
                 <div class="section">
@@ -895,22 +987,27 @@ $action = $person ? 'person' : 'overview';
                                 <h3 style="border-bottom: 0; margin-top: 0; color: #2d5a2d;">🗓️ Upcoming Events</h3>
                                 <ul style="margin-bottom: 0;">
                                     <?php foreach ( $upcoming_events as $event ) : ?>
-                                        <li><?php echo htmlspecialchars( $event['description'] ); ?> - <?php echo $event['date']->format( 'F j, Y' ); ?></li>
+                                        <li><?php echo htmlspecialchars( mask_event_description( $event['description'], $privacy_mode, array( $person_data ) ) ); ?> - <?php echo $privacy_mode && in_array( $event['type'], array( 'birthday', 'anniversary' ) ) ? '[Hidden]' : $event['date']->format( 'F j, Y' ); ?></li>
                                     <?php endforeach; ?>
                                 </ul>
                             </div>
                         <?php endif; ?>
 
                         <?php if ( ! empty( $person_data->birthday ) ) : ?>
-                            <p><strong>🎂 Birthday:</strong> <?php echo htmlspecialchars( $person_data->get_birthday_display() ); ?></p>
+                            <p><strong>🎂 Birthday:</strong> <?php echo htmlspecialchars( mask_birthday_display( $person_data, $privacy_mode ) ); ?></p>
                         <?php endif; ?>
 
                         <?php if ( ! empty( $person_data->company_anniversary ) ) : ?>
                             <?php
                             $anniversary_date = DateTime::createFromFormat( 'Y-m-d', $person_data->company_anniversary );
                             if ( $anniversary_date ) {
-                                $years_at_company = (int) date( 'Y' ) - (int) $anniversary_date->format( 'Y' );
-                                echo '<p><strong>🏢 Company Anniversary:</strong> ' . htmlspecialchars( $anniversary_date->format( 'F j, Y' ) ) . ' (' . $years_at_company . ' years)</p>';
+                                if ( $privacy_mode ) {
+                                    $years_at_company = (int) date( 'Y' ) - (int) $anniversary_date->format( 'Y' );
+                                    echo '<p><strong>🏢 Company Anniversary:</strong> ' . $years_at_company . ' years (date hidden)</p>';
+                                } else {
+                                    $years_at_company = (int) date( 'Y' ) - (int) $anniversary_date->format( 'Y' );
+                                    echo '<p><strong>🏢 Company Anniversary:</strong> ' . htmlspecialchars( $anniversary_date->format( 'F j, Y' ) ) . ' (' . $years_at_company . ' years)</p>';
+                                }
                             }
                             ?>
                         <?php endif; ?>
@@ -929,25 +1026,29 @@ $action = $person ? 'person' : 'overview';
 
                         <?php if ( ! empty( $kids_with_ages ) ) : ?>
                             <div style="margin: 15px 0;">
-                                <strong>👨‍👩‍👧‍👦 Family:</strong>
-                                <ul style="margin: 5px 0 0 20px;">
-                                    <?php foreach ( $kids_with_ages as $kid ) : ?>
-                                        <li>
-                                            <?php echo htmlspecialchars( $kid['name'] ); ?>
-                                            <?php if ( isset( $kid['age'] ) ) : ?>
-                                                (<?php echo $kid['age']; ?> years old)
-                                            <?php endif; ?>
-                                            <?php if ( ! empty( $kid['birthday_display'] ) ) : ?>
-                                                - <?php echo htmlspecialchars( $kid['birthday_display'] ); ?>
-                                                <?php if ( ! empty( $kid['time_to_birthday'] ) ) : ?>
-                                                    • <?php echo htmlspecialchars( $kid['time_to_birthday'] ); ?>
+                                <strong>👨‍👩‍👧‍👦 Children:</strong>
+                                <?php if ( $privacy_mode ) : ?>
+                                    <?php echo count( $kids_with_ages ); ?> child<?php echo count( $kids_with_ages ) !== 1 ? 'ren' : ''; ?>
+                                <?php else : ?>
+                                    <ul style="margin: 5px 0 0 20px;">
+                                        <?php foreach ( $kids_with_ages as $kid ) : ?>
+                                            <li>
+                                                <?php echo htmlspecialchars( $kid['name'] ); ?>
+                                                <?php if ( isset( $kid['age'] ) ) : ?>
+                                                    (<?php echo $kid['age']; ?> years old)
                                                 <?php endif; ?>
-                                            <?php elseif ( ! empty( $kid['birth_year'] ) ) : ?>
-                                                - born <?php echo $kid['birth_year']; ?>
-                                            <?php endif; ?>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ul>
+                                                <?php if ( ! empty( $kid['birthday_display'] ) ) : ?>
+                                                    - <?php echo htmlspecialchars( $kid['birthday_display'] ); ?>
+                                                    <?php if ( ! empty( $kid['time_to_birthday'] ) ) : ?>
+                                                        • <?php echo htmlspecialchars( $kid['time_to_birthday'] ); ?>
+                                                    <?php endif; ?>
+                                                <?php elseif ( ! empty( $kid['birth_year'] ) ) : ?>
+                                                    - born <?php echo $kid['birth_year']; ?>
+                                                <?php endif; ?>
+                                            </li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                <?php endif; ?>
                             </div>
                         <?php endif; ?>
 

@@ -12,9 +12,10 @@ error_reporting( E_ALL );
 $config_file = __DIR__ . '/team.json';
 $action = $_POST['action'] ?? $_GET['action'] ?? 'dashboard';
 
-// Determine active tab
+// Determine active tab and privacy mode
 $active_tab = $_GET['tab'] ?? 'general';
 $is_adding_new = isset( $_GET['add'] ) && $_GET['add'] === 'new';
+$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
 // Check if we're editing a specific member or event
 $edit_member = $_GET['edit_member'] ?? '';
@@ -308,6 +309,46 @@ function sanitize_textarea_field( $str ) {
 }
 
 /**
+ * Privacy mode helper functions
+ */
+function mask_name( $full_name, $privacy_mode ) {
+	if ( ! $privacy_mode ) {
+		return $full_name;
+	}
+	
+	$parts = explode( ' ', trim( $full_name ) );
+	if ( count( $parts ) <= 1 ) {
+		return $full_name; // Only first name, no masking needed
+	}
+	
+	// Return first name + masked last name
+	$first_name = $parts[0];
+	$last_name_initial = isset( $parts[ count( $parts ) - 1 ] ) ? substr( $parts[ count( $parts ) - 1 ], 0, 1 ) . '.' : '';
+	
+	return $first_name . ' ' . $last_name_initial;
+}
+
+function mask_date_input( $date, $privacy_mode ) {
+	if ( ! $privacy_mode || empty( $date ) ) {
+		return $date;
+	}
+	
+	return ''; // Hide the date input value in privacy mode
+}
+
+function mask_username( $username, $privacy_mode ) {
+	if ( ! $privacy_mode ) {
+		return $username;
+	}
+	
+	if ( strlen( $username ) <= 3 ) {
+		return $username; // Too short to mask meaningfully
+	}
+	
+	return substr( $username, 0, 3 ) . '...';
+}
+
+/**
  * Get person type configuration
  */
 function get_person_type_config( $person_type ) {
@@ -554,6 +595,8 @@ function format_kids_for_form( $kids ) {
  * Render a person form (team member, leader, or alumni)
  */
 function render_person_form( $type, $edit_data = null, $is_editing = false ) {
+	global $privacy_mode;
+	
 	$config = get_person_type_config( $type );
 	if ( ! $config ) {
 		return; // Invalid type
@@ -579,8 +622,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<h4 style="margin: 20px 0 10px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Personal Information</h4>
 	<div class="form-grid">
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>name">Full Name</label>
-			<input type="text" id="<?php echo $prefix; ?>name" name="name" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['name'] ?? '' ) : ''; ?>">
+			<label for="<?php echo $prefix; ?>name">Full Name<?php echo $privacy_mode ? ' (Privacy Mode - Last name will be masked)' : ''; ?></label>
+			<input type="text" id="<?php echo $prefix; ?>name" name="name" value="<?php echo $is_editing ? htmlspecialchars( $privacy_mode ? mask_name( $edit_data['name'] ?? '', true ) : ( $edit_data['name'] ?? '' ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="First name visible only"' : ''; ?>>
 		</div>
 
 		<div class="form-group">
@@ -605,8 +648,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>birthday">Birthday</label>
-			<input type="date" id="<?php echo $prefix; ?>birthday" name="birthday" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['birthday'] ?? '' ) : ''; ?>">
+			<label for="<?php echo $prefix; ?>birthday">Birthday<?php echo $privacy_mode ? ' (Hidden in Privacy Mode)' : ''; ?></label>
+			<input type="date" id="<?php echo $prefix; ?>birthday" name="birthday" value="<?php echo $is_editing ? htmlspecialchars( mask_date_input( $edit_data['birthday'] ?? '', $privacy_mode ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="Hidden for privacy"' : ''; ?>>
 		</div>
 	</div>
 
@@ -641,8 +684,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>company_anniversary">Company Anniversary</label>
-			<input type="date" id="<?php echo $prefix; ?>company_anniversary" name="company_anniversary" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['company_anniversary'] ?? '' ) : ''; ?>">
+			<label for="<?php echo $prefix; ?>company_anniversary">Company Anniversary<?php echo $privacy_mode ? ' (Hidden in Privacy Mode)' : ''; ?></label>
+			<input type="date" id="<?php echo $prefix; ?>company_anniversary" name="company_anniversary" value="<?php echo $is_editing ? htmlspecialchars( mask_date_input( $edit_data['company_anniversary'] ?? '', $privacy_mode ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="Hidden for privacy"' : ''; ?>>
 		</div>
 
 		<div class="form-group">
@@ -903,6 +946,16 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <p>Manage your team configuration file</p>
             </div>
             <div class="navigation">
+                <?php
+                $current_params = $_GET;
+                if ( $privacy_mode ) {
+                    $current_params['privacy'] = '0';
+                    echo '<a href="?' . http_build_query( $current_params ) . '" class="nav-link" style="background: #28a745;">🔒 Privacy Mode ON</a>';
+                } else {
+                    $current_params['privacy'] = '1';
+                    echo '<a href="?' . http_build_query( $current_params ) . '" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>';
+                }
+                ?>
                 <a href="index.php" class="nav-link">📊 Team Overview</a>
             </div>
         </div>
@@ -947,23 +1000,31 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         <!-- Team Members Tab -->
         <div id="members" class="tab-content <?php echo $active_tab === 'members' ? 'active' : ''; ?>">
             <?php if ( $is_editing_member ) : ?>
-                <h2>Edit Team Member: <?php echo htmlspecialchars( $edit_data['name'] ?? $edit_data['username'] ); ?></h2>
+                <h2>Edit Team Member: <?php echo htmlspecialchars( mask_name( $edit_data['name'] ?? $edit_data['username'], $privacy_mode ) ); ?></h2>
             <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
             <?php else : ?>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="margin: 0;">Current Team Members</h3>
-                    <a href="?tab=members&add=new" class="btn">+ Add New Team Member</a>
+                    <?php
+                    $add_params = array( 'tab' => 'members', 'add' => 'new' );
+                    if ( $privacy_mode ) $add_params['privacy'] = '1';
+                    ?>
+                    <a href="?<?php echo http_build_query( $add_params ); ?>" class="btn">+ Add New Team Member</a>
                 </div>
                 <?php if ( ! empty( $config['team_members'] ) ) : ?>
                     <div class="person-list">
                         <?php foreach ( $config['team_members'] as $username => $member ) : ?>
                             <div class="person-item">
                                 <div class="person-info">
-                                    <h4><?php echo htmlspecialchars( $member['name'] ); ?></h4>
-                                    <small>@<?php echo htmlspecialchars( $username ); ?> • <?php echo htmlspecialchars( $member['location'] ?? $member['town'] ?? '' ); ?></small>
+                                    <h4><?php echo htmlspecialchars( mask_name( $member['name'], $privacy_mode ) ); ?></h4>
+                                    <small>@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?> • <?php echo htmlspecialchars( $member['location'] ?? $member['town'] ?? '' ); ?></small>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
-                                    <a href="?edit_member=<?php echo htmlspecialchars( $username ); ?>" class="btn">Edit</a>
+                                    <?php
+                                    $edit_params = array( 'edit_member' => $username );
+                                    if ( $privacy_mode ) $edit_params['privacy'] = '1';
+                                    ?>
+                                    <a href="?<?php echo http_build_query( $edit_params ); ?>" class="btn">Edit</a>
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this team member?')">
                                         <input type="hidden" name="action" value="delete_member">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
@@ -982,7 +1043,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <?php render_person_form( 'member', $edit_data, $is_editing_member ); ?>
             <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
                 <div style="margin-bottom: 20px;">
-                    <a href="?tab=members" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Members</a>
+                    <?php
+                    $back_params = array( 'tab' => 'members' );
+                    if ( $privacy_mode ) $back_params['privacy'] = '1';
+                    ?>
+                    <a href="?<?php echo http_build_query( $back_params ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Members</a>
                 </div>
                 <h3>Add New Team Member</h3>
                 <?php render_person_form( 'member', null, false ); ?>
@@ -992,22 +1057,30 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         <!-- Leadership Tab -->
         <div id="leadership" class="tab-content <?php echo $active_tab === 'leadership' ? 'active' : ''; ?>">
             <?php if ( $is_editing_leader ) : ?>
-                <h2>Edit Leadership: <?php echo htmlspecialchars( $edit_data['name'] ?? $edit_data['username'] ); ?></h2>
+                <h2>Edit Leadership: <?php echo htmlspecialchars( mask_name( $edit_data['name'] ?? $edit_data['username'], $privacy_mode ) ); ?></h2>
             <?php else : ?>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="margin: 0;">Current Leadership</h3>
-                    <a href="?tab=leadership&add=new" class="btn">+ Add New Leader</a>
+                    <?php
+                    $add_params = array( 'tab' => 'leadership', 'add' => 'new' );
+                    if ( $privacy_mode ) $add_params['privacy'] = '1';
+                    ?>
+                    <a href="?<?php echo http_build_query( $add_params ); ?>" class="btn">+ Add New Leader</a>
                 </div>
                 <?php if ( ! empty( $config['leadership'] ) ) : ?>
                     <div class="person-list">
                         <?php foreach ( $config['leadership'] as $username => $leader ) : ?>
                             <div class="person-item">
                                 <div class="person-info">
-                                    <h4><?php echo htmlspecialchars( $leader['name'] ); ?> <small>(<?php echo htmlspecialchars( $leader['role'] ); ?>)</small></h4>
-                                    <small>@<?php echo htmlspecialchars( $username ); ?> • <?php echo htmlspecialchars( $leader['location'] ?? $leader['town'] ?? '' ); ?></small>
+                                    <h4><?php echo htmlspecialchars( mask_name( $leader['name'], $privacy_mode ) ); ?> <small>(<?php echo htmlspecialchars( $leader['role'] ); ?>)</small></h4>
+                                    <small>@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?> • <?php echo htmlspecialchars( $leader['location'] ?? $leader['town'] ?? '' ); ?></small>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
-                                    <a href="?edit_member=<?php echo htmlspecialchars( $username ); ?>" class="btn">Edit</a>
+                                    <?php
+                                    $edit_params = array( 'edit_member' => $username );
+                                    if ( $privacy_mode ) $edit_params['privacy'] = '1';
+                                    ?>
+                                    <a href="?<?php echo http_build_query( $edit_params ); ?>" class="btn">Edit</a>
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this leader?')">
                                         <input type="hidden" name="action" value="delete_leader">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
@@ -1026,7 +1099,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <?php render_person_form( 'leader', $edit_data, $is_editing_leader ); ?>
             <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
                 <div style="margin-bottom: 20px;">
-                    <a href="?tab=leadership" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Leadership</a>
+                    <?php
+                    $back_params = array( 'tab' => 'leadership' );
+                    if ( $privacy_mode ) $back_params['privacy'] = '1';
+                    ?>
+                    <a href="?<?php echo http_build_query( $back_params ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Leadership</a>
                 </div>
                 <h3>Add New Leader</h3>
                 <?php render_person_form( 'leader', null, false ); ?>
@@ -1036,7 +1113,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         <!-- Alumni Tab -->
         <div id="alumni" class="tab-content <?php echo $active_tab === 'alumni' ? 'active' : ''; ?>">
             <?php if ( $is_editing_alumni ) : ?>
-                <h2>Edit Alumni: <?php echo htmlspecialchars( $edit_data['name'] ?? $edit_data['username'] ); ?></h2>
+                <h2>Edit Alumni: <?php echo htmlspecialchars( mask_name( $edit_data['name'] ?? $edit_data['username'], $privacy_mode ) ); ?></h2>
             <?php else : ?>
 
                 <h3>Current Alumni</h3>
@@ -1045,11 +1122,15 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                         <?php foreach ( $config['alumni'] as $username => $alumni_member ) : ?>
                             <div class="person-item">
                                 <div class="person-info">
-                                    <h4><?php echo htmlspecialchars( $alumni_member['name'] ); ?> <small>(Alumni)</small></h4>
-                                    <small>@<?php echo htmlspecialchars( $username ); ?> • <?php echo htmlspecialchars( $alumni_member['location'] ?? $alumni_member['town'] ?? '' ); ?></small>
+                                    <h4><?php echo htmlspecialchars( mask_name( $alumni_member['name'], $privacy_mode ) ); ?> <small>(Alumni)</small></h4>
+                                    <small>@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?> • <?php echo htmlspecialchars( $alumni_member['location'] ?? $alumni_member['town'] ?? '' ); ?></small>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
-                                    <a href="?edit_member=<?php echo htmlspecialchars( $username ); ?>" class="btn">Edit</a>
+                                    <?php
+                                    $edit_params = array( 'edit_member' => $username );
+                                    if ( $privacy_mode ) $edit_params['privacy'] = '1';
+                                    ?>
+                                    <a href="?<?php echo http_build_query( $edit_params ); ?>" class="btn">Edit</a>
                                     <form method="post" style="display: inline;">
                                         <input type="hidden" name="action" value="restore_from_alumni">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
