@@ -6,6 +6,28 @@
  * Provides overview of team members, 1:1 documents, and team activities.
  */
 
+// Include common functions
+require_once __DIR__ . '/includes/common.php';
+
+// Team redirection logic - handle cases where no team parameter is provided
+if ( ! isset( $_GET['team'] ) ) {
+	$available_teams = get_available_teams();
+	
+	if ( empty( $available_teams ) ) {
+		// No teams exist, redirect to team creation
+		header( 'Location: admin.php?create_team=new' );
+		exit;
+	} elseif ( count( $available_teams ) === 1 ) {
+		// Only one team exists, redirect to it
+		header( 'Location: index.php?team=' . urlencode( $available_teams[0] ) );
+		exit;
+	} else {
+		// Multiple teams exist, redirect to team selection screen
+		header( 'Location: team-selection.php' );
+		exit;
+	}
+}
+
 /**
  * Person class to represent team members and leadership
  */
@@ -305,38 +327,6 @@ class Person {
 	}
 }
 
-/**
- * Get all available team files (excluding backup files)
- */
-function get_available_teams() {
-	$teams = array();
-	$json_files = glob( __DIR__ . '/*.json' );
-	
-	foreach ( $json_files as $file ) {
-		$basename = basename( $file, '.json' );
-		// Skip backup files
-		if ( strpos( $basename, '.bak' ) === false && strpos( $basename, 'bak-' ) === false ) {
-			$teams[] = $basename;
-		}
-	}
-	
-	sort( $teams );
-	return $teams;
-}
-
-/**
- * Get team name from config file
- */
-function get_team_name_from_file( $team_slug ) {
-	$file_path = __DIR__ . '/' . $team_slug . '.json';
-	if ( file_exists( $file_path ) ) {
-		$config = json_decode( file_get_contents( $file_path ), true );
-		if ( json_last_error() === JSON_ERROR_NONE && isset( $config['team_name'] ) ) {
-			return $config['team_name'];
-		}
-	}
-	return ucfirst( str_replace( '_', ' ', $team_slug ) );
-}
 
 /**
  * Load team configuration from JSON file
@@ -345,7 +335,10 @@ function load_team_config( $team_slug = 'team' ) {
 	$config_file = __DIR__ . '/' . $team_slug . '.json';
 	
 	if ( ! file_exists( $config_file ) ) {
-		die( 'Error: ' . $team_slug . '.json file not found. Please create the configuration file from the admin panel.' );
+		// Redirect to team creation page
+		$create_team_url = 'admin.php?create_team=new' . ( $team_slug !== 'team' ? '&team=' . urlencode( $team_slug ) : '' );
+		header( 'Location: ' . $create_team_url );
+		exit;
 	}
 	
 	$json_content = file_get_contents( $config_file );
@@ -482,37 +475,6 @@ function get_all_upcoming_events( $team_data ) {
 	return $all_events;
 }
 
-/**
- * Privacy mode helper functions
- */
-function mask_name( $full_name, $privacy_mode ) {
-	if ( ! $privacy_mode ) {
-		return $full_name;
-	}
-	
-	$parts = explode( ' ', trim( $full_name ) );
-	if ( count( $parts ) <= 1 ) {
-		return $full_name; // Only first name, no masking needed
-	}
-	
-	// Return first name + masked last name
-	$first_name = $parts[0];
-	$last_name_initial = isset( $parts[ count( $parts ) - 1 ] ) ? substr( $parts[ count( $parts ) - 1 ], 0, 1 ) . '.' : '';
-	
-	return $first_name . ' ' . $last_name_initial;
-}
-
-function mask_username( $username, $privacy_mode ) {
-	if ( ! $privacy_mode ) {
-		return $username;
-	}
-	
-	if ( strlen( $username ) <= 3 ) {
-		return $username; // Too short to mask meaningfully
-	}
-	
-	return substr( $username, 0, 3 ) . '...';
-}
 
 function mask_date( $date, $privacy_mode, $show_year = false ) {
 	if ( ! $privacy_mode || empty( $date ) ) {
@@ -832,7 +794,7 @@ $available_teams = get_available_teams();
         <?php if ( $action === 'overview' ) : ?>
             <div class="header">
                 <div style="flex-grow: 1;">
-                    <h1><a href="index.php<?php echo $current_team !== 'team' ? '?team=' . urlencode( $current_team ) : ''; ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Overview</a></h1>
+                    <h1><a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Overview</a></h1>
                 </div>
                 <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
                     <!-- Team Switcher -->
@@ -851,7 +813,7 @@ $available_teams = get_available_teams();
                     <?php else : ?>
                         <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
                     <?php endif; ?>
-                    <a href="admin.php<?php echo $current_team !== 'team' ? '?team=' . urlencode( $current_team ) : ''; ?>" class="nav-link">⚙️ Admin Panel</a>
+                    <a href="<?php echo build_team_url( 'admin.php' ); ?>" class="nav-link">⚙️ Admin Panel</a>
                 </div>
             </div>
 
@@ -863,7 +825,7 @@ $available_teams = get_available_teams();
                             <?php foreach ( $team_data['team_members'] as $username => $member ) : ?>
                                 <li>
                                     <div class="person-row-container">
-                                        <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ) ); ?>" class="person-row">
+                                        <a href="<?php echo build_team_url( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="person-row">
                                             <div class="person-info">
                                                 <div class="person-name"><?php echo htmlspecialchars( mask_name( $member->name, $privacy_mode ) ); ?></div>
                                                 <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
@@ -885,7 +847,7 @@ $available_teams = get_available_teams();
                             <?php foreach ( $team_data['leadership'] as $username => $leader ) : ?>
                                 <li>
                                     <div class="person-row-container">
-                                        <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ) ); ?>" class="person-row">
+                                        <a href="<?php echo build_team_url( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="person-row">
                                             <div class="person-info">
                                                 <div class="person-name"><?php echo htmlspecialchars( mask_name( $leader->name, $privacy_mode ) ); ?> <span style="color: #666; font-weight: normal;">(<?php echo htmlspecialchars( $leader->role ); ?>)</span></div>
                                                 <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
@@ -907,7 +869,7 @@ $available_teams = get_available_teams();
                                 <?php foreach ( $team_data['alumni'] as $username => $alumnus ) : ?>
                                     <li>
                                         <div class="person-row-container">
-                                            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ) ); ?>" class="person-row">
+                                            <a href="<?php echo build_team_url( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="person-row">
                                                 <div class="person-info">
                                                     <div class="person-name"><?php echo htmlspecialchars( mask_name( $alumnus->name, $privacy_mode ) ); ?> <span style="color: #999; font-weight: normal;">(Alumni)</span></div>
                                                     <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
@@ -976,12 +938,12 @@ $available_teams = get_available_teams();
             } else {
             ?>
                 <div class="back-link">
-                    <a href="?<?php echo $current_team !== 'team' ? 'team=' . urlencode( $current_team ) : ''; ?>">← Back to Team Overview</a>
+                    <a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to Team Overview</a>
                 </div>
 
                 <div class="header" style="flex-wrap: wrap;">
                     <div>
-                        <h1><a href="index.php<?php echo $current_team !== 'team' ? '?team=' . urlencode( $current_team ) : ''; ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( mask_name( $person_data->name, $privacy_mode ) ); ?></a> 
+                        <h1><a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( mask_name( $person_data->name, $privacy_mode ) ); ?></a> 
                             <?php if ( $is_alumni ) : ?>
                                 <span style="color: #999; font-size: 18px; font-weight: normal;">(Alumni)</span>
                             <?php endif; ?>
@@ -1003,7 +965,7 @@ $available_teams = get_available_teams();
                 <div class="section">
                     <h2>Quick Links</h2>
                     <div class="links">
-                        <a href="admin.php?edit_member=<?php echo htmlspecialchars( $person ); ?><?php echo $current_team !== 'team' ? '&team=' . urlencode( $current_team ) : ''; ?>" target="_blank">✏️ Edit Person</a>
+                        <a href="<?php echo build_team_url( 'admin.php', array( 'edit_member' => $person ) ); ?>" target="_blank">✏️ Edit Person</a>
                         <?php if ( ! empty( $person_data->one_on_one ) ) : ?>
                             <a href="<?php echo htmlspecialchars( $person_data->one_on_one ); ?>" target="_blank">📄 1:1 Document</a>
                         <?php endif; ?>

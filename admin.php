@@ -5,14 +5,15 @@
  * A web interface for creating and managing team.json configuration
  */
 
+// Include common functions
+require_once __DIR__ . '/includes/common.php';
+
 // Error handling
 ini_set( 'display_errors', 1 );
 error_reporting( E_ALL );
 
-// Get current team from URL parameter or session
-session_start();
-$current_team = $_GET['team'] ?? $_SESSION['current_team'] ?? 'team';
-$_SESSION['current_team'] = $current_team;
+// Get current team from URL parameter or POST (for form submissions)
+$current_team = $_POST['team'] ?? $_GET['team'] ?? 'team';
 
 $config_file = __DIR__ . '/' . $current_team . '.json';
 $action = $_POST['action'] ?? $_GET['action'] ?? 'dashboard';
@@ -20,6 +21,14 @@ $action = $_POST['action'] ?? $_GET['action'] ?? 'dashboard';
 // Determine active tab and privacy mode
 $active_tab = $_GET['tab'] ?? 'general';
 $is_adding_new = isset( $_GET['add'] ) && $_GET['add'] === 'new';
+$is_creating_team = isset( $_GET['create_team'] ) && $_GET['create_team'] === 'new';
+
+// Check if JSON file exists and redirect to team creation if not (unless already creating a team)
+if ( ! file_exists( $config_file ) && ! $is_creating_team ) {
+	$create_team_url = build_team_url( 'admin.php', array( 'create_team' => 'new' ) );
+	header( 'Location: ' . $create_team_url );
+	exit;
+}
 $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
 // Check if we're editing a specific member or event
@@ -82,38 +91,6 @@ function load_or_create_config( $file_path ) {
 	);
 }
 
-/**
- * Get all available team files (excluding backup files)
- */
-function get_available_teams() {
-	$teams = array();
-	$json_files = glob( __DIR__ . '/*.json' );
-	
-	foreach ( $json_files as $file ) {
-		$basename = basename( $file, '.json' );
-		// Skip backup files
-		if ( strpos( $basename, '.bak' ) === false && strpos( $basename, 'bak-' ) === false ) {
-			$teams[] = $basename;
-		}
-	}
-	
-	sort( $teams );
-	return $teams;
-}
-
-/**
- * Get team name from config file
- */
-function get_team_name_from_file( $team_slug ) {
-	$file_path = __DIR__ . '/' . $team_slug . '.json';
-	if ( file_exists( $file_path ) ) {
-		$config = json_decode( file_get_contents( $file_path ), true );
-		if ( json_last_error() === JSON_ERROR_NONE && isset( $config['team_name'] ) ) {
-			return $config['team_name'];
-		}
-	}
-	return ucfirst( str_replace( '_', ' ', $team_slug ) );
-}
 
 /**
  * Create backup of existing configuration file
@@ -361,9 +338,9 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			
 			if ( save_config( $new_config, $new_team_file ) ) {
 				$message = 'Team created successfully!';
-				// Switch to the new team
-				$_SESSION['current_team'] = $new_team_slug;
-				header( 'Location: admin.php?team=' . urlencode( $new_team_slug ) );
+				// Redirect to the new team
+				$redirect_url = 'admin.php' . ( $new_team_slug !== 'team' ? '?team=' . urlencode( $new_team_slug ) : '' );
+				header( 'Location: ' . $redirect_url );
 				exit;
 			} else {
 				$error = 'Failed to create team.';
@@ -388,44 +365,12 @@ function sanitize_textarea_field( $str ) {
 	return trim( strip_tags( $str ) );
 }
 
-/**
- * Privacy mode helper functions
- */
-function mask_name( $full_name, $privacy_mode ) {
-	if ( ! $privacy_mode ) {
-		return $full_name;
-	}
-	
-	$parts = explode( ' ', trim( $full_name ) );
-	if ( count( $parts ) <= 1 ) {
-		return $full_name; // Only first name, no masking needed
-	}
-	
-	// Return first name + masked last name
-	$first_name = $parts[0];
-	$last_name_initial = isset( $parts[ count( $parts ) - 1 ] ) ? substr( $parts[ count( $parts ) - 1 ], 0, 1 ) . '.' : '';
-	
-	return $first_name . ' ' . $last_name_initial;
-}
-
 function mask_date_input( $date, $privacy_mode ) {
 	if ( ! $privacy_mode || empty( $date ) ) {
 		return $date;
 	}
 	
 	return ''; // Hide the date input value in privacy mode
-}
-
-function mask_username( $username, $privacy_mode ) {
-	if ( ! $privacy_mode ) {
-		return $username;
-	}
-	
-	if ( strlen( $username ) <= 3 ) {
-		return $username; // Too short to mask meaningfully
-	}
-	
-	return substr( $username, 0, 3 ) . '...';
 }
 
 /**
@@ -501,7 +446,9 @@ function handle_person_action( $action, $config, $person_data ) {
 		$main_config[ $config['section_key'] ][ $username ] = $person_data;
 
 		if ( save_config( $main_config, $config_file ) ) {
-			header( 'Location: index.php?person=' . urlencode( $username ) );
+			global $current_team;
+			$redirect_url = build_team_url( 'index.php', array( 'person' => $username ) );
+			header( 'Location: ' . $redirect_url );
 			exit;
 		} else {
 			return array( 'error' => 'Failed to update ' . strtolower( $config['display_name'] ) . '.' );
@@ -516,7 +463,9 @@ function handle_person_action( $action, $config, $person_data ) {
 		$main_config[ $config['section_key'] ][ $username ] = $person_data;
 
 		if ( save_config( $main_config, $config_file ) ) {
-			header( 'Location: index.php?person=' . urlencode( $username ) );
+			global $current_team;
+			$redirect_url = build_team_url( 'index.php', array( 'person' => $username ) );
+			header( 'Location: ' . $redirect_url );
 			exit;
 		} else {
 			return array( 'error' => 'Failed to save ' . strtolower( $config['display_name'] ) . '.' );
@@ -697,6 +646,9 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 <form method="post" id="<?php echo $form_id; ?>">
 	<input type="hidden" name="action" value="<?php echo $action; ?>">
 	<input type="hidden" name="original_username" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['username'] ?? '' ) : ''; ?>">
+	<?php global $current_team; if ( $current_team !== 'team' ) : ?>
+		<input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+	<?php endif; ?>
 
 	<!-- Personal Information -->
 	<h4 style="margin: 20px 0 10px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Personal Information</h4>
@@ -809,6 +761,9 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 				<input type="hidden" name="action" value="move_to_alumni">
 				<input type="hidden" name="username" value="<?php echo htmlspecialchars( $edit_data['username'] ?? '' ); ?>">
 				<input type="hidden" name="from_section" value="<?php echo $config['section_key']; ?>">
+				<?php if ( $current_team !== 'team' ) : ?>
+					<input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+				<?php endif; ?>
 				<button type="submit" class="btn" style="background: #f0ad4e; border-color: #eea236;">
 					📚 Move to Alumni
 				</button>
@@ -1016,36 +971,6 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         .timezone-suggestion:last-child {
             border-bottom: none;
         }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.4);
-        }
-        .modal-content {
-            background-color: #fefefe;
-            margin: 15% auto;
-            padding: 20px;
-            border: 1px solid #888;
-            width: 400px;
-            border-radius: 8px;
-        }
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .close:hover,
-        .close:focus {
-            color: black;
-            text-decoration: none;
-        }
     </style>
 </head>
 <body>
@@ -1068,7 +993,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                         }
                         ?>
                     </select>
-                    <button onclick="showCreateTeamModal()" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Team</button>
+                    <a href="<?php echo build_team_url( 'admin.php', array( 'create_team' => 'new' ) ); ?>" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Team</a>
                 </div>
                 
                 <?php
@@ -1081,7 +1006,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     echo '<a href="?' . http_build_query( $current_params ) . '" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>';
                 }
                 ?>
-                <a href="index.php<?php echo $current_team !== 'team' ? '?team=' . urlencode( $current_team ) : ''; ?>" class="nav-link">📊 Team Overview</a>
+                <a href="<?php echo build_team_url( 'index.php' ); ?>" class="nav-link">📊 Team Overview</a>
             </div>
         </div>
 
@@ -1093,13 +1018,41 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <div class="message error"><?php echo htmlspecialchars( $error ); ?></div>
         <?php endif; ?>
 
+        <?php if ( $is_creating_team ) : ?>
+            <!-- Create New Team Page -->
+            <div style="margin-bottom: 20px;">
+                <a href="<?php echo build_team_url( 'admin.php' ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Admin Dashboard</a>
+            </div>
+            
+            <h2>Create New Team</h2>
+            <form method="post">
+                <input type="hidden" name="action" value="create_team">
+                <?php if ( $current_team !== 'team' ) : ?>
+                    <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+                <?php endif; ?>
+                <div class="form-group">
+                    <label for="new_team_name">Team Name *</label>
+                    <input type="text" id="new_team_name" name="new_team_name" required placeholder="e.g., Marketing Team">
+                </div>
+                <div class="form-group">
+                    <label for="new_team_slug">Team Slug *</label>
+                    <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing-team" pattern="[a-z0-9_-]+" value="<?php echo $current_team !== 'team' ? htmlspecialchars( $current_team ) : ''; ?>">
+                    <small style="color: #666; font-size: 12px;">Only lowercase letters, numbers, hyphens, and underscores allowed. This will be used as the filename.</small>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button type="submit" class="btn">Create Team</button>
+                    <a href="<?php echo build_team_url( 'admin.php' ); ?>" class="btn" style="background: #6c757d; margin-left: 10px;">Cancel</a>
+                </div>
+            </form>
+        <?php else : ?>
+
         <div class="nav-tabs">
-            <a href="?tab=general" class="nav-tab <?php echo $active_tab === 'general' ? 'active' : ''; ?>">General Settings</a>
-            <a href="?tab=members" class="nav-tab <?php echo $active_tab === 'members' ? 'active' : ''; ?>">Team Members (<?php echo count( $config['team_members'] ); ?>)</a>
-            <a href="?tab=leadership" class="nav-tab <?php echo $active_tab === 'leadership' ? 'active' : ''; ?>">Leadership (<?php echo count( $config['leadership'] ); ?>)</a>
-            <a href="?tab=alumni" class="nav-tab <?php echo $active_tab === 'alumni' ? 'active' : ''; ?>">Alumni (<?php echo count( $config['alumni'] ?? array() ); ?>)</a>
-            <a href="?tab=events" class="nav-tab <?php echo $active_tab === 'events' ? 'active' : ''; ?>">Events (<?php echo count( $config['events'] ); ?>)</a>
-            <a href="?tab=json" class="nav-tab <?php echo $active_tab === 'json' ? 'active' : ''; ?>">View JSON</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'general' ) ); ?>" class="nav-tab <?php echo $active_tab === 'general' ? 'active' : ''; ?>">General Settings</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'members' ) ); ?>" class="nav-tab <?php echo $active_tab === 'members' ? 'active' : ''; ?>">Team Members (<?php echo count( $config['team_members'] ); ?>)</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'leadership' ) ); ?>" class="nav-tab <?php echo $active_tab === 'leadership' ? 'active' : ''; ?>">Leadership (<?php echo count( $config['leadership'] ); ?>)</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'alumni' ) ); ?>" class="nav-tab <?php echo $active_tab === 'alumni' ? 'active' : ''; ?>">Alumni (<?php echo count( $config['alumni'] ?? array() ); ?>)</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-tab <?php echo $active_tab === 'events' ? 'active' : ''; ?>">Events (<?php echo count( $config['events'] ); ?>)</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'json' ) ); ?>" class="nav-tab <?php echo $active_tab === 'json' ? 'active' : ''; ?>">View JSON</a>
         </div>
 
         <!-- General Settings Tab -->
@@ -1107,6 +1060,9 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <h2>General Settings</h2>
             <form method="post">
                 <input type="hidden" name="action" value="save_general">
+                <?php if ( $current_team !== 'team' ) : ?>
+                    <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+                <?php endif; ?>
                 
                 <div class="form-group">
                     <label for="team_name">Team Name</label>
@@ -1134,7 +1090,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     $add_params = array( 'tab' => 'members', 'add' => 'new' );
                     if ( $privacy_mode ) $add_params['privacy'] = '1';
                     ?>
-                    <a href="?<?php echo http_build_query( $add_params ); ?>" class="btn">+ Add New Team Member</a>
+                    <a href="<?php echo build_team_url( 'admin.php', $add_params ); ?>" class="btn">+ Add New Team Member</a>
                 </div>
                 <?php if ( ! empty( $config['team_members'] ) ) : ?>
                     <div class="person-list">
@@ -1149,10 +1105,13 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     $edit_params = array( 'edit_member' => $username );
                                     if ( $privacy_mode ) $edit_params['privacy'] = '1';
                                     ?>
-                                    <a href="?<?php echo http_build_query( $edit_params ); ?>" class="btn">Edit</a>
+                                    <a href="<?php echo build_team_url( 'admin.php', $edit_params ); ?>" class="btn">Edit</a>
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this team member?')">
                                         <input type="hidden" name="action" value="delete_member">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
+                                        <?php if ( $current_team !== 'team' ) : ?>
+                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+                                        <?php endif; ?>
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
                                 </div>
@@ -1172,7 +1131,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     $back_params = array( 'tab' => 'members' );
                     if ( $privacy_mode ) $back_params['privacy'] = '1';
                     ?>
-                    <a href="?<?php echo http_build_query( $back_params ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Members</a>
+                    <a href="<?php echo build_team_url( 'admin.php', $back_params ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Members</a>
                 </div>
                 <h3>Add New Team Member</h3>
                 <?php render_person_form( 'member', null, false ); ?>
@@ -1190,7 +1149,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     $add_params = array( 'tab' => 'leadership', 'add' => 'new' );
                     if ( $privacy_mode ) $add_params['privacy'] = '1';
                     ?>
-                    <a href="?<?php echo http_build_query( $add_params ); ?>" class="btn">+ Add New Leader</a>
+                    <a href="<?php echo build_team_url( 'admin.php', $add_params ); ?>" class="btn">+ Add New Leader</a>
                 </div>
                 <?php if ( ! empty( $config['leadership'] ) ) : ?>
                     <div class="person-list">
@@ -1205,10 +1164,13 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     $edit_params = array( 'edit_member' => $username );
                                     if ( $privacy_mode ) $edit_params['privacy'] = '1';
                                     ?>
-                                    <a href="?<?php echo http_build_query( $edit_params ); ?>" class="btn">Edit</a>
+                                    <a href="<?php echo build_team_url( 'admin.php', $edit_params ); ?>" class="btn">Edit</a>
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this leader?')">
                                         <input type="hidden" name="action" value="delete_leader">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
+                                        <?php if ( $current_team !== 'team' ) : ?>
+                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+                                        <?php endif; ?>
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
                                 </div>
@@ -1228,7 +1190,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     $back_params = array( 'tab' => 'leadership' );
                     if ( $privacy_mode ) $back_params['privacy'] = '1';
                     ?>
-                    <a href="?<?php echo http_build_query( $back_params ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Leadership</a>
+                    <a href="<?php echo build_team_url( 'admin.php', $back_params ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Leadership</a>
                 </div>
                 <h3>Add New Leader</h3>
                 <?php render_person_form( 'leader', null, false ); ?>
@@ -1255,10 +1217,13 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     $edit_params = array( 'edit_member' => $username );
                                     if ( $privacy_mode ) $edit_params['privacy'] = '1';
                                     ?>
-                                    <a href="?<?php echo http_build_query( $edit_params ); ?>" class="btn">Edit</a>
+                                    <a href="<?php echo build_team_url( 'admin.php', $edit_params ); ?>" class="btn">Edit</a>
                                     <form method="post" style="display: inline;">
                                         <input type="hidden" name="action" value="restore_from_alumni">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
+                                        <?php if ( $current_team !== 'team' ) : ?>
+                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+                                        <?php endif; ?>
                                         <?php
                                         $original_section = $alumni_member['original_section'] ?? 'team_members'; // Default to team_members for legacy data
                                         $display_name = $original_section === 'leadership' ? 'Leadership' : 'Team Member';
@@ -1268,6 +1233,9 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this alumni member?')">
                                         <input type="hidden" name="action" value="delete_alumni">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
+                                        <?php if ( $current_team !== 'team' ) : ?>
+                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+                                        <?php endif; ?>
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
                                 </div>
@@ -1306,10 +1274,13 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     <small><?php echo htmlspecialchars( $event['start_date'] ); ?> • <?php echo htmlspecialchars( $event['location'] ); ?> • <?php echo ucfirst( $event['type'] ); ?></small>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
-                                    <a href="?tab=events&edit_event=<?php echo $index; ?>" class="btn">Edit</a>
+                                    <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events', 'edit_event' => $index ) ); ?>" class="btn">Edit</a>
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this event?')">
                                         <input type="hidden" name="action" value="delete_event">
                                         <input type="hidden" name="event_index" value="<?php echo $index; ?>">
+                                        <?php if ( $current_team !== 'team' ) : ?>
+                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+                                        <?php endif; ?>
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
                                 </div>
@@ -1325,6 +1296,9 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <form method="post" id="event-form">
                 <input type="hidden" id="event-action" name="action" value="<?php echo $is_editing_event ? 'edit_event' : 'add_event'; ?>">
                 <input type="hidden" id="event-index" name="event_index" value="<?php echo $is_editing_event ? htmlspecialchars( $edit_data['event_index'] ) : ''; ?>">
+                <?php if ( $current_team !== 'team' ) : ?>
+                    <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+                <?php endif; ?>
                 
                 <div class="form-grid">
                     <div class="form-group">
@@ -1374,34 +1348,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <pre style="background: #f8f8f8; padding: 20px; border-radius: 4px; overflow-x: auto;"><?php echo htmlspecialchars( json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ); ?></pre>
             
             <p style="margin-top: 20px;">
-                <a href="index.php<?php echo $current_team !== 'team' ? '?team=' . urlencode( $current_team ) : ''; ?>" class="btn" target="_blank">View Team Dashboard</a>
+                <a href="<?php echo build_team_url( 'index.php' ); ?>" class="btn" target="_blank">View Team Dashboard</a>
             </p>
         </div>
-    </div>
-
-    <!-- Create Team Modal -->
-    <div id="createTeamModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="hideCreateTeamModal()">&times;</span>
-            <h3>Create New Team</h3>
-            <form method="post" id="create-team-form">
-                <input type="hidden" name="action" value="create_team">
-                <div class="form-group">
-                    <label for="new_team_name">Team Name *</label>
-                    <input type="text" id="new_team_name" name="new_team_name" required placeholder="e.g., Marketing Team">
-                </div>
-                <div class="form-group">
-                    <label for="new_team_slug">Team Slug *</label>
-                    <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing-team" pattern="[a-z0-9_-]+">
-                    <small style="color: #666; font-size: 12px;">Only lowercase letters, numbers, hyphens, and underscores allowed. This will be used as the filename.</small>
-                </div>
-                <div style="margin-top: 20px;">
-                    <button type="submit" class="btn">Create Team</button>
-                    <button type="button" onclick="hideCreateTeamModal()" class="btn" style="background: #6c757d; margin-left: 10px;">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
+        
+        <?php endif; ?>
 
     <script>
         const teamMembers = <?php echo json_encode( $config['team_members'] ); ?>;
@@ -1576,15 +1527,6 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             const currentUrl = new URL(window.location);
             currentUrl.searchParams.set('team', selectedTeam);
             window.location = currentUrl.toString();
-        }
-        
-        function showCreateTeamModal() {
-            document.getElementById('createTeamModal').style.display = 'block';
-        }
-        
-        function hideCreateTeamModal() {
-            document.getElementById('createTeamModal').style.display = 'none';
-            document.getElementById('create-team-form').reset();
         }
         
         // Auto-generate slug from team name

@@ -4,13 +4,11 @@ A comprehensive team management dashboard for tracking team members, leadership,
 
 ## Setup
 
-1. Copy `team.example.json` to `team.json` and customize with your team data
-2. Use `admin.php` to manage your team configuration through a web interface
-3. View your team dashboard at `team.php`
+1. Visit `admin.php` to create and manage your team configuration through a web interface
+2. View your team dashboard at `index.php`
 
 ## Files
 
-- `team.php` - Main team dashboard
+- `index.php` - Main team dashboard
 - `admin.php` - Web-based configuration manager  
-- `team.example.json` - Example configuration file
-- `team.json` - Your team configuration (add to .gitignore)
+- `*.json` - Team configuration files (automatically created via admin interface)
