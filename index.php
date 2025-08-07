@@ -34,8 +34,7 @@ if ( ! isset( $_GET['team'] ) ) {
 class Person {
 	public $name;
 	public $username;
-	public $one_on_one;
-	public $hr_feedback;
+	public $links; // Array of links where key is text and value is URL
 	public $role;
 	public $birthday; // YYYY-MM-DD format, e.g., '1978-03-15' or MM-DD format '03-15' for backward compatibility
 	public $company_anniversary; // YYYY-MM-DD format
@@ -45,11 +44,10 @@ class Person {
 	public $location; // Location/town
 	public $timezone; // Timezone identifier (e.g., "America/New_York")
 
-	public function __construct( $name, $username = '', $one_on_one = '', $hr_feedback = '', $role = '' ) {
+	public function __construct( $name, $username = '', $links = array(), $role = '' ) {
 		$this->name = $name;
 		$this->username = $username;
-		$this->one_on_one = $one_on_one;
-		$this->hr_feedback = $hr_feedback;
+		$this->links = $links;
 		$this->role = $role;
 		$this->birthday = '';
 		$this->company_anniversary = '';
@@ -351,11 +349,25 @@ function load_team_config( $team_slug = 'team' ) {
 	// Convert arrays to Person objects
 	$team_members = array();
 	foreach ( $config['team_members'] as $username => $member_data ) {
+		// Handle migration from old format to new format
+		$links = array();
+		if ( isset( $member_data['links'] ) ) {
+			// New format - use links directly
+			$links = $member_data['links'];
+		} else {
+			// Old format - migrate one_on_one and hr_feedback to links
+			if ( ! empty( $member_data['one_on_one'] ) ) {
+				$links['1:1 doc'] = $member_data['one_on_one'];
+			}
+			if ( ! empty( $member_data['hr_feedback'] ) ) {
+				$links['HR monthly'] = $member_data['hr_feedback'];
+			}
+		}
+		
 		$person = new Person( 
 			$member_data['name'], 
 			$username,
-			$member_data['one_on_one'], 
-			$member_data['hr_feedback'] ?? ''
+			$links
 		);
 		
 		// Set additional properties
@@ -373,11 +385,22 @@ function load_team_config( $team_slug = 'team' ) {
 	
 	$leadership = array();
 	foreach ( $config['leadership'] as $username => $leader_data ) {
+		// Handle migration from old format to new format
+		$links = array();
+		if ( isset( $leader_data['links'] ) ) {
+			// New format - use links directly
+			$links = $leader_data['links'];
+		} else {
+			// Old format - migrate one_on_one to links (no hr_feedback for leaders)
+			if ( ! empty( $leader_data['one_on_one'] ) ) {
+				$links['1:1 doc'] = $leader_data['one_on_one'];
+			}
+		}
+		
 		$person = new Person( 
 			$leader_data['name'], 
 			$username,
-			$leader_data['one_on_one'], 
-			'', // HR feedback not applicable to leadership
+			$links,
 			$leader_data['role'] ?? ''
 		);
 		
@@ -390,16 +413,30 @@ function load_team_config( $team_slug = 'team' ) {
 		$person->location = $leader_data['location'] ?? $leader_data['town'] ?? ''; // Support both 'location' and legacy 'town'
 		$person->timezone = $leader_data['timezone'] ?? '';
 		
-			$leadership[$username] = $person;
+		$leadership[$username] = $person;
 	}
 	
 	$alumni = array();
 	foreach ( $config['alumni'] ?? array() as $username => $alumni_data ) {
+		// Handle migration from old format to new format
+		$links = array();
+		if ( isset( $alumni_data['links'] ) ) {
+			// New format - use links directly
+			$links = $alumni_data['links'];
+		} else {
+			// Old format - migrate one_on_one and hr_feedback to links
+			if ( ! empty( $alumni_data['one_on_one'] ) ) {
+				$links['1:1 doc'] = $alumni_data['one_on_one'];
+			}
+			if ( ! empty( $alumni_data['hr_feedback'] ) ) {
+				$links['HR monthly'] = $alumni_data['hr_feedback'];
+			}
+		}
+		
 		$person = new Person( 
 			$alumni_data['name'], 
 			$username,
-			$alumni_data['one_on_one'] ?? '', 
-			$alumni_data['hr_feedback'] ?? ''
+			$links
 		);
 		
 		// Set additional properties
@@ -413,6 +450,99 @@ function load_team_config( $team_slug = 'team' ) {
 		$person->timezone = $alumni_data['timezone'] ?? '';
 		
 		$alumni[$username] = $person;
+	}
+	
+	// Sort all collections by name
+	uasort( $team_members, function( $a, $b ) {
+		return strcasecmp( $a->name, $b->name );
+	} );
+	
+	uasort( $leadership, function( $a, $b ) {
+		return strcasecmp( $a->name, $b->name );
+	} );
+	
+	uasort( $alumni, function( $a, $b ) {
+		return strcasecmp( $a->name, $b->name );
+	} );
+	
+	// Check if we need to migrate and save the updated config
+	$needs_migration = false;
+	
+	// Check if any section still uses the old format
+	foreach ( $config['team_members'] as $member_data ) {
+		if ( isset( $member_data['one_on_one'] ) || isset( $member_data['hr_feedback'] ) ) {
+			$needs_migration = true;
+			break;
+		}
+	}
+	
+	if ( ! $needs_migration ) {
+		foreach ( $config['leadership'] as $leader_data ) {
+			if ( isset( $leader_data['one_on_one'] ) ) {
+				$needs_migration = true;
+				break;
+			}
+		}
+	}
+	
+	if ( ! $needs_migration && isset( $config['alumni'] ) ) {
+		foreach ( $config['alumni'] as $alumni_data ) {
+			if ( isset( $alumni_data['one_on_one'] ) || isset( $alumni_data['hr_feedback'] ) ) {
+				$needs_migration = true;
+				break;
+			}
+		}
+	}
+	
+	// If migration is needed, update the config and save it
+	if ( $needs_migration ) {
+		// Update the config array with the new format
+		foreach ( $config['team_members'] as $username => &$member_data ) {
+			if ( isset( $member_data['one_on_one'] ) || isset( $member_data['hr_feedback'] ) ) {
+				$links = array();
+				if ( ! empty( $member_data['one_on_one'] ) ) {
+					$links['1:1 doc'] = $member_data['one_on_one'];
+				}
+				if ( ! empty( $member_data['hr_feedback'] ) ) {
+					$links['HR monthly'] = $member_data['hr_feedback'];
+				}
+				$member_data['links'] = $links;
+				unset( $member_data['one_on_one'] );
+				unset( $member_data['hr_feedback'] );
+			}
+		}
+		
+		foreach ( $config['leadership'] as $username => &$leader_data ) {
+			if ( isset( $leader_data['one_on_one'] ) ) {
+				$links = array();
+				if ( ! empty( $leader_data['one_on_one'] ) ) {
+					$links['1:1 doc'] = $leader_data['one_on_one'];
+				}
+				$leader_data['links'] = $links;
+				unset( $leader_data['one_on_one'] );
+			}
+		}
+		
+		if ( isset( $config['alumni'] ) ) {
+			foreach ( $config['alumni'] as $username => &$alumni_data ) {
+				if ( isset( $alumni_data['one_on_one'] ) || isset( $alumni_data['hr_feedback'] ) ) {
+					$links = array();
+					if ( ! empty( $alumni_data['one_on_one'] ) ) {
+						$links['1:1 doc'] = $alumni_data['one_on_one'];
+					}
+					if ( ! empty( $alumni_data['hr_feedback'] ) ) {
+						$links['HR monthly'] = $alumni_data['hr_feedback'];
+					}
+					$alumni_data['links'] = $links;
+					unset( $alumni_data['one_on_one'] );
+					unset( $alumni_data['hr_feedback'] );
+				}
+			}
+		}
+		
+		// Save the migrated config
+		$json = json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+		file_put_contents( $config_file, $json );
 	}
 	
 	return array(
@@ -832,8 +962,11 @@ $available_teams = get_available_teams();
                                             </div>
                                         </a>
                                         <div class="person-links">
-                                            <a href="<?php echo htmlspecialchars( $member->one_on_one ); ?>" target="_blank">1:1 doc</a>
-                                            <a href="<?php echo htmlspecialchars( $member->hr_feedback ); ?>" target="_blank">HR monthly</a>
+                                            <?php foreach ( $member->links as $link_text => $link_url ) : ?>
+                                                <?php if ( ! empty( $link_url ) ) : ?>
+                                                    <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"><?php echo htmlspecialchars( $link_text ); ?></a>
+                                                <?php endif; ?>
+                                            <?php endforeach; ?>
                                         </div>
                                     </div>
                                 </li>
@@ -854,7 +987,11 @@ $available_teams = get_available_teams();
                                             </div>
                                         </a>
                                         <div class="person-links">
-                                            <a href="<?php echo htmlspecialchars( $leader->one_on_one ); ?>" target="_blank">1:1</a>
+                                            <?php foreach ( $leader->links as $link_text => $link_url ) : ?>
+                                                <?php if ( ! empty( $link_url ) ) : ?>
+                                                    <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"><?php echo htmlspecialchars( $link_text ); ?></a>
+                                                <?php endif; ?>
+                                            <?php endforeach; ?>
                                         </div>
                                     </div>
                                 </li>
@@ -876,9 +1013,11 @@ $available_teams = get_available_teams();
                                                 </div>
                                             </a>
                                             <div class="person-links">
-                                                <?php if ( ! empty( $alumnus->one_on_one ) ) : ?>
-                                                    <a href="<?php echo htmlspecialchars( $alumnus->one_on_one ); ?>" target="_blank">1:1</a>
-                                                <?php endif; ?>
+                                                <?php foreach ( $alumnus->links as $link_text => $link_url ) : ?>
+                                                    <?php if ( ! empty( $link_url ) ) : ?>
+                                                        <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"><?php echo htmlspecialchars( $link_text ); ?></a>
+                                                    <?php endif; ?>
+                                                <?php endforeach; ?>
                                             </div>
                                         </div>
                                     </li>
@@ -966,22 +1105,21 @@ $available_teams = get_available_teams();
                     <h2>Quick Links</h2>
                     <div class="links">
                         <a href="<?php echo build_team_url( 'admin.php', array( 'edit_member' => $person ) ); ?>" target="_blank">✏️ Edit Person</a>
-                        <?php if ( ! empty( $person_data->one_on_one ) ) : ?>
-                            <a href="<?php echo htmlspecialchars( $person_data->one_on_one ); ?>" target="_blank">📄 1:1 Document</a>
-                        <?php endif; ?>
-                        <?php if ( $is_team_member ) : ?>
-                            <a href="<?php echo htmlspecialchars( $person_data->hr_feedback ); ?>" target="_blank">📋 HR Feedback Template</a>
-                            <?php if ( ! empty( $person_data->username ) ) : ?>
-                                <?php
-                                $last_month = date( 'Y-m', strtotime( 'last month') );
-                                $start_date = $last_month . '-01';
-                                $end_date = date( 'Y-m-t', strtotime( $start_date ) );
-                                $activity_url = $team_data['activity_url_prefix'] . '&member=' . urlencode( $person_data->username ) . "&start={$start_date}&end={$end_date}";
-                                ?>
-                                <a href="<?php echo htmlspecialchars( $activity_url ); ?>" target="_blank" class="activity-link">📊 Team Activity (Last Month)</a>
-                            <?php else : ?>
-                                <span style="color: #666; font-style: italic;">Team Activity (Username not configured)</span>
+                        <?php foreach ( $person_data->links as $link_text => $link_url ) : ?>
+                            <?php if ( ! empty( $link_url ) ) : ?>
+                                <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank">📄 <?php echo htmlspecialchars( $link_text ); ?></a>
                             <?php endif; ?>
+                        <?php endforeach; ?>
+                        <?php if ( $is_team_member && ! empty( $person_data->username ) ) : ?>
+                            <?php
+                            $last_month = date( 'Y-m', strtotime( 'last month') );
+                            $start_date = $last_month . '-01';
+                            $end_date = date( 'Y-m-t', strtotime( $start_date ) );
+                            $activity_url = $team_data['activity_url_prefix'] . '&member=' . urlencode( $person_data->username ) . "&start={$start_date}&end={$end_date}";
+                            ?>
+                            <a href="<?php echo htmlspecialchars( $activity_url ); ?>" target="_blank" class="activity-link">📊 Team Activity (Last Month)</a>
+                        <?php elseif ( $is_team_member ) : ?>
+                            <span style="color: #666; font-style: italic;">Team Activity (Username not configured)</span>
                         <?php endif; ?>
                     </div>
                 </div>

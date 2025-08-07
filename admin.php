@@ -489,6 +489,24 @@ function handle_person_action( $action, $config, $person_data ) {
  * Create person data array from form input
  */
 function create_person_data_from_form() {
+	// Parse links data from form
+	$links = array();
+
+	// Process all link pairs from the form
+	if ( isset( $_POST['link_text'] ) && isset( $_POST['link_url'] ) ) {
+		$link_texts = $_POST['link_text'];
+		$link_urls = $_POST['link_url'];
+
+		foreach ( $link_texts as $index => $text ) {
+			$text = sanitize_text_field( $text );
+			$url = sanitize_url( $link_urls[$index] ?? '' );
+
+			if ( ! empty( $text ) && ! empty( $url ) ) {
+				$links[$text] = $url;
+			}
+		}
+	}
+
 	return array(
 		'name' => sanitize_text_field( $_POST['name'] ?? '' ),
 		'role' => sanitize_text_field( $_POST['role'] ?? '' ),
@@ -496,8 +514,7 @@ function create_person_data_from_form() {
 		'linear' => sanitize_text_field( $_POST['linear'] ?? '' ),
 		'location' => sanitize_text_field( $_POST['location'] ?? '' ),
 		'timezone' => sanitize_text_field( $_POST['timezone'] ?? '' ),
-		'one_on_one' => sanitize_url( $_POST['one_on_one'] ?? '' ),
-		'hr_feedback' => sanitize_url( $_POST['hr_feedback'] ?? '' ),
+		'links' => $links,
 		'birthday' => sanitize_text_field( $_POST['birthday'] ?? '' ),
 		'company_anniversary' => sanitize_text_field( $_POST['company_anniversary'] ?? '' ),
 		'partner' => sanitize_text_field( $_POST['partner'] ?? '' ),
@@ -720,17 +737,48 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			<input type="date" id="<?php echo $prefix; ?>company_anniversary" name="company_anniversary" value="<?php echo $is_editing ? htmlspecialchars( mask_date_input( $edit_data['company_anniversary'] ?? '', $privacy_mode ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="Hidden for privacy"' : ''; ?>>
 		</div>
 
-		<div class="form-group">
-			<label for="<?php echo $prefix; ?>one_on_one">1:1 Document URL</label>
-			<input type="url" id="<?php echo $prefix; ?>one_on_one" name="one_on_one" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['one_on_one'] ?? '' ) : ''; ?>">
-		</div>
+		<!-- Links Section -->
+		<div class="form-group" style="grid-column: 1 / -1;">
+			<label>Links</label>
+			<div id="<?php echo $prefix; ?>links-container">
+				<?php
+				// Prepare links for display
+				$current_links = array();
+				if ( $is_editing && isset( $edit_data['links'] ) ) {
+					$current_links = $edit_data['links'];
+				}
 
-		<?php if ( $show_hr_feedback ) : ?>
-		<div class="form-group">
-			<label for="<?php echo $prefix; ?>hr_feedback">HR Feedback URL</label>
-			<input type="url" id="<?php echo $prefix; ?>hr_feedback" name="hr_feedback" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['hr_feedback'] ?? '' ) : ''; ?>">
+				// Ensure default links are always present for team members
+				if ( $show_hr_feedback ) {
+					if ( ! isset( $current_links['1:1 doc'] ) ) {
+						$current_links['1:1 doc'] = '';
+					}
+					if ( ! isset( $current_links['HR monthly'] ) ) {
+						$current_links['HR monthly'] = '';
+					}
+				} else {
+					// For leadership and alumni, just ensure 1:1 doc is present
+					if ( ! isset( $current_links['1:1 doc'] ) ) {
+						$current_links['1:1 doc'] = '';
+					}
+				}
+
+				// Add one empty row if no links exist
+				if ( empty( $current_links ) ) {
+					$current_links[''] = '';
+				}
+
+				foreach ( $current_links as $link_text => $link_url ) :
+				?>
+					<div class="link-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+						<input type="text" name="link_text[]" placeholder="Link text (e.g., '1:1 doc')" value="<?php echo htmlspecialchars( $link_text ); ?>" style="flex: 1;">
+						<input type="url" name="link_url[]" placeholder="URL" value="<?php echo htmlspecialchars( $link_url ); ?>" style="flex: 2;">
+						<button type="button" onclick="removeLink(this)" style="padding: 6px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Remove</button>
+					</div>
+				<?php endforeach; ?>
+			</div>
+			<button type="button" onclick="addLink('<?php echo $prefix; ?>')" style="margin-top: 10px; padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">+ Add Link</button>
 		</div>
-		<?php endif; ?>
 	</div>
 
 	<!-- Usernames -->
@@ -753,27 +801,27 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	</div>
 
 	<button type="submit" class="btn"><?php echo $submit_text; ?></button>
-
-	<?php if ( $is_editing && $show_alumni_actions ) : ?>
-		<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
-			<h4 style="color: #666; margin-bottom: 10px;">Alumni Actions</h4>
-			<form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to move this person to alumni? They will be removed from active team lists.')">
-				<input type="hidden" name="action" value="move_to_alumni">
-				<input type="hidden" name="username" value="<?php echo htmlspecialchars( $edit_data['username'] ?? '' ); ?>">
-				<input type="hidden" name="from_section" value="<?php echo $config['section_key']; ?>">
-				<?php if ( $current_team !== 'team' ) : ?>
-					<input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
-				<?php endif; ?>
-				<button type="submit" class="btn" style="background: #f0ad4e; border-color: #eea236;">
-					📚 Move to Alumni
-				</button>
-			</form>
-			<p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">
-				This will move the person to alumni status while preserving all their data.
-			</p>
-		</div>
-	<?php endif; ?>
 </form>
+
+<?php if ( $is_editing && $show_alumni_actions ) : ?>
+	<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+		<h4 style="color: #666; margin-bottom: 10px;">Alumni Actions</h4>
+		<form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to move this person to alumni? They will be removed from active team lists.')">
+			<input type="hidden" name="action" value="move_to_alumni">
+			<input type="hidden" name="username" value="<?php echo htmlspecialchars( $edit_data['username'] ?? '' ); ?>">
+			<input type="hidden" name="from_section" value="<?php echo $config['section_key']; ?>">
+			<?php if ( $current_team !== 'team' ) : ?>
+				<input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+			<?php endif; ?>
+			<button type="submit" class="btn" style="background: #f0ad4e; border-color: #eea236;">
+				📚 Move to Alumni
+			</button>
+		</form>
+		<p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">
+			This will move the person to alumni status while preserving all their data.
+		</p>
+	</div>
+<?php endif; ?>
 <?php
 }
 
@@ -977,8 +1025,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
     <div class="container">
         <div class="header">
             <div class="header-content">
-                <h1><a href="index.php" style="color: inherit; text-decoration: none;">🛠️ Team Management Admin</a></h1>
-                <p>Manage your team configuration file</p>
+                <h1><a href="admin.php" style="color: inherit; text-decoration: none;">Team Management Admin</a></h1>
             </div>
             <div class="navigation">
                 <!-- Team Switcher -->
@@ -1094,7 +1141,14 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 </div>
                 <?php if ( ! empty( $config['team_members'] ) ) : ?>
                     <div class="person-list">
-                        <?php foreach ( $config['team_members'] as $username => $member ) : ?>
+                        <?php
+                        // Sort members by name
+                        $sorted_members = $config['team_members'];
+                        uasort( $sorted_members, function( $a, $b ) {
+                            return strcasecmp( $a['name'], $b['name'] );
+                        } );
+
+                        foreach ( $sorted_members as $username => $member ) : ?>
                             <div class="person-item">
                                 <div class="person-info">
                                     <h4><?php echo htmlspecialchars( mask_name( $member['name'], $privacy_mode ) ); ?></h4>
@@ -1153,7 +1207,14 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 </div>
                 <?php if ( ! empty( $config['leadership'] ) ) : ?>
                     <div class="person-list">
-                        <?php foreach ( $config['leadership'] as $username => $leader ) : ?>
+                        <?php
+                        // Sort leadership by name
+                        $sorted_leadership = $config['leadership'];
+                        uasort( $sorted_leadership, function( $a, $b ) {
+                            return strcasecmp( $a['name'], $b['name'] );
+                        } );
+
+                        foreach ( $sorted_leadership as $username => $leader ) : ?>
                             <div class="person-item">
                                 <div class="person-info">
                                     <h4><?php echo htmlspecialchars( mask_name( $leader['name'], $privacy_mode ) ); ?> <small>(<?php echo htmlspecialchars( $leader['role'] ); ?>)</small></h4>
@@ -1206,7 +1267,14 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <h3>Current Alumni</h3>
                 <?php if ( ! empty( $config['alumni'] ) ) : ?>
                     <div class="person-list">
-                        <?php foreach ( $config['alumni'] as $username => $alumni_member ) : ?>
+                        <?php
+                        // Sort alumni by name
+                        $sorted_alumni = $config['alumni'];
+                        uasort( $sorted_alumni, function( $a, $b ) {
+                            return strcasecmp( $a['name'], $b['name'] );
+                        } );
+
+                        foreach ( $sorted_alumni as $username => $alumni_member ) : ?>
                             <div class="person-item">
                                 <div class="person-info">
                                     <h4><?php echo htmlspecialchars( mask_name( $alumni_member['name'], $privacy_mode ) ); ?> <small>(Alumni)</small></h4>
@@ -1548,6 +1616,33 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             }
         });
         
+        // Links management functions
+        function addLink(prefix) {
+            const container = document.getElementById(prefix + 'links-container');
+            const newRow = document.createElement('div');
+            newRow.className = 'link-row';
+            newRow.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
+            newRow.innerHTML = `
+                <input type="text" name="link_text[]" placeholder="Link text (e.g., 'Project docs')" style="flex: 1;">
+                <input type="url" name="link_url[]" placeholder="URL" style="flex: 2;">
+                <button type="button" onclick="removeLink(this)" style="padding: 6px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Remove</button>
+            `;
+            container.appendChild(newRow);
+        }
+
+        function removeLink(button) {
+            const row = button.parentNode;
+            const container = row.parentNode;
+
+            // Don't remove if it's the last row - just clear it instead
+            if (container.children.length === 1) {
+                const inputs = row.querySelectorAll('input');
+                inputs.forEach(input => input.value = '');
+            } else {
+                row.remove();
+            }
+        }
+
         // Initialize timezone autocomplete when page loads
         document.addEventListener('DOMContentLoaded', initTimezoneAutocomplete);
     </script>
