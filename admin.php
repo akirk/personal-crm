@@ -507,6 +507,20 @@ function create_person_data_from_form() {
 		}
 	}
 
+	// Construct birthday from dropdowns
+	$birthday = '';
+	$day = sanitize_text_field( $_POST['birthday_day'] ?? '' );
+	$month = sanitize_text_field( $_POST['birthday_month'] ?? '' );
+	$year = sanitize_text_field( $_POST['birthday_year'] ?? '' );
+	
+	if ( ! empty( $day ) && ! empty( $month ) ) {
+		if ( ! empty( $year ) ) {
+			$birthday = $year . '-' . $month . '-' . $day;
+		} else {
+			$birthday = $month . '-' . $day; // Legacy format for year-unknown
+		}
+	}
+
 	return array(
 		'name' => sanitize_text_field( $_POST['name'] ?? '' ),
 		'role' => sanitize_text_field( $_POST['role'] ?? '' ),
@@ -515,7 +529,7 @@ function create_person_data_from_form() {
 		'location' => sanitize_text_field( $_POST['location'] ?? '' ),
 		'timezone' => sanitize_text_field( $_POST['timezone'] ?? '' ),
 		'links' => $links,
-		'birthday' => sanitize_text_field( $_POST['birthday'] ?? '' ),
+		'birthday' => $birthday,
 		'company_anniversary' => sanitize_text_field( $_POST['company_anniversary'] ?? '' ),
 		'partner' => sanitize_text_field( $_POST['partner'] ?? '' ),
 		'kids' => parse_kids_data( $_POST['kids'] ?? '' ),
@@ -697,8 +711,67 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>birthday">Birthday<?php echo $privacy_mode ? ' (Hidden in Privacy Mode)' : ''; ?></label>
-			<input type="date" id="<?php echo $prefix; ?>birthday" name="birthday" value="<?php echo $is_editing ? htmlspecialchars( mask_date_input( $edit_data['birthday'] ?? '', $privacy_mode ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="Hidden for privacy"' : ''; ?>>
+			<label>Birthday<?php echo $privacy_mode ? ' (Hidden in Privacy Mode)' : ''; ?></label>
+			<?php if ( ! $privacy_mode ) : ?>
+				<?php
+				// Parse existing birthday data
+				$day = $month = $year = '';
+				if ( $is_editing && ! empty( $edit_data['birthday'] ) ) {
+					if ( preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $edit_data['birthday'], $matches ) ) {
+						// Full YYYY-MM-DD format
+						$year = $matches[1];
+						$month = $matches[2];
+						$day = $matches[3];
+					} elseif ( preg_match( '/^(\d{2})-(\d{2})$/', $edit_data['birthday'], $matches ) ) {
+						// MM-DD format (legacy)
+						$month = $matches[1];
+						$day = $matches[2];
+					}
+				}
+				?>
+				<div style="display: flex; gap: 10px; align-items: center;">
+					<select name="birthday_day" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+						<option value="">Day</option>
+						<?php for ( $d = 1; $d <= 31; $d++ ) : ?>
+							<option value="<?php echo sprintf( '%02d', $d ); ?>" <?php echo $day === sprintf( '%02d', $d ) ? 'selected' : ''; ?>>
+								<?php echo $d; ?>
+							</option>
+						<?php endfor; ?>
+					</select>
+					
+					<select name="birthday_month" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+						<option value="">Month</option>
+						<?php 
+						$months = array(
+							'01' => 'January', '02' => 'February', '03' => 'March', '04' => 'April',
+							'05' => 'May', '06' => 'June', '07' => 'July', '08' => 'August', 
+							'09' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'
+						);
+						foreach ( $months as $num => $name ) : ?>
+							<option value="<?php echo $num; ?>" <?php echo $month === $num ? 'selected' : ''; ?>>
+								<?php echo $name; ?>
+							</option>
+						<?php endforeach; ?>
+					</select>
+					
+					<select name="birthday_year" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+						<option value="">Year (optional)</option>
+						<?php for ( $y = date( 'Y' ) - 80; $y <= date( 'Y' ) - 16; $y++ ) : ?>
+							<option value="<?php echo $y; ?>" <?php echo $year === (string) $y ? 'selected' : ''; ?>>
+								<?php echo $y; ?>
+							</option>
+						<?php endfor; ?>
+					</select>
+				</div>
+				<small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+					Year is optional - leave empty if unknown
+				</small>
+			<?php else : ?>
+				<input type="hidden" name="birthday_day" value="">
+				<input type="hidden" name="birthday_month" value="">
+				<input type="hidden" name="birthday_year" value="">
+				<p style="color: #666; font-style: italic;">Hidden in privacy mode</p>
+			<?php endif; ?>
 		</div>
 	</div>
 
