@@ -950,52 +950,60 @@ $available_teams = get_available_teams();
                 <div class="people-section">
                     <div class="section">
                         <h3>Team Members (<?php echo count( $team_data['team_members'] ); ?>)</h3>
-                        <ul class="people-list">
-                            <?php foreach ( $team_data['team_members'] as $username => $member ) : ?>
-                                <li>
-                                    <div class="person-row-container">
-                                        <a href="<?php echo build_team_url( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="person-row">
-                                            <div class="person-info">
-                                                <div class="person-name"><?php echo htmlspecialchars( mask_name( $member->name, $privacy_mode ) ); ?></div>
-                                                <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
+                        <?php if ( ! empty( $team_data['team_members'] ) ) : ?>
+                            <ul class="people-list">
+                                <?php foreach ( $team_data['team_members'] as $username => $member ) : ?>
+                                    <li>
+                                        <div class="person-row-container">
+                                            <a href="<?php echo build_team_url( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="person-row">
+                                                <div class="person-info">
+                                                    <div class="person-name"><?php echo htmlspecialchars( mask_name( $member->name, $privacy_mode ) ); ?></div>
+                                                    <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
+                                                </div>
+                                            </a>
+                                            <div class="person-links">
+                                                <?php foreach ( $member->links as $link_text => $link_url ) : ?>
+                                                    <?php if ( ! empty( $link_url ) ) : ?>
+                                                        <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"><?php echo htmlspecialchars( $link_text ); ?></a>
+                                                    <?php endif; ?>
+                                                <?php endforeach; ?>
                                             </div>
-                                        </a>
-                                        <div class="person-links">
-                                            <?php foreach ( $member->links as $link_text => $link_url ) : ?>
-                                                <?php if ( ! empty( $link_url ) ) : ?>
-                                                    <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"><?php echo htmlspecialchars( $link_text ); ?></a>
-                                                <?php endif; ?>
-                                            <?php endforeach; ?>
                                         </div>
-                                    </div>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php else : ?>
+                            <p style="color: #666; font-style: italic;">No team members yet. <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'members', 'add' => 'new' ) ); ?>" style="color: #007cba; text-decoration: none;">Add your first team member →</a></p>
+                        <?php endif; ?>
                     </div>
 
                     <div class="section">
                         <h3>Leadership (<?php echo count( $team_data['leadership'] ); ?>)</h3>
-                        <ul class="people-list">
-                            <?php foreach ( $team_data['leadership'] as $username => $leader ) : ?>
-                                <li>
-                                    <div class="person-row-container">
-                                        <a href="<?php echo build_team_url( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="person-row">
-                                            <div class="person-info">
-                                                <div class="person-name"><?php echo htmlspecialchars( mask_name( $leader->name, $privacy_mode ) ); ?> <span style="color: #666; font-weight: normal;">(<?php echo htmlspecialchars( $leader->role ); ?>)</span></div>
-                                                <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
+                        <?php if ( ! empty( $team_data['leadership'] ) ) : ?>
+                            <ul class="people-list">
+                                <?php foreach ( $team_data['leadership'] as $username => $leader ) : ?>
+                                    <li>
+                                        <div class="person-row-container">
+                                            <a href="<?php echo build_team_url( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="person-row">
+                                                <div class="person-info">
+                                                    <div class="person-name"><?php echo htmlspecialchars( mask_name( $leader->name, $privacy_mode ) ); ?> <span style="color: #666; font-weight: normal;">(<?php echo htmlspecialchars( $leader->role ); ?>)</span></div>
+                                                    <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
+                                                </div>
+                                            </a>
+                                            <div class="person-links">
+                                                <?php foreach ( $leader->links as $link_text => $link_url ) : ?>
+                                                    <?php if ( ! empty( $link_url ) ) : ?>
+                                                        <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"><?php echo htmlspecialchars( $link_text ); ?></a>
+                                                    <?php endif; ?>
+                                                <?php endforeach; ?>
                                             </div>
-                                        </a>
-                                        <div class="person-links">
-                                            <?php foreach ( $leader->links as $link_text => $link_url ) : ?>
-                                                <?php if ( ! empty( $link_url ) ) : ?>
-                                                    <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"><?php echo htmlspecialchars( $link_text ); ?></a>
-                                                <?php endif; ?>
-                                            <?php endforeach; ?>
                                         </div>
-                                    </div>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php else : ?>
+                            <p style="color: #666; font-style: italic;">No leadership yet. <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'leadership', 'add' => 'new' ) ); ?>" style="color: #007cba; text-decoration: none;">Add your first leader →</a></p>
+                        <?php endif; ?>
                     </div>
 
                     <div class="section">
@@ -1023,7 +1031,7 @@ $available_teams = get_available_teams();
                                 <?php endforeach; ?>
                             </ul>
                         <?php else : ?>
-                            <p style="color: #666; font-style: italic;">No alumni yet</p>
+                            <p style="color: #666; font-style: italic;">No alumni yet. Alumni are created by moving existing team members or leaders.</p>
                         <?php endif; ?>
                     </div>
                 </div>

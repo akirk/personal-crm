@@ -13,7 +13,11 @@ ini_set( 'display_errors', 1 );
 error_reporting( E_ALL );
 
 // Get current team from URL parameter or POST (for form submissions)
-$current_team = $_POST['team'] ?? $_GET['team'] ?? 'team';
+$current_team = $_POST['team'] ?? $_GET['team'] ?? null;
+if ( ! $current_team ) {
+	header( 'Location: team-selection.php' );
+	exit;
+}
 
 $config_file = __DIR__ . '/' . $current_team . '.json';
 $action = $_POST['action'] ?? $_GET['action'] ?? 'dashboard';
@@ -720,7 +724,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<div class="form-grid">
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>name">Full Name<?php echo $privacy_mode ? ' (Privacy Mode - Last name will be masked)' : ''; ?></label>
-			<input type="text" id="<?php echo $prefix; ?>name" name="name" value="<?php echo $is_editing ? htmlspecialchars( $privacy_mode ? mask_name( $edit_data['name'] ?? '', true ) : ( $edit_data['name'] ?? '' ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="First name visible only"' : ''; ?>>
+			<input type="text" id="<?php echo $prefix; ?>name" name="name" value="<?php echo $is_editing ? htmlspecialchars( $privacy_mode ? mask_name( $edit_data['name'] ?? '', true ) : ( $edit_data['name'] ?? '' ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="First name visible only"' : ''; ?> autofocus>
 		</div>
 
 		<div class="form-group">
@@ -1137,9 +1141,12 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <div class="navigation">
                 <!-- Team Switcher -->
                 <div class="team-switcher" style="display: inline-block; margin-right: 10px;">
+                    <?php
+                    $available_teams = get_available_teams();
+                    if ( $available_teams ) :
+                    	?>
                     <select id="team-selector" onchange="switchTeam()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white;">
                         <?php
-                        $available_teams = get_available_teams();
                         foreach ( $available_teams as $team_slug ) {
                             $team_display_name = get_team_name_from_file( $team_slug );
                             $selected = $team_slug === $current_team ? 'selected' : '';
@@ -1147,6 +1154,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                         }
                         ?>
                     </select>
+                <?php endif; ?>
                     <a href="<?php echo build_team_url( 'admin.php', array( 'create_team' => 'new' ) ); ?>" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Team</a>
                 </div>
                 
@@ -1186,7 +1194,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <?php endif; ?>
                 <div class="form-group">
                     <label for="new_team_name">Team Name *</label>
-                    <input type="text" id="new_team_name" name="new_team_name" required placeholder="e.g., Marketing Team">
+                    <input type="text" id="new_team_name" name="new_team_name" required placeholder="e.g., Marketing Team" autofocus>
                 </div>
                 <div class="form-group">
                     <label for="new_team_slug">Team Slug *</label>
@@ -1220,7 +1228,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 
                 <div class="form-group">
                     <label for="team_name">Team Name</label>
-                    <input type="text" id="team_name" name="team_name" value="<?php echo htmlspecialchars( $config['team_name'] ); ?>" required>
+                    <input type="text" id="team_name" name="team_name" value="<?php echo htmlspecialchars( $config['team_name'] ); ?>" required autofocus>
                 </div>
                 
                 <div class="form-group">
@@ -1488,7 +1496,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="event-name">Event Name *</label>
-                        <input type="text" id="event-name" name="event_name" value="<?php echo $is_editing_event ? htmlspecialchars( $edit_data['name'] ?? '' ) : ''; ?>" required>
+                        <input type="text" id="event-name" name="event_name" value="<?php echo $is_editing_event ? htmlspecialchars( $edit_data['name'] ?? '' ) : ''; ?>" required autofocus>
                     </div>
                     
                     <div class="form-group">
