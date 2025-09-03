@@ -84,3 +84,25 @@ function mask_username( $username, $privacy_mode ) {
 	
 	return substr( $username, 0, 3 ) . '...';
 }
+
+/**
+ * Get the default team slug (team marked with default: true)
+ */
+function get_default_team() {
+	$available_teams = get_available_teams();
+	if ( count( $available_teams ) === 1 ) {
+		return $available_teams[0];
+	}
+
+	foreach ( $available_teams as $team_slug ) {
+		$file_path = __DIR__ . '/../' . $team_slug . '.json';
+		if ( file_exists( $file_path ) ) {
+			$config = json_decode( file_get_contents( $file_path ), true );
+			if ( json_last_error() === JSON_ERROR_NONE && isset( $config['default'] ) && $config['default'] ) {
+				return $team_slug;
+			}
+		}
+	}
+
+	return '';
+}

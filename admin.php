@@ -128,6 +128,34 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 		case 'save_general':
 			$config['team_name'] = sanitize_text_field( $_POST['team_name'] ?? '' );
 			$config['activity_url_prefix'] = sanitize_url( $_POST['activity_url_prefix'] ?? '' );
+			
+			// Handle default team setting
+			$is_default = isset( $_POST['is_default'] ) && $_POST['is_default'] === '1';
+			
+			if ( $is_default ) {
+				// If this team is being set as default, clear default from all other teams
+				$available_teams = get_available_teams();
+				foreach ( $available_teams as $team_slug ) {
+					if ( $team_slug !== $current_team ) {
+						$other_team_file = __DIR__ . '/' . $team_slug . '.json';
+						if ( file_exists( $other_team_file ) ) {
+							$other_config = json_decode( file_get_contents( $other_team_file ), true );
+							if ( json_last_error() === JSON_ERROR_NONE && isset( $other_config['default'] ) ) {
+								unset( $other_config['default'] );
+								$other_json = json_encode( $other_config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+								file_put_contents( $other_team_file, $other_json );
+							}
+						}
+					}
+				}
+				$config['default'] = true;
+			} else {
+				// Remove default flag if unchecked
+				if ( isset( $config['default'] ) ) {
+					unset( $config['default'] );
+				}
+			}
+			
 			if ( save_config( $config, $config_file ) ) {
 				$message = 'General settings saved successfully!';
 			} else {
@@ -335,6 +363,12 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				'alumni' => array(),
 				'events' => array()
 			);
+			
+			// If this is the first team being created, make it the default
+			$existing_teams = get_available_teams();
+			if ( empty( $existing_teams ) ) {
+				$new_config['default'] = true;
+			}
 			
 			if ( save_config( $new_config, $new_team_file ) ) {
 				$message = 'Team created successfully!';
@@ -1192,6 +1226,16 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <div class="form-group">
                     <label for="activity_url_prefix">Activity URL Prefix</label>
                     <input type="url" id="activity_url_prefix" name="activity_url_prefix" value="<?php echo htmlspecialchars( $config['activity_url_prefix'] ); ?>">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 600;">
+                        <input type="checkbox" id="is_default" name="is_default" value="1" <?php echo isset( $config['default'] ) && $config['default'] ? 'checked' : ''; ?> style="width: auto;">
+                        <span>Set as default team</span>
+                    </label>
+                    <small style="color: #666; font-size: 12px; margin-left: 20px;">
+                        When users visit the site without specifying a team, they'll be redirected to this team automatically.
+                    </small>
                 </div>
                 
                 <button type="submit" class="btn">Save General Settings</button>

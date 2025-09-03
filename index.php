@@ -10,19 +10,17 @@
 require_once __DIR__ . '/includes/common.php';
 
 // Team redirection logic - handle cases where no team parameter is provided
-if ( ! isset( $_GET['team'] ) ) {
+if ( isset( $_GET['team'] ) ) {
+	$current_team = $_GET['team'];
+	if ( $current_team === get_default_team() ) {
+		// Redirect to root if default team is selected
+		header( 'Location: ./' );
+		exit;
+	}
+} else {
+	$current_team = get_default_team();
 	$available_teams = get_available_teams();
-	
-	if ( empty( $available_teams ) ) {
-		// No teams exist, redirect to team creation
-		header( 'Location: admin.php?create_team=new' );
-		exit;
-	} elseif ( count( $available_teams ) === 1 ) {
-		// Only one team exists, redirect to it
-		header( 'Location: index.php?team=' . urlencode( $available_teams[0] ) );
-		exit;
-	} else {
-		// Multiple teams exist, redirect to team selection screen
+	if ( count( $available_teams ) > 1 && ! $current_team ) {
 		header( 'Location: team-selection.php' );
 		exit;
 	}
@@ -364,7 +362,7 @@ function load_team_config( $team_slug = 'team' ) {
 			}
 		}
 
-		if ( isset( $member_data['linear'] ) ) {
+		if ( isset( $member_data['linear'] ) && ! empty( $member_data['linear'] ) ) {
 			$links['Linear'] = 'https://linear.app/a8c/profiles/' . $member_data['linear'];
 		}
 		
@@ -558,9 +556,6 @@ function load_team_config( $team_slug = 'team' ) {
 		'events' => $config['events'] ?? array(),
 	);
 }
-
-// Get current team from URL parameter
-$current_team = $_GET['team'] ?? 'team';
 
 // Load team configuration
 $team_data = load_team_config( $current_team );
