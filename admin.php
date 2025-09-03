@@ -592,7 +592,7 @@ function parse_kids_data( $kids_input ) {
 			continue;
 		}
 
-		// Format: "Name (YYYY-MM-DD)" or "Name (YYYY)" or "Name - YYYY" or just "Name"
+		// Format: "Name (YYYY-MM-DD)" or "Name (MM-DD)" or "Name (YYYY)" or "Name - YYYY" or just "Name"
 		if ( preg_match( '/^(.+?)\s*[\(\-]\s*(\d{4}-\d{2}-\d{2})\s*[\)]?\s*$/', $line, $matches ) ) {
 			// Full birthday date
 			$birth_date = DateTime::createFromFormat( 'Y-m-d', $matches[2] );
@@ -609,6 +609,13 @@ function parse_kids_data( $kids_input ) {
 					'birthday' => ''
 				);
 			}
+		} elseif ( preg_match( '/^(.+?)\s*[\(\-]\s*(\d{2}-\d{2})\s*[\)]?\s*$/', $line, $matches ) ) {
+			// Month-day format (MM-DD)
+			$kids[] = array(
+				'name' => trim( $matches[1] ),
+				'birth_year' => '',
+				'birthday' => $matches[2] // Store as MM-DD
+			);
 		} elseif ( preg_match( '/^(.+?)\s*[\(\-]\s*(\d{4})\s*[\)]?\s*$/', $line, $matches ) ) {
 			// Just birth year
 			$kids[] = array(
@@ -627,6 +634,90 @@ function parse_kids_data( $kids_input ) {
 	}
 
 	return $kids;
+}
+
+/**
+ * Check which data points are missing for a person
+ */
+function get_missing_data_points( $person, $person_type = 'member' ) {
+	$missing = array();
+
+	// Core fields
+	if ( empty( $person['name'] ) ) {
+		$missing[] = 'Name';
+	}
+	if ( empty( $person['role'] ) ) {
+		$missing[] = 'Role';
+	}
+	if ( empty( $person['location'] ) ) {
+		$missing[] = 'Location';
+	}
+	if ( empty( $person['timezone'] ) ) {
+		$missing[] = 'Timezone';
+	}
+
+	// Birthday
+	if ( empty( $person['birthday'] ) ) {
+		$missing[] = 'Birthday';
+	}
+
+	// Company anniversary
+	if ( empty( $person['company_anniversary'] ) ) {
+		$missing[] = 'Company Anniversary';
+	}
+
+	// Links - check for key links
+	$expected_links = array();
+	if ( $person_type === 'member' ) {
+		$expected_links = array( '1:1 doc', 'HR monthly' );
+	} elseif ( $person_type === 'leader' || $person_type === 'alumni' ) {
+		$expected_links = array( '1:1 doc' );
+	}
+
+	foreach ( $expected_links as $expected_link ) {
+		if ( ! isset( $person['links'][ $expected_link ] ) || empty( $person['links'][ $expected_link ] ) ) {
+			$missing[] = $expected_link . ' link';
+		}
+	}
+
+	// Optional fields that are nice to have
+	if ( empty( $person['partner'] ) ) {
+		$missing[] = 'Partner (optional)';
+	}
+	if ( empty( $person['kids'] ) ) {
+		$missing[] = 'Kids info (optional)';
+	}
+	if ( empty( $person['notes'] ) ) {
+		$missing[] = 'Notes (optional)';
+	}
+
+	return $missing;
+}
+
+/**
+ * Get completeness score as percentage
+ */
+function get_completeness_score( $missing_data, $person_type = 'member' ) {
+	// Core required fields
+	$total_core_fields = 6; // name, role, location, timezone, birthday, company_anniversary
+	if ( $person_type === 'member' ) {
+		$total_core_fields += 2; // 1:1 doc, HR monthly links
+	} else {
+		$total_core_fields += 1; // 1:1 doc link
+	}
+
+	// Count missing core fields (exclude optional ones)
+	$missing_core = 0;
+	foreach ( $missing_data as $missing_item ) {
+		if ( strpos( $missing_item, 'optional' ) === false ) {
+			$missing_core++;
+		}
+	}
+
+	$completed_core = $total_core_fields - $missing_core;
+	$score = round( ( $completed_core / $total_core_fields ) * 100 );
+
+	return max( 0, $score );
 }
 
 /**
@@ -765,13 +856,21 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 						$month = $matches[1];
 						$day = $matches[2];
 					}
+					// Ensure month is always 2 digits with leading zero
+					if ( ! empty( $month ) && strlen( $month ) === 1 ) {
+						$month = '0' . $month;
+					}
+					// Ensure day is always 2 digits with leading zero
+					if ( ! empty( $day ) && strlen( $day ) === 1 ) {
+						$day = '0' . $day;
+					}
 				}
 				?>
 				<div style="display: flex; gap: 10px; align-items: center;">
 					<select name="birthday_day" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
 						<option value="">Day</option>
 						<?php for ( $d = 1; $d <= 31; $d++ ) : ?>
-							<option value="<?php echo sprintf( '%02d', $d ); ?>" <?php echo $day === sprintf( '%02d', $d ) ? 'selected' : ''; ?>>
+							<option value="<?php echo sprintf( '%02d', $d ); ?>" <?php echo (string) $day === sprintf( '%02d', $d ) ? 'selected' : ''; ?>>
 								<?php echo $d; ?>
 							</option>
 						<?php endfor; ?>
@@ -786,8 +885,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 							'09' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'
 						);
 						foreach ( $months as $num => $name ) : ?>
-							<option value="<?php echo $num; ?>" <?php echo $month === $num ? 'selected' : ''; ?>>
-								<?php echo $name; ?>
+							<option value="<?php echo $num; ?>" <?php echo (string) $month === (string) $num ? 'selected' : ''; ?>>
+								<?php echo $num; ?> - <?php echo $name; ?>
 							</option>
 						<?php endforeach; ?>
 					</select>
@@ -825,8 +924,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>kids">Kids (one per line, formats: "Name (YYYY-MM-DD)" or "Name (YYYY)" or just "Name")</label>
-			<textarea id="<?php echo $prefix; ?>kids" name="kids" rows="4" placeholder="Emma (2010-03-15)&#10;Jake (2012)&#10;Sam"><?php echo $is_editing ? htmlspecialchars( format_kids_for_form( $edit_data['kids'] ?? array() ) ) : ''; ?></textarea>
+			<label for="<?php echo $prefix; ?>kids">Kids (one per line, formats: "Name (YYYY-MM-DD)", "Name (MM-DD)", "Name (YYYY)" or just "Name")</label>
+			<textarea id="<?php echo $prefix; ?>kids" name="kids" rows="4" placeholder="Emma (2010-03-15)&#10;Jake (12-25)&#10;Sam (2012)&#10;Alex"><?php echo $is_editing ? htmlspecialchars( format_kids_for_form( $edit_data['kids'] ?? array() ) ) : ''; ?></textarea>
 		</div>
 	</details>
 
@@ -1168,7 +1267,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     echo '<a href="?' . http_build_query( $current_params ) . '" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>';
                 }
                 ?>
-                <a href="<?php echo build_team_url( 'index.php' ); ?>" class="nav-link">📊 Team Overview</a>
+                <a href="<?php echo build_team_url( 'index.php' ); ?>" class="nav-link">👥 Team Overview</a>
             </div>
         </div>
 
@@ -1214,6 +1313,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'leadership' ) ); ?>" class="nav-tab <?php echo $active_tab === 'leadership' ? 'active' : ''; ?>">Leadership (<?php echo count( $config['leadership'] ); ?>)</a>
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'alumni' ) ); ?>" class="nav-tab <?php echo $active_tab === 'alumni' ? 'active' : ''; ?>">Alumni (<?php echo count( $config['alumni'] ?? array() ); ?>)</a>
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-tab <?php echo $active_tab === 'events' ? 'active' : ''; ?>">Events (<?php echo count( $config['events'] ); ?>)</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'audit' ) ); ?>" class="nav-tab <?php echo $active_tab === 'audit' ? 'active' : ''; ?>">📊 Audit</a>
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'json' ) ); ?>" class="nav-tab <?php echo $active_tab === 'json' ? 'active' : ''; ?>">View JSON</a>
         </div>
 
@@ -1535,6 +1635,159 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             </form>
         </div>
 
+        <!-- Audit Tab -->
+        <div id="audit" class="tab-content <?php echo $active_tab === 'audit' ? 'active' : ''; ?>">
+            <h2>📊 Data Completeness Audit</h2>
+            <p style="color: #666; margin-bottom: 20px;">Identify missing data points and improve team profiles</p>
+
+            <?php
+            // Get audit data for all people
+            $audit_data = array();
+
+            // Team members
+            foreach ( $config['team_members'] as $username => $member ) {
+                $missing = get_missing_data_points( $member, 'member' );
+                $score = get_completeness_score( $missing, 'member' );
+                $audit_data[] = array(
+                    'type' => 'Team Member',
+                    'name' => $member['name'],
+                    'username' => $username,
+                    'missing' => $missing,
+                    'score' => $score,
+                    'person' => $member
+                );
+            }
+
+            // Leadership
+            foreach ( $config['leadership'] as $username => $leader ) {
+                $missing = get_missing_data_points( $leader, 'leader' );
+                $score = get_completeness_score( $missing, 'leader' );
+                $audit_data[] = array(
+                    'type' => 'Leadership',
+                    'name' => $leader['name'],
+                    'username' => $username,
+                    'missing' => $missing,
+                    'score' => $score,
+                    'person' => $leader
+                );
+            }
+
+            // Alumni
+            foreach ( $config['alumni'] ?? array() as $username => $alumnus ) {
+                $missing = get_missing_data_points( $alumnus, 'alumni' );
+                $score = get_completeness_score( $missing, 'alumni' );
+                $audit_data[] = array(
+                    'type' => 'Alumni',
+                    'name' => $alumnus['name'],
+                    'username' => $username,
+                    'missing' => $missing,
+                    'score' => $score,
+                    'person' => $alumnus
+                );
+            }
+
+            // Sort by completeness score (lowest first to prioritize fixes)
+            usort( $audit_data, function( $a, $b ) {
+                if ( $a['score'] === $b['score'] ) {
+                    return strcasecmp( $a['name'], $b['name'] );
+                }
+                return $a['score'] <=> $b['score'];
+            } );
+
+            // Calculate statistics
+            $total_people = count( $audit_data );
+            $complete_profiles = count( array_filter( $audit_data, function( $item ) { return $item['score'] >= 90; } ) );
+            $needs_attention = count( array_filter( $audit_data, function( $item ) { return $item['score'] < 70; } ) );
+            $avg_score = $total_people > 0 ? round( array_sum( array_column( $audit_data, 'score' ) ) / $total_people ) : 0;
+            ?>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 2em; font-weight: bold; color: #0073aa; margin-bottom: 5px;"><?php echo $total_people; ?></div>
+                    <div style="color: #666; font-size: 14px;">Total People</div>
+                </div>
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 2em; font-weight: bold; color: #0073aa; margin-bottom: 5px;"><?php echo $avg_score; ?>%</div>
+                    <div style="color: #666; font-size: 14px;">Average Completeness</div>
+                </div>
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 2em; font-weight: bold; color: #0073aa; margin-bottom: 5px;"><?php echo $complete_profiles; ?></div>
+                    <div style="color: #666; font-size: 14px;">Complete Profiles (90%+)</div>
+                </div>
+                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 2em; font-weight: bold; color: #0073aa; margin-bottom: 5px;"><?php echo $needs_attention; ?></div>
+                    <div style="color: #666; font-size: 14px;">Needs Attention (&lt;70%)</div>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <span style="margin-right: 15px; font-weight: 600;">Filter by:</span>
+                <select style="padding: 6px 12px; border: 1px solid #ced4da; border-radius: 4px; margin-right: 15px;" id="type-filter" onchange="filterAuditTable()">
+                    <option value="">All Types</option>
+                    <option value="Team Member">Team Members</option>
+                    <option value="Leadership">Leadership</option>
+                    <option value="Alumni">Alumni</option>
+                </select>
+                <select style="padding: 6px 12px; border: 1px solid #ced4da; border-radius: 4px;" id="score-filter" onchange="filterAuditTable()">
+                    <option value="">All Scores</option>
+                    <option value="poor">Poor (&lt;50%)</option>
+                    <option value="fair">Fair (50-79%)</option>
+                    <option value="good">Good (80-89%)</option>
+                    <option value="excellent">Excellent (90%+)</option>
+                </select>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;" id="audit-table">
+                <thead>
+                    <tr style="background: #f8f9fa;">
+                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-weight: 600;">Person</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-weight: 600;">Type</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-weight: 600;">Completeness</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-weight: 600;">Missing Data Points</th>
+                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-weight: 600;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ( $audit_data as $item ) : ?>
+                        <tr style="border-bottom: 1px solid #dee2e6;" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" data-score="<?php echo $item['score']; ?>" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background=''">
+                            <td style="padding: 12px;">
+                                <div style="font-weight: 600;">
+                                    <?php echo htmlspecialchars( mask_name( $item['name'], $privacy_mode ) ); ?>
+                                </div>
+                                <div style="font-size: 12px; color: #666;">
+                                    @<?php echo htmlspecialchars( mask_username( $item['username'], $privacy_mode ) ); ?>
+                                </div>
+                            </td>
+                            <td style="padding: 12px;"><?php echo htmlspecialchars( $item['type'] ); ?></td>
+                            <td style="padding: 12px;">
+                                <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-weight: 600; font-size: 12px; min-width: 40px; text-align: center; <?php
+                                    if ( $item['score'] >= 90 ) echo 'background: #d4edda; color: #155724;';
+                                    elseif ( $item['score'] >= 80 ) echo 'background: #d1ecf1; color: #0c5460;';
+                                    elseif ( $item['score'] >= 50 ) echo 'background: #fff3cd; color: #856404;';
+                                    else echo 'background: #f8d7da; color: #721c24;';
+                                ?>"><?php echo $item['score']; ?>%</span>
+                            </td>
+                            <td style="padding: 12px; font-size: 13px;">
+                                <?php if ( empty( $item['missing'] ) ) : ?>
+                                    <span style="color: #28a745; font-weight: 500;">✅ Complete</span>
+                                <?php else : ?>
+                                    <?php foreach ( $item['missing'] as $missing_item ) : ?>
+                                        <span style="<?php echo strpos( $missing_item, 'optional' ) !== false ? 'color: #6c757d;' : 'color: #dc3545; font-weight: 500;'; ?>">
+                                            <?php echo htmlspecialchars( $missing_item ); ?>
+                                        </span><?php echo $missing_item !== end( $item['missing'] ) ? ', ' : ''; ?>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </td>
+                            <td style="padding: 12px;">
+                                <a href="<?php echo build_team_url( 'admin.php', array( 'edit_member' => $item['username'] ) ); ?>" style="color: #0073aa; text-decoration: none; font-size: 12px; margin-right: 8px;">✏️ Edit</a>
+                                <a href="<?php echo build_team_url( 'index.php', array( 'person' => $item['username'] ) ); ?>" style="color: #0073aa; text-decoration: none; font-size: 12px;" target="_blank">👁️ View</a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+
         <!-- JSON View Tab -->
         <div id="json" class="tab-content <?php echo $active_tab === 'json' ? 'active' : ''; ?>">
             <p>This is the current contents of your team.json file:</p>
@@ -1770,6 +2023,37 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
         // Initialize timezone autocomplete when page loads
         document.addEventListener('DOMContentLoaded', initTimezoneAutocomplete);
+
+        // Filter functionality for audit table
+        function filterAuditTable() {
+            const typeFilter = document.getElementById('type-filter').value;
+            const scoreFilter = document.getElementById('score-filter').value;
+            const table = document.getElementById('audit-table');
+            const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i];
+                const type = row.getAttribute('data-type');
+                const score = parseInt(row.getAttribute('data-score'));
+
+                let showRow = true;
+
+                // Filter by type
+                if (typeFilter && type !== typeFilter) {
+                    showRow = false;
+                }
+
+                // Filter by score range
+                if (scoreFilter) {
+                    if (scoreFilter === 'poor' && score >= 50) showRow = false;
+                    if (scoreFilter === 'fair' && (score < 50 || score >= 80)) showRow = false;
+                    if (scoreFilter === 'good' && (score < 80 || score >= 90)) showRow = false;
+                    if (scoreFilter === 'excellent' && score < 90) showRow = false;
+                }
+
+                row.style.display = showRow ? '' : 'none';
+            }
+        }
     </script>
 </body>
 </html>

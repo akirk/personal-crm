@@ -12,7 +12,7 @@ require_once __DIR__ . '/includes/common.php';
 // Team redirection logic - handle cases where no team parameter is provided
 if ( isset( $_GET['team'] ) ) {
 	$current_team = $_GET['team'];
-	if ( $current_team === get_default_team() ) {
+	if ( $current_team === get_default_team() && ! isset( $_GET['person'] ) ) {
 		// Redirect to root if default team is selected
 		header( 'Location: ./' );
 		exit;
@@ -122,27 +122,52 @@ class Person {
 		if ( ! empty( $this->kids ) && is_array( $this->kids ) ) {
 			foreach ( $this->kids as $kid ) {
 				if ( ! empty( $kid['birthday'] ) ) {
-					// Full birthday date available
-					$kid_birth_date = DateTime::createFromFormat( 'Y-m-d', $kid['birthday'] );
-					if ( $kid_birth_date ) {
-						$kid_birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid_birth_date->format( 'm-d' ) );
-						if ( $kid_birthday_this_year >= $current_date && $kid_birthday_this_year <= $cutoff_date ) {
-							$age = $current_year - (int) $kid_birth_date->format( 'Y' );
-							$events[] = array(
-								'type' => 'birthday',
-								'date' => $kid_birthday_this_year,
-								'description' => $kid['name'] . '\'s ' . $age . 'th Birthday (' . $this->name . '\'s kid)',
-							);
-						} elseif ( $kid_birthday_this_year < $current_date ) {
-							// Check next year's birthday
-							$kid_birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid_birth_date->format( 'm-d' ) );
-							if ( $kid_birthday_next_year && $kid_birthday_next_year <= $cutoff_date ) {
-								$age = ( $current_year + 1 ) - (int) $kid_birth_date->format( 'Y' );
+					// Check if it's a full birthday date (YYYY-MM-DD)
+					if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $kid['birthday'] ) ) {
+						// Full birthday date available
+						$kid_birth_date = DateTime::createFromFormat( 'Y-m-d', $kid['birthday'] );
+						if ( $kid_birth_date ) {
+							$kid_birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid_birth_date->format( 'm-d' ) );
+							if ( $kid_birthday_this_year >= $current_date && $kid_birthday_this_year <= $cutoff_date ) {
+								$age = $current_year - (int) $kid_birth_date->format( 'Y' );
 								$events[] = array(
 									'type' => 'birthday',
-									'date' => $kid_birthday_next_year,
+									'date' => $kid_birthday_this_year,
 									'description' => $kid['name'] . '\'s ' . $age . 'th Birthday (' . $this->name . '\'s kid)',
 								);
+							} elseif ( $kid_birthday_this_year < $current_date ) {
+								// Check next year's birthday
+								$kid_birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid_birth_date->format( 'm-d' ) );
+								if ( $kid_birthday_next_year && $kid_birthday_next_year <= $cutoff_date ) {
+									$age = ( $current_year + 1 ) - (int) $kid_birth_date->format( 'Y' );
+									$events[] = array(
+										'type' => 'birthday',
+										'date' => $kid_birthday_next_year,
+										'description' => $kid['name'] . '\'s ' . $age . 'th Birthday (' . $this->name . '\'s kid)',
+									);
+								}
+							}
+						}
+					} elseif ( preg_match( '/^\d{2}-\d{2}$/', $kid['birthday'] ) ) {
+						// Month-day format (MM-DD) - no birth year known
+						$kid_birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid['birthday'] );
+						if ( $kid_birthday_this_year ) {
+							if ( $kid_birthday_this_year >= $current_date && $kid_birthday_this_year <= $cutoff_date ) {
+								$events[] = array(
+									'type' => 'birthday',
+									'date' => $kid_birthday_this_year,
+									'description' => $kid['name'] . '\'s Birthday (' . $this->name . '\'s kid)',
+								);
+							} elseif ( $kid_birthday_this_year < $current_date ) {
+								// Check next year's birthday
+								$kid_birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid['birthday'] );
+								if ( $kid_birthday_next_year && $kid_birthday_next_year <= $cutoff_date ) {
+									$events[] = array(
+										'type' => 'birthday',
+										'date' => $kid_birthday_next_year,
+										'description' => $kid['name'] . '\'s Birthday (' . $this->name . '\'s kid)',
+									);
+								}
 							}
 						}
 					}
@@ -168,25 +193,48 @@ class Person {
 
 		foreach ( $this->kids as $kid ) {
 			if ( ! empty( $kid['birthday'] ) ) {
-				// Full birthday available
-				$birth_date = DateTime::createFromFormat( 'Y-m-d', $kid['birthday'] );
-				if ( $birth_date ) {
-					$age = $current_date->diff( $birth_date )->y;
-					$next_birthday = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
+				// Check if it's a full birthday date (YYYY-MM-DD)
+				if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $kid['birthday'] ) ) {
+					// Full birthday available
+					$birth_date = DateTime::createFromFormat( 'Y-m-d', $kid['birthday'] );
+					if ( $birth_date ) {
+						$age = $current_date->diff( $birth_date )->y;
+						$next_birthday = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
+						if ( $next_birthday && $next_birthday < $current_date ) {
+							$next_birthday = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birth_date->format( 'm-d' ) );
+						}
+
+						$time_info = '';
+						if ( $next_birthday ) {
+							$time_info = $this->get_time_until_date( $current_date, $next_birthday );
+						}
+
+						$kids_with_ages[] = array(
+							'name' => $kid['name'] ?? 'Child',
+							'age' => $age,
+							'birthday' => $kid['birthday'],
+							'birthday_display' => $birth_date->format( 'F j, Y' ),
+							'time_to_birthday' => $time_info,
+						);
+					}
+				} elseif ( preg_match( '/^\d{2}-\d{2}$/', $kid['birthday'] ) ) {
+					// Month-day format (MM-DD) - no birth year known
+					$next_birthday = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid['birthday'] );
 					if ( $next_birthday && $next_birthday < $current_date ) {
-						$next_birthday = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birth_date->format( 'm-d' ) );
+						$next_birthday = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid['birthday'] );
 					}
 
 					$time_info = '';
+					$birthday_display = '';
 					if ( $next_birthday ) {
 						$time_info = $this->get_time_until_date( $current_date, $next_birthday );
+						$birthday_display = $next_birthday->format( 'F j' );
 					}
 
 					$kids_with_ages[] = array(
 						'name' => $kid['name'] ?? 'Child',
-						'age' => $age,
 						'birthday' => $kid['birthday'],
-						'birthday_display' => $birth_date->format( 'F j, Y' ),
+						'birthday_display' => $birthday_display,
 						'time_to_birthday' => $time_info,
 					);
 				}
@@ -323,6 +371,33 @@ class Person {
 	}
 }
 
+/**
+ * Get SVG icon for a link based on its text or URL
+ */
+function get_link_icon( $link_text, $link_url, $size = 16 ) {
+	if ( 0 === strpos( $link_url, 'https://linear.app/' ) ) {
+		return '<svg xmlns="http://www.w3.org/2000/svg" fill="none" width="' . $size . '" height="' . $size . '" viewBox="0 0 100 100" style="vertical-align: middle; margin-right: 4px"><path fill="#222326" d="M1.22541 61.5228c-.2225-.9485.90748-1.5459 1.59638-.857L39.3342 97.1782c.6889.6889.0915 1.8189-.857 1.5964C20.0515 94.4522 5.54779 79.9485 1.22541 61.5228ZM.00189135 46.8891c-.01764375.2833.08887215.5599.28957165.7606L52.3503 99.7085c.2007.2007.4773.3075.7606.2896 2.3692-.1476 4.6938-.46 6.9624-.9259.7645-.157 1.0301-1.0963.4782-1.6481L2.57595 39.4485c-.55186-.5519-1.49117-.2863-1.648174.4782-.465915 2.2686-.77832 4.5932-.92588465 6.9624ZM4.21093 29.7054c-.16649.3738-.08169.8106.20765 1.1l64.77602 64.776c.2894.2894.7262.3742 1.1.2077 1.7861-.7956 3.5171-1.6927 5.1855-2.684.5521-.328.6373-1.0867.1832-1.5407L8.43566 24.3367c-.45409-.4541-1.21271-.3689-1.54074.1832-.99132 1.6684-1.88843 3.3994-2.68399 5.1855ZM12.6587 18.074c-.3701-.3701-.393-.9637-.0443-1.3541C21.7795 6.45931 35.1114 0 49.9519 0 77.5927 0 100 22.4073 100 50.0481c0 14.8405-6.4593 28.1724-16.7199 37.3375-.3903.3487-.984.3258-1.3542-.0443L12.6587 18.074Z"/></svg> ';
+	} elseif ( $link_text === '1:1 doc' ) {
+		return '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#222326" style="vertical-align: middle; margin-right: 4px"><path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/><circle cx="9" cy="13" r="1.5"/><circle cx="15" cy="13" r="1.5"/><path d="M9,16H15V18H9V16Z"/></svg>';
+	} elseif ( $link_text === 'HR monthly' ) {
+		return '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#222326" style="vertical-align: middle; margin-right: 4px"><path d="M19,3H18V1H16V3H8V1H6V3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,19H5V8H19V19M5,6V5H19V6H5Z"/><rect x="7" y="10" width="2" height="2"/><rect x="11" y="10" width="2" height="2"/><rect x="15" y="10" width="2" height="2"/><rect x="7" y="14" width="2" height="2"/><rect x="11" y="14" width="2" height="2"/></svg>';
+	}
+	return '';
+}
+
+/**
+ * Render person links with icons
+ */
+function render_person_links( $links, $icon_size = 12 ) {
+	foreach ( $links as $link_text => $link_url ) {
+		if ( ! empty( $link_url ) ) {
+			echo '<a href="' . htmlspecialchars( $link_url ) . '" target="_blank">';
+			echo get_link_icon( $link_text, $link_url, $icon_size );
+			echo htmlspecialchars( $link_text );
+			echo '</a>';
+		}
+	}
+}
 
 /**
  * Load team configuration from JSON file
@@ -962,11 +1037,7 @@ $available_teams = get_available_teams();
                                                 </div>
                                             </a>
                                             <div class="person-links">
-                                                <?php foreach ( $member->links as $link_text => $link_url ) : ?>
-                                                    <?php if ( ! empty( $link_url ) ) : ?>
-                                                        <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"><?php echo htmlspecialchars( $link_text ); ?></a>
-                                                    <?php endif; ?>
-                                                <?php endforeach; ?>
+                                                <?php render_person_links( $member->links ); ?>
                                             </div>
                                         </div>
                                     </li>
@@ -991,11 +1062,7 @@ $available_teams = get_available_teams();
                                                 </div>
                                             </a>
                                             <div class="person-links">
-                                                <?php foreach ( $leader->links as $link_text => $link_url ) : ?>
-                                                    <?php if ( ! empty( $link_url ) ) : ?>
-                                                        <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"><?php echo htmlspecialchars( $link_text ); ?></a>
-                                                    <?php endif; ?>
-                                                <?php endforeach; ?>
+                                                <?php render_person_links( $leader->links ); ?>
                                             </div>
                                         </div>
                                     </li>
@@ -1020,11 +1087,7 @@ $available_teams = get_available_teams();
                                                 </div>
                                             </a>
                                             <div class="person-links">
-                                                <?php foreach ( $alumnus->links as $link_text => $link_url ) : ?>
-                                                    <?php if ( ! empty( $link_url ) ) : ?>
-                                                        <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"><?php echo htmlspecialchars( $link_text ); ?></a>
-                                                    <?php endif; ?>
-                                                <?php endforeach; ?>
+                                                <?php render_person_links( $alumnus->links ); ?>
                                             </div>
                                         </div>
                                     </li>
@@ -1112,17 +1175,7 @@ $available_teams = get_available_teams();
                     <h2>Quick Links</h2>
                     <div class="links">
                         <a href="<?php echo build_team_url( 'admin.php', array( 'edit_member' => $person ) ); ?>" target="_blank">✏️ Edit Person</a>
-                        <?php foreach ( $person_data->links as $link_text => $link_url ) : ?>
-                            <?php if ( ! empty( $link_url ) ) : ?>
-                                <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"><?php
-                                if ( 0 === strpos( $link_url, 'https://linear.app/' ) ) {
-                                	?><svg xmlns="http://www.w3.org/2000/svg" fill="none" width="16" height="16" viewBox="0 0 100 100" style="vertical-align: middle"><path fill="#222326" d="M1.22541 61.5228c-.2225-.9485.90748-1.5459 1.59638-.857L39.3342 97.1782c.6889.6889.0915 1.8189-.857 1.5964C20.0515 94.4522 5.54779 79.9485 1.22541 61.5228ZM.00189135 46.8891c-.01764375.2833.08887215.5599.28957165.7606L52.3503 99.7085c.2007.2007.4773.3075.7606.2896 2.3692-.1476 4.6938-.46 6.9624-.9259.7645-.157 1.0301-1.0963.4782-1.6481L2.57595 39.4485c-.55186-.5519-1.49117-.2863-1.648174.4782-.465915 2.2686-.77832 4.5932-.92588465 6.9624ZM4.21093 29.7054c-.16649.3738-.08169.8106.20765 1.1l64.77602 64.776c.2894.2894.7262.3742 1.1.2077 1.7861-.7956 3.5171-1.6927 5.1855-2.684.5521-.328.6373-1.0867.1832-1.5407L8.43566 24.3367c-.45409-.4541-1.21271-.3689-1.54074.1832-.99132 1.6684-1.88843 3.3994-2.68399 5.1855ZM12.6587 18.074c-.3701-.3701-.393-.9637-.0443-1.3541C21.7795 6.45931 35.1114 0 49.9519 0 77.5927 0 100 22.4073 100 50.0481c0 14.8405-6.4593 28.1724-16.7199 37.3375-.3903.3487-.984.3258-1.3542-.0443L12.6587 18.074Z"/></svg> <?php
-                                } else {
-                                	?>📄<?php
-                                }
-                                echo htmlspecialchars( $link_text ); ?></a>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
+                        <?php render_person_links( $person_data->links, 16 ); ?>
                         <?php if ( $is_team_member && ! empty( $person_data->username ) ) : ?>
                             <?php
                             $last_month = date( 'Y-m', strtotime( 'last month') );
