@@ -106,3 +106,202 @@ function get_default_team() {
 
 	return '';
 }
+
+/**
+ * Get team statistics for all teams
+ */
+function get_all_teams_stats() {
+	$available_teams = get_available_teams();
+	$stats = array();
+	
+	foreach ( $available_teams as $team_slug ) {
+		$file_path = __DIR__ . '/../' . $team_slug . '.json';
+		if ( file_exists( $file_path ) ) {
+			$config = json_decode( file_get_contents( $file_path ), true );
+			if ( json_last_error() === JSON_ERROR_NONE ) {
+				$team_members_count = count( $config['team_members'] ?? array() );
+				$leadership_count = count( $config['leadership'] ?? array() );
+				$alumni_count = count( $config['alumni'] ?? array() );
+				$total_people = $team_members_count + $leadership_count + $alumni_count;
+				
+				$stats[] = array(
+					'slug' => $team_slug,
+					'name' => $config['team_name'] ?? ucfirst( str_replace( '_', ' ', $team_slug ) ),
+					'team_members' => $team_members_count,
+					'leadership' => $leadership_count,
+					'alumni' => $alumni_count,
+					'total_people' => $total_people,
+					'is_default' => isset( $config['default'] ) && $config['default'],
+					'url' => build_team_url_extended( 'index.php', array(), $team_slug )
+				);
+			}
+		}
+	}
+	
+	// Sort by name
+	usort( $stats, function( $a, $b ) {
+		return strcasecmp( $a['name'], $b['name'] );
+	});
+	
+	return $stats;
+}
+
+/**
+ * Get all people from all teams for global search
+ */
+function get_all_people_from_all_teams( $privacy_mode = false ) {
+	$available_teams = get_available_teams();
+	$all_people = array();
+	
+	foreach ( $available_teams as $team_slug ) {
+		$file_path = __DIR__ . '/../' . $team_slug . '.json';
+		if ( file_exists( $file_path ) ) {
+			$config = json_decode( file_get_contents( $file_path ), true );
+			if ( json_last_error() === JSON_ERROR_NONE ) {
+				$team_name = $config['team_name'] ?? ucfirst( str_replace( '_', ' ', $team_slug ) );
+				
+				// Team members
+				foreach ( $config['team_members'] ?? array() as $username => $member_data ) {
+					$links_js = array();
+					foreach ( $member_data['links'] ?? array() as $text => $url ) {
+						$links_js[] = array(
+							'text' => $text,
+							'url' => $url
+						);
+					}
+					
+					// Handle Linear links
+					if ( isset( $member_data['linear'] ) && ! empty( $member_data['linear'] ) ) {
+						$links_js[] = array(
+							'text' => 'Linear',
+							'url' => 'https://linear.app/a8c/profiles/' . $member_data['linear']
+						);
+					}
+					
+					$all_people[] = array(
+						'username' => $username,
+						'name' => mask_name( $member_data['name'] ?? '', $privacy_mode ),
+						'role' => $member_data['role'] ?? '',
+						'type' => 'Team Member',
+						'team' => $team_name,
+						'team_slug' => $team_slug,
+						'location' => $member_data['location'] ?? '',
+						'birthday' => get_birthday_display_for_js( $member_data, $privacy_mode ),
+						'links' => $links_js,
+						'url' => build_team_url_extended( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ), $team_slug )
+					);
+				}
+				
+				// Leadership
+				foreach ( $config['leadership'] ?? array() as $username => $leader_data ) {
+					$links_js = array();
+					foreach ( $leader_data['links'] ?? array() as $text => $url ) {
+						$links_js[] = array(
+							'text' => $text,
+							'url' => $url
+						);
+					}
+					
+					$all_people[] = array(
+						'username' => $username,
+						'name' => mask_name( $leader_data['name'] ?? '', $privacy_mode ),
+						'role' => $leader_data['role'] ?? '',
+						'type' => 'Leadership',
+						'team' => $team_name,
+						'team_slug' => $team_slug,
+						'location' => $leader_data['location'] ?? '',
+						'birthday' => get_birthday_display_for_js( $leader_data, $privacy_mode ),
+						'links' => $links_js,
+						'url' => build_team_url_extended( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ), $team_slug )
+					);
+				}
+				
+				// Alumni
+				foreach ( $config['alumni'] ?? array() as $username => $alumni_data ) {
+					$links_js = array();
+					foreach ( $alumni_data['links'] ?? array() as $text => $url ) {
+						$links_js[] = array(
+							'text' => $text,
+							'url' => $url
+						);
+					}
+					
+					$all_people[] = array(
+						'username' => $username,
+						'name' => mask_name( $alumni_data['name'] ?? '', $privacy_mode ),
+						'role' => $alumni_data['role'] ?? '',
+						'type' => 'Alumni',
+						'team' => $team_name,
+						'team_slug' => $team_slug,
+						'location' => $alumni_data['location'] ?? '',
+						'birthday' => get_birthday_display_for_js( $alumni_data, $privacy_mode ),
+						'links' => $links_js,
+						'url' => build_team_url_extended( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ), $team_slug )
+					);
+				}
+			}
+		}
+	}
+	
+	// Sort by name
+	usort( $all_people, function( $a, $b ) {
+		return strcasecmp( $a['name'], $b['name'] );
+	});
+	
+	return $all_people;
+}
+
+/**
+ * Helper function to build URL with different team (extended version)
+ */
+function build_team_url_extended( $base_url, $additional_params = array(), $team_slug = null ) {
+	$target_team = $team_slug;
+	
+	$params = array();
+	if ( $target_team && $target_team !== 'team' ) {
+		$params['team'] = $target_team;
+	}
+	$params = array_merge( $params, $additional_params );
+	
+	if ( ! empty( $params ) ) {
+		return $base_url . '?' . http_build_query( $params );
+	}
+	return $base_url;
+}
+
+/**
+ * Helper function to get birthday display for JavaScript
+ */
+function get_birthday_display_for_js( $person_data, $privacy_mode ) {
+	if ( empty( $person_data['birthday'] ) ) {
+		return '';
+	}
+	
+	if ( $privacy_mode ) {
+		// For privacy mode, just show age if available
+		if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $person_data['birthday'] ) ) {
+			$birth_date = DateTime::createFromFormat( 'Y-m-d', $person_data['birthday'] );
+			$current_date = new DateTime();
+			if ( $birth_date ) {
+				$age = $current_date->diff( $birth_date )->y;
+				return 'Age ' . $age;
+			}
+		}
+		return '[Hidden]';
+	}
+	
+	// For non-privacy mode, return formatted display
+	if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $person_data['birthday'] ) ) {
+		$birth_date = DateTime::createFromFormat( 'Y-m-d', $person_data['birthday'] );
+		if ( $birth_date ) {
+			return $birth_date->format( 'M j, Y' );
+		}
+	} elseif ( preg_match( '/^\d{2}-\d{2}$/', $person_data['birthday'] ) ) {
+		$display_date = DateTime::createFromFormat( 'm-d', $person_data['birthday'] );
+		if ( $display_date ) {
+			return $display_date->format( 'M j' );
+		}
+	}
+	
+	return $person_data['birthday'];
+}
