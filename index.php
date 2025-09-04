@@ -6,8 +6,9 @@
  * Provides overview of team members, 1:1 documents, and team activities.
  */
 
-// Include common functions
+// Include common functions and Person class
 require_once __DIR__ . '/includes/common.php';
+require_once __DIR__ . '/includes/person.php';
 
 // Team redirection logic - handle cases where no team parameter is provided
 if ( isset( $_GET['team'] ) ) {
@@ -26,350 +27,6 @@ if ( isset( $_GET['team'] ) ) {
 	}
 }
 
-/**
- * Person class to represent team members and leadership
- */
-class Person {
-	public $name;
-	public $username;
-	public $links; // Array of links where key is text and value is URL
-	public $role;
-	public $birthday; // YYYY-MM-DD format, e.g., '1978-03-15' or MM-DD format '03-15' for backward compatibility
-	public $company_anniversary; // YYYY-MM-DD format
-	public $partner; // Partner/spouse name
-	public $kids; // Array of arrays with 'name' and 'birth_year'
-	public $notes; // Additional personal notes
-	public $location; // Location/town
-	public $timezone; // Timezone identifier (e.g., "America/New_York")
-
-	public function __construct( $name, $username = '', $links = array(), $role = '' ) {
-		$this->name = $name;
-		$this->username = $username;
-		$this->links = $links;
-		$this->role = $role;
-		$this->birthday = '';
-		$this->company_anniversary = '';
-		$this->partner = '';
-		$this->kids = array();
-		$this->notes = '';
-		$this->location = '';
-		$this->timezone = '';
-	}
-
-	/**
-	 * Get upcoming events for this person (within next 3 months)
-	 */
-	public function get_upcoming_events() {
-		$events = array();
-		$current_date = new DateTime();
-		$current_year = (int) $current_date->format( 'Y' );
-		$cutoff_date = clone $current_date;
-		$cutoff_date->add( new DateInterval( 'P3M' ) ); // 3 months from now
-
-		// Birthday
-		if ( ! empty( $this->birthday ) ) {
-			$birthday_date = null;
-			
-			// Check if it's full YYYY-MM-DD format
-			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->birthday ) ) {
-				$birth_date = DateTime::createFromFormat( 'Y-m-d', $this->birthday );
-				if ( $birth_date ) {
-					$birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
-				}
-			} elseif ( preg_match( '/^\d{2}-\d{2}$/', $this->birthday ) ) {
-				// Legacy MM-DD format
-				$birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->birthday );
-			}
-			
-			if ( isset( $birthday_this_year ) && $birthday_this_year ) {
-				if ( $birthday_this_year >= $current_date && $birthday_this_year <= $cutoff_date ) {
-					$events[] = array(
-						'type' => 'birthday',
-						'date' => $birthday_this_year,
-						'description' => $this->name . '\'s Birthday',
-					);
-				} elseif ( $birthday_this_year < $current_date ) {
-					// Check next year's birthday
-					$birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birthday_this_year->format( 'm-d' ) );
-					if ( $birthday_next_year && $birthday_next_year <= $cutoff_date ) {
-						$events[] = array(
-							'type' => 'birthday',
-							'date' => $birthday_next_year,
-							'description' => $this->name . '\'s Birthday',
-						);
-					}
-				}
-			}
-		}
-
-		// Company anniversary
-		if ( ! empty( $this->company_anniversary ) ) {
-			$anniversary_date = DateTime::createFromFormat( 'Y-m-d', $this->company_anniversary );
-			if ( $anniversary_date ) {
-				$anniversary_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $anniversary_date->format( 'm-d' ) );
-				if ( $anniversary_this_year && $anniversary_this_year >= $current_date && $anniversary_this_year <= $cutoff_date ) {
-					$years = $current_year - (int) $anniversary_date->format( 'Y' );
-					$events[] = array(
-						'type' => 'anniversary',
-						'date' => $anniversary_this_year,
-						'description' => $this->name . '\'s ' . $years . ' Year Anniversary',
-					);
-				}
-			}
-		}
-
-		// Kids' birthdays
-		if ( ! empty( $this->kids ) && is_array( $this->kids ) ) {
-			foreach ( $this->kids as $kid ) {
-				if ( ! empty( $kid['birthday'] ) ) {
-					// Check if it's a full birthday date (YYYY-MM-DD)
-					if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $kid['birthday'] ) ) {
-						// Full birthday date available
-						$kid_birth_date = DateTime::createFromFormat( 'Y-m-d', $kid['birthday'] );
-						if ( $kid_birth_date ) {
-							$kid_birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid_birth_date->format( 'm-d' ) );
-							if ( $kid_birthday_this_year >= $current_date && $kid_birthday_this_year <= $cutoff_date ) {
-								$age = $current_year - (int) $kid_birth_date->format( 'Y' );
-								$events[] = array(
-									'type' => 'birthday',
-									'date' => $kid_birthday_this_year,
-									'description' => $kid['name'] . '\'s ' . $age . 'th Birthday (' . $this->name . '\'s kid)',
-								);
-							} elseif ( $kid_birthday_this_year < $current_date ) {
-								// Check next year's birthday
-								$kid_birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid_birth_date->format( 'm-d' ) );
-								if ( $kid_birthday_next_year && $kid_birthday_next_year <= $cutoff_date ) {
-									$age = ( $current_year + 1 ) - (int) $kid_birth_date->format( 'Y' );
-									$events[] = array(
-										'type' => 'birthday',
-										'date' => $kid_birthday_next_year,
-										'description' => $kid['name'] . '\'s ' . $age . 'th Birthday (' . $this->name . '\'s kid)',
-									);
-								}
-							}
-						}
-					} elseif ( preg_match( '/^\d{2}-\d{2}$/', $kid['birthday'] ) ) {
-						// Month-day format (MM-DD) - no birth year known
-						$kid_birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid['birthday'] );
-						if ( $kid_birthday_this_year ) {
-							if ( $kid_birthday_this_year >= $current_date && $kid_birthday_this_year <= $cutoff_date ) {
-								$events[] = array(
-									'type' => 'birthday',
-									'date' => $kid_birthday_this_year,
-									'description' => $kid['name'] . '\'s Birthday (' . $this->name . '\'s kid)',
-								);
-							} elseif ( $kid_birthday_this_year < $current_date ) {
-								// Check next year's birthday
-								$kid_birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid['birthday'] );
-								if ( $kid_birthday_next_year && $kid_birthday_next_year <= $cutoff_date ) {
-									$events[] = array(
-										'type' => 'birthday',
-										'date' => $kid_birthday_next_year,
-										'description' => $kid['name'] . '\'s Birthday (' . $this->name . '\'s kid)',
-									);
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// Sort events by date
-		usort( $events, function( $a, $b ) {
-			return $a['date'] <=> $b['date'];
-		} );
-
-		return $events;
-	}
-
-	/**
-	 * Get age of kids with enhanced display
-	 */
-	public function get_kids_ages() {
-		$current_date = new DateTime();
-		$current_year = (int) $current_date->format( 'Y' );
-		$kids_with_ages = array();
-
-		foreach ( $this->kids as $kid ) {
-			if ( ! empty( $kid['birthday'] ) ) {
-				// Check if it's a full birthday date (YYYY-MM-DD)
-				if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $kid['birthday'] ) ) {
-					// Full birthday available
-					$birth_date = DateTime::createFromFormat( 'Y-m-d', $kid['birthday'] );
-					if ( $birth_date ) {
-						$age = $current_date->diff( $birth_date )->y;
-						$next_birthday = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
-						if ( $next_birthday && $next_birthday < $current_date ) {
-							$next_birthday = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birth_date->format( 'm-d' ) );
-						}
-
-						$time_info = '';
-						if ( $next_birthday ) {
-							$time_info = $this->get_time_until_date( $current_date, $next_birthday );
-						}
-
-						$kids_with_ages[] = array(
-							'name' => $kid['name'] ?? 'Child',
-							'age' => $age,
-							'birthday' => $kid['birthday'],
-							'birthday_display' => $birth_date->format( 'F j, Y' ),
-							'time_to_birthday' => $time_info,
-						);
-					}
-				} elseif ( preg_match( '/^\d{2}-\d{2}$/', $kid['birthday'] ) ) {
-					// Month-day format (MM-DD) - no birth year known
-					$next_birthday = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid['birthday'] );
-					if ( $next_birthday && $next_birthday < $current_date ) {
-						$next_birthday = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid['birthday'] );
-					}
-
-					$time_info = '';
-					$birthday_display = '';
-					if ( $next_birthday ) {
-						$time_info = $this->get_time_until_date( $current_date, $next_birthday );
-						$birthday_display = $next_birthday->format( 'F j' );
-					}
-
-					$kids_with_ages[] = array(
-						'name' => $kid['name'] ?? 'Child',
-						'birthday' => $kid['birthday'],
-						'birthday_display' => $birthday_display,
-						'time_to_birthday' => $time_info,
-					);
-				}
-			} elseif ( isset( $kid['birth_year'] ) && ! empty( $kid['birth_year'] ) ) {
-				// Only birth year available
-				$age = $current_year - (int) $kid['birth_year'];
-				$kids_with_ages[] = array(
-					'name' => $kid['name'] ?? 'Child',
-					'age' => $age,
-					'birth_year' => $kid['birth_year'],
-				);
-			} else {
-				// No birth info
-				$kids_with_ages[] = array(
-					'name' => $kid['name'] ?? 'Child',
-				);
-			}
-		}
-
-		return $kids_with_ages;
-	}
-
-	/**
-	 * Get person's age if full birthday is available
-	 */
-	public function get_age() {
-		if ( empty( $this->birthday ) ) {
-			return null;
-		}
-
-		// Only calculate age for full YYYY-MM-DD format
-		if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->birthday ) ) {
-			$birth_date = DateTime::createFromFormat( 'Y-m-d', $this->birthday );
-			$current_date = new DateTime();
-			
-			if ( $birth_date ) {
-				$age = $current_date->diff( $birth_date )->y;
-				return $age;
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * Get formatted birthday display with time-to-birthday info
-	 */
-	public function get_birthday_display() {
-		if ( empty( $this->birthday ) ) {
-			return '';
-		}
-
-		$current_date = new DateTime();
-		$current_year = (int) $current_date->format( 'Y' );
-
-		if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->birthday ) ) {
-			// Full YYYY-MM-DD format
-			$birth_date = DateTime::createFromFormat( 'Y-m-d', $this->birthday );
-			if ( $birth_date ) {
-				$age = $this->get_age();
-				$display = $birth_date->format( 'F j, Y' );
-				if ( $age !== null ) {
-					$display .= ' (age ' . $age . ')';
-				}
-
-				// Add time to next birthday
-				$next_birthday = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
-				if ( $next_birthday && $next_birthday < $current_date ) {
-					$next_birthday = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birth_date->format( 'm-d' ) );
-				}
-
-				if ( $next_birthday ) {
-					$time_info = $this->get_time_until_date( $current_date, $next_birthday );
-					if ( $time_info ) {
-						$display .= ' • ' . $time_info;
-					}
-				}
-
-				return $display;
-			}
-		} elseif ( preg_match( '/^\d{2}-\d{2}$/', $this->birthday ) ) {
-			// Legacy MM-DD format
-			$display_date = DateTime::createFromFormat( 'm-d', $this->birthday );
-			if ( $display_date ) {
-				$display = $display_date->format( 'F j' );
-
-				// Add time to next birthday
-				$next_birthday = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->birthday );
-				if ( $next_birthday && $next_birthday < $current_date ) {
-					$next_birthday = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $this->birthday );
-				}
-
-				if ( $next_birthday ) {
-					$time_info = $this->get_time_until_date( $current_date, $next_birthday );
-					if ( $time_info ) {
-						$display .= ' • ' . $time_info;
-					}
-				}
-
-				return $display;
-			}
-		}
-
-		return $this->birthday;
-	}
-
-	/**
-	 * Get human-readable time until a date
-	 */
-	private function get_time_until_date( $from_date, $to_date ) {
-		$diff = $from_date->diff( $to_date );
-
-		if ( $diff->days <= 0 ) {
-			return 'today';
-		} elseif ( $diff->days == 1 ) {
-			return 'tomorrow';
-		} elseif ( $diff->days <= 7 ) {
-			return 'in ' . $diff->days . ' days';
-		} elseif ( $diff->days <= 30 ) {
-			$weeks = floor( $diff->days / 7 );
-			if ( $weeks == 1 ) {
-				return 'in 1 week';
-			} else {
-				return 'in ' . $weeks . ' weeks';
-			}
-		} else {
-			$months = $diff->m + ( $diff->y * 12 );
-			if ( $months == 1 ) {
-				return 'in 1 month';
-			} else {
-				return 'in ' . $months . ' months';
-			}
-		}
-	}
-}
 
 /**
  * Get SVG icon for a link based on its text or URL
@@ -399,241 +56,12 @@ function render_person_links( $links, $icon_size = 12 ) {
 	}
 }
 
-/**
- * Load team configuration from JSON file
- */
-function load_team_config( $team_slug = 'team' ) {
-	$config_file = __DIR__ . '/' . $team_slug . '.json';
-	
-	if ( ! file_exists( $config_file ) ) {
-		// Redirect to team creation page
-		$create_team_url = 'admin.php?create_team=new' . ( $team_slug !== 'team' ? '&team=' . urlencode( $team_slug ) : '' );
-		header( 'Location: ' . $create_team_url );
-		exit;
-	}
-	
-	$json_content = file_get_contents( $config_file );
-	$config = json_decode( $json_content, true );
-	
-	if ( json_last_error() !== JSON_ERROR_NONE ) {
-		die( 'Error: Invalid JSON in team-config.json file: ' . json_last_error_msg() );
-	}
-	
-	// Convert arrays to Person objects
-	$team_members = array();
-	foreach ( $config['team_members'] as $username => $member_data ) {
-		// Handle migration from old format to new format
-		$links = array();
-		if ( isset( $member_data['links'] ) ) {
-			// New format - use links directly
-			$links = $member_data['links'];
-		} else {
-			// Old format - migrate one_on_one and hr_feedback to links
-			if ( ! empty( $member_data['one_on_one'] ) ) {
-				$links['1:1 doc'] = $member_data['one_on_one'];
-			}
-			if ( ! empty( $member_data['hr_feedback'] ) ) {
-				$links['HR monthly'] = $member_data['hr_feedback'];
-			}
-		}
 
-		if ( isset( $member_data['linear'] ) && ! empty( $member_data['linear'] ) ) {
-			$links['Linear'] = 'https://linear.app/a8c/profiles/' . $member_data['linear'];
-		}
-		
-		$person = new Person( 
-			$member_data['name'], 
-			$username,
-			$links
-		);
-		
-		// Set additional properties
-		$person->role = $member_data['role'] ?? '';
-		$person->birthday = $member_data['birthday'] ?? '';
-		$person->company_anniversary = $member_data['company_anniversary'] ?? '';
-		$person->partner = $member_data['partner'] ?? '';
-		$person->kids = $member_data['kids'] ?? array();
-		$person->notes = $member_data['notes'] ?? '';
-		$person->location = $member_data['location'] ?? $member_data['town'] ?? ''; // Support both 'location' and legacy 'town'
-		$person->timezone = $member_data['timezone'] ?? '';
-		
-		$team_members[$username] = $person;
-	}
-	
-	$leadership = array();
-	foreach ( $config['leadership'] as $username => $leader_data ) {
-		// Handle migration from old format to new format
-		$links = array();
-		if ( isset( $leader_data['links'] ) ) {
-			// New format - use links directly
-			$links = $leader_data['links'];
-		} else {
-			// Old format - migrate one_on_one to links (no hr_feedback for leaders)
-			if ( ! empty( $leader_data['one_on_one'] ) ) {
-				$links['1:1 doc'] = $leader_data['one_on_one'];
-			}
-		}
-		
-		$person = new Person( 
-			$leader_data['name'], 
-			$username,
-			$links,
-			$leader_data['role'] ?? ''
-		);
-		
-		// Set additional properties
-		$person->birthday = $leader_data['birthday'] ?? '';
-		$person->company_anniversary = $leader_data['company_anniversary'] ?? '';
-		$person->partner = $leader_data['partner'] ?? '';
-		$person->kids = $leader_data['kids'] ?? array();
-		$person->notes = $leader_data['notes'] ?? '';
-		$person->location = $leader_data['location'] ?? $leader_data['town'] ?? ''; // Support both 'location' and legacy 'town'
-		$person->timezone = $leader_data['timezone'] ?? '';
-		
-		$leadership[$username] = $person;
-	}
-	
-	$alumni = array();
-	foreach ( $config['alumni'] ?? array() as $username => $alumni_data ) {
-		// Handle migration from old format to new format
-		$links = array();
-		if ( isset( $alumni_data['links'] ) ) {
-			// New format - use links directly
-			$links = $alumni_data['links'];
-		} else {
-			// Old format - migrate one_on_one and hr_feedback to links
-			if ( ! empty( $alumni_data['one_on_one'] ) ) {
-				$links['1:1 doc'] = $alumni_data['one_on_one'];
-			}
-			if ( ! empty( $alumni_data['hr_feedback'] ) ) {
-				$links['HR monthly'] = $alumni_data['hr_feedback'];
-			}
-		}
-		
-		$person = new Person( 
-			$alumni_data['name'], 
-			$username,
-			$links
-		);
-		
-		// Set additional properties
-		$person->role = $alumni_data['role'] ?? '';
-		$person->birthday = $alumni_data['birthday'] ?? '';
-		$person->company_anniversary = $alumni_data['company_anniversary'] ?? '';
-		$person->partner = $alumni_data['partner'] ?? '';
-		$person->kids = $alumni_data['kids'] ?? array();
-		$person->notes = $alumni_data['notes'] ?? '';
-		$person->location = $alumni_data['location'] ?? $alumni_data['town'] ?? '';
-		$person->timezone = $alumni_data['timezone'] ?? '';
-		
-		$alumni[$username] = $person;
-	}
-	
-	// Sort all collections by name
-	uasort( $team_members, function( $a, $b ) {
-		return strcasecmp( $a->name, $b->name );
-	} );
-	
-	uasort( $leadership, function( $a, $b ) {
-		return strcasecmp( $a->name, $b->name );
-	} );
-	
-	uasort( $alumni, function( $a, $b ) {
-		return strcasecmp( $a->name, $b->name );
-	} );
-	
-	// Check if we need to migrate and save the updated config
-	$needs_migration = false;
-	
-	// Check if any section still uses the old format
-	foreach ( $config['team_members'] as $member_data ) {
-		if ( isset( $member_data['one_on_one'] ) || isset( $member_data['hr_feedback'] ) ) {
-			$needs_migration = true;
-			break;
-		}
-	}
-	
-	if ( ! $needs_migration ) {
-		foreach ( $config['leadership'] as $leader_data ) {
-			if ( isset( $leader_data['one_on_one'] ) ) {
-				$needs_migration = true;
-				break;
-			}
-		}
-	}
-	
-	if ( ! $needs_migration && isset( $config['alumni'] ) ) {
-		foreach ( $config['alumni'] as $alumni_data ) {
-			if ( isset( $alumni_data['one_on_one'] ) || isset( $alumni_data['hr_feedback'] ) ) {
-				$needs_migration = true;
-				break;
-			}
-		}
-	}
-	
-	// If migration is needed, update the config and save it
-	if ( $needs_migration ) {
-		// Update the config array with the new format
-		foreach ( $config['team_members'] as $username => &$member_data ) {
-			if ( isset( $member_data['one_on_one'] ) || isset( $member_data['hr_feedback'] ) ) {
-				$links = array();
-				if ( ! empty( $member_data['one_on_one'] ) ) {
-					$links['1:1 doc'] = $member_data['one_on_one'];
-				}
-				if ( ! empty( $member_data['hr_feedback'] ) ) {
-					$links['HR monthly'] = $member_data['hr_feedback'];
-				}
-				$member_data['links'] = $links;
-				unset( $member_data['one_on_one'] );
-				unset( $member_data['hr_feedback'] );
-			}
-		}
-		
-		foreach ( $config['leadership'] as $username => &$leader_data ) {
-			if ( isset( $leader_data['one_on_one'] ) ) {
-				$links = array();
-				if ( ! empty( $leader_data['one_on_one'] ) ) {
-					$links['1:1 doc'] = $leader_data['one_on_one'];
-				}
-				$leader_data['links'] = $links;
-				unset( $leader_data['one_on_one'] );
-			}
-		}
-		
-		if ( isset( $config['alumni'] ) ) {
-			foreach ( $config['alumni'] as $username => &$alumni_data ) {
-				if ( isset( $alumni_data['one_on_one'] ) || isset( $alumni_data['hr_feedback'] ) ) {
-					$links = array();
-					if ( ! empty( $alumni_data['one_on_one'] ) ) {
-						$links['1:1 doc'] = $alumni_data['one_on_one'];
-					}
-					if ( ! empty( $alumni_data['hr_feedback'] ) ) {
-						$links['HR monthly'] = $alumni_data['hr_feedback'];
-					}
-					$alumni_data['links'] = $links;
-					unset( $alumni_data['one_on_one'] );
-					unset( $alumni_data['hr_feedback'] );
-				}
-			}
-		}
-		
-		// Save the migrated config
-		$json = json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
-		file_put_contents( $config_file, $json );
-	}
-	
-	return array(
-		'activity_url_prefix' => $config['activity_url_prefix'],
-        'team_name' => $config['team_name'],
-		'team_members' => $team_members,
-		'leadership' => $leadership,
-		'alumni' => $alumni,
-		'events' => $config['events'] ?? array(),
-	);
-}
+// Get privacy mode early for Person object creation
+$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
-// Load team configuration
-$team_data = load_team_config( $current_team );
+// Load team configuration with Person objects
+$team_data = load_team_config_with_objects( $current_team, $privacy_mode );
 
 /**
  * Get all upcoming events (personal + team/company) - within next 3 months
@@ -653,20 +81,20 @@ function get_all_upcoming_events( $team_data ) {
 	
 	// Add team and company events (within 3 months)
 	foreach ( $team_data['events'] as $event ) {
-		$start_date = DateTime::createFromFormat( 'Y-m-d', $event['start_date'] );
+		$start_date = DateTime::createFromFormat( 'Y-m-d', $event->start_date );
 		if ( $start_date && $start_date >= $current_date && $start_date <= $cutoff_date ) {
-			$end_date = DateTime::createFromFormat( 'Y-m-d', $event['end_date'] );
+			$end_date = DateTime::createFromFormat( 'Y-m-d', $event->end_date );
 			$duration = '';
 			if ( $end_date && $start_date->format( 'Y-m-d' ) !== $end_date->format( 'Y-m-d' ) ) {
 				$duration = ' - ' . $end_date->format( 'M j' );
 			}
 			
 			$all_events[] = array(
-				'type' => $event['type'],
+				'type' => $event->type,
 				'date' => $start_date,
-				'description' => $event['name'] . $duration,
-				'location' => $event['location'] ?? '',
-				'details' => $event['description'] ?? '',
+				'description' => $event->name . $duration,
+				'location' => $event->location ?? '',
+				'details' => $event->description ?? '',
 			);
 		}
 	}
@@ -724,9 +152,8 @@ function mask_event_description( $description, $privacy_mode, $all_people ) {
 	return $description;
 }
 
-// Get current action and privacy mode
+// Get current action
 $person = $_GET['person'] ?? null;
-$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 $action = $person ? 'person' : 'overview';
 
 // Get available teams for switcher
@@ -775,13 +202,6 @@ $available_teams = get_available_teams();
                         }
                         ?>
                     </select>
-                    
-                    <?php if ( $privacy_mode ) : ?>
-                        <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" class="nav-link" style="background: #28a745;">🔒 Privacy Mode ON</a>
-                    <?php else : ?>
-                        <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
-                    <?php endif; ?>
-                    <a href="<?php echo build_team_url( 'admin.php' ); ?>" class="nav-link">⚙️ Admin Panel</a>
                 </div>
             </div>
 
@@ -796,7 +216,7 @@ $available_teams = get_available_teams();
                                         <div class="person-row-container">
                                             <a href="<?php echo build_team_url( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="person-row">
                                                 <div class="person-info">
-                                                    <div class="person-name"><?php echo htmlspecialchars( mask_name( $member->name, $privacy_mode ) ); ?></div>
+                                                    <div class="person-name"><?php echo htmlspecialchars( display_name_with_nickname( $member, $privacy_mode ) ); ?></div>
                                                     <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
                                                 </div>
                                             </a>
@@ -821,7 +241,7 @@ $available_teams = get_available_teams();
                                         <div class="person-row-container">
                                             <a href="<?php echo build_team_url( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="person-row">
                                                 <div class="person-info">
-                                                    <div class="person-name"><?php echo htmlspecialchars( mask_name( $leader->name, $privacy_mode ) ); ?> <span style="color: #666; font-weight: normal;">(<?php echo htmlspecialchars( $leader->role ); ?>)</span></div>
+                                                    <div class="person-name"><?php echo htmlspecialchars( display_name_with_nickname( $leader, $privacy_mode ) ); ?> <span style="color: #666; font-weight: normal;">(<?php echo htmlspecialchars( $leader->role ); ?>)</span></div>
                                                     <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
                                                 </div>
                                             </a>
@@ -846,7 +266,7 @@ $available_teams = get_available_teams();
                                         <div class="person-row-container">
                                             <a href="<?php echo build_team_url( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="person-row">
                                                 <div class="person-info">
-                                                    <div class="person-name"><?php echo htmlspecialchars( mask_name( $alumnus->name, $privacy_mode ) ); ?> <span style="color: #999; font-weight: normal;">(Alumni)</span></div>
+                                                    <div class="person-name"><?php echo htmlspecialchars( display_name_with_nickname( $alumnus, $privacy_mode ) ); ?> <span style="color: #999; font-weight: normal;">(Alumni)</span></div>
                                                     <div class="person-username">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></div>
                                                 </div>
                                             </a>
@@ -864,28 +284,13 @@ $available_teams = get_available_teams();
                 </div>
 
                 <div class="events-sidebar">
-                    <h3>🗓️ Upcoming Events</h3>
+                    <a href="<?php echo build_team_url( 'events.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" style="color: inherit; text-decoration: none; display: block; margin-bottom: 15px;">
+                        <h3 style="margin: 0; color: #007cba; cursor: pointer; transition: color 0.2s;">🗓️ Upcoming Events →</h3>
+                    </a>
                     <?php
-                    $upcoming_events = get_all_upcoming_events( $team_data );
-                    if ( ! empty( $upcoming_events ) ) :
-                        $displayed_events = array_slice( $upcoming_events, 0, 10 ); // Show first 10 events
-                        $all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['alumni'] );
-                        foreach ( $displayed_events as $event ) :
+                    $upcoming_events = get_upcoming_events_for_display( $team_data );
+                    render_upcoming_events_sidebar( $upcoming_events, $privacy_mode );
                     ?>
-                        <div class="event-item">
-                            <div class="event-date"><?php echo $privacy_mode && in_array( $event['type'], array( 'birthday', 'anniversary' ) ) ? '[Hidden]' : $event['date']->format( 'M j, Y' ); ?></div>
-                            <div class="event-description"><?php echo htmlspecialchars( mask_event_description( $event['description'], $privacy_mode, $all_people ) ); ?></div>
-                            <span class="event-type <?php echo htmlspecialchars( $event['type'] ); ?>"><?php echo ucfirst( $event['type'] ); ?></span>
-                            <?php if ( ! empty( $event['location'] ) ) : ?>
-                                <div style="font-size: 12px; color: #666; margin-top: 4px;">📍 <?php echo htmlspecialchars( $event['location'] ); ?></div>
-                            <?php endif; ?>
-                        </div>
-                    <?php 
-                        endforeach;
-                    else : 
-                    ?>
-                        <p style="color: #666; font-style: italic; margin: 0;">No upcoming events</p>
-                    <?php endif; ?>
                 </div>
             </div>
 
@@ -916,7 +321,7 @@ $available_teams = get_available_teams();
 
                 <div class="header" style="flex-wrap: wrap;">
                     <div>
-                        <h1><a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( mask_name( $person_data->name, $privacy_mode ) ); ?></a> 
+                        <h1><a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( display_name_with_nickname( $person_data, $privacy_mode ) ); ?></a>
                             <?php if ( $is_alumni ) : ?>
                                 <span style="color: #999; font-size: 18px; font-weight: normal;">(Alumni)</span>
                             <?php endif; ?>
@@ -924,13 +329,6 @@ $available_teams = get_available_teams();
                         <p style="color: #666;">@<?php echo htmlspecialchars( mask_username( $person_data->username, $privacy_mode ) ); ?></p>
                         <?php if ( ! empty( $person_data->role ) ) : ?>
                             <p><strong><?php echo htmlspecialchars( $person_data->role ); ?></strong></p>
-                        <?php endif; ?>
-                    </div>
-                    <div class="navigation" style="margin-top: 10px;">
-                        <?php if ( $privacy_mode ) : ?>
-                            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" class="nav-link" style="background: #28a745;">🔒 Privacy Mode ON</a>
-                        <?php else : ?>
-                            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -973,7 +371,7 @@ $available_teams = get_available_teams();
                                 <h3 style="border-bottom: 0; margin-top: 0; color: #2d5a2d;">🗓️ Upcoming Events</h3>
                                 <ul style="margin-bottom: 0;">
                                     <?php foreach ( $upcoming_events as $event ) : ?>
-                                        <li><?php echo htmlspecialchars( mask_event_description( $event['description'], $privacy_mode, array( $person_data ) ) ); ?> - <?php echo $privacy_mode && in_array( $event['type'], array( 'birthday', 'anniversary' ) ) ? '[Hidden]' : $event['date']->format( 'F j, Y' ); ?></li>
+                                        <li><?php echo htmlspecialchars( mask_event_description( $event->description, $privacy_mode, array( $person_data ) ) ); ?> - <?php echo $privacy_mode && in_array( $event->type, array( 'birthday', 'anniversary' ) ) ? '[Hidden]' : $event->date->format( 'F j, Y' ); ?></li>
                                     <?php endforeach; ?>
                                 </ul>
                             </div>
@@ -1055,6 +453,19 @@ $available_teams = get_available_teams();
                 <p><a href="?<?php echo $current_team !== 'team' ? 'team=' . urlencode( $current_team ) : ''; ?>">← Back to Team Overview</a></p>
             </div>
         <?php endif; ?>
+        
+        <!-- Footer with admin/privacy links -->
+        <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 14px;">
+            <?php if ( $privacy_mode ) : ?>
+                <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔒 Privacy Mode ON</a>
+            <?php else : ?>
+                <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>
+            <?php endif; ?>
+            <a href="<?php echo build_team_url( 'admin.php' ); ?>" style="color: #666; text-decoration: none;">⚙️ Admin Panel</a>
+            <?php if ( $action === 'person' ) : ?>
+                | <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'team', 'edit_person' => $person ) ); ?>" style="color: #666; text-decoration: none;">✏️ Edit Person</a>
+            <?php endif; ?>
+        </footer>
     </div>
     
     <script src="assets/cmd-k.js"></script>

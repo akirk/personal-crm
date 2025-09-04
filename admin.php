@@ -44,6 +44,7 @@ $is_editing_leader = false;
 $is_editing_alumni = false;
 $is_editing_event = false;
 
+
 if ( ! empty( $edit_member ) ) {
 	$config = load_or_create_config( $config_file );
 	if ( isset( $config['team_members'][ $edit_member ] ) ) {
@@ -62,7 +63,7 @@ if ( ! empty( $edit_member ) ) {
 		$is_editing_alumni = true;
 		$active_tab = 'alumni';
 	}
-} elseif ( ! empty( $edit_event_index ) && is_numeric( $edit_event_index ) ) {
+} elseif ( $edit_event_index !== '' && is_numeric( $edit_event_index ) ) {
 	$config = load_or_create_config( $config_file );
 	if ( isset( $config['events'][ $edit_event_index ] ) ) {
 		$edit_data = $config['events'][ $edit_event_index ];
@@ -198,18 +199,34 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				break;
 			}
 			
+			// Process links
+			$links = array();
+			if ( ! empty( $_POST['event_links'] ) && is_array( $_POST['event_links'] ) ) {
+				foreach ( $_POST['event_links'] as $link ) {
+					$text = sanitize_text_field( $link['text'] ?? '' );
+					$url = sanitize_url( $link['url'] ?? '' );
+					if ( ! empty( $text ) && ! empty( $url ) ) {
+						$links[ $text ] = $url;
+					}
+				}
+			}
+
 			$event = array(
 				'name' => sanitize_text_field( $_POST['event_name'] ?? '' ),
 				'start_date' => sanitize_text_field( $_POST['start_date'] ?? '' ),
 				'end_date' => sanitize_text_field( $_POST['end_date'] ?? '' ),
 				'type' => sanitize_text_field( $_POST['event_type'] ?? 'team' ),
 				'location' => sanitize_text_field( $_POST['location'] ?? '' ),
-				'description' => sanitize_textarea_field( $_POST['description'] ?? '' )
+				'description' => sanitize_textarea_field( $_POST['description'] ?? '' ),
+				'links' => $links
 			);
 			
 			$config['events'][ $event_index ] = $event;
 			if ( save_config( $config, $config_file ) ) {
 				$message = 'Event updated successfully!';
+				// Reload the edit data to show updated information
+				$edit_data = $config['events'][ $event_index ];
+				$edit_data['event_index'] = $event_index;
 			} else {
 				$error = 'Failed to update event.';
 			}
@@ -227,18 +244,33 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			break;
 
 		case 'add_event':
+			// Process links
+			$links = array();
+			if ( ! empty( $_POST['event_links'] ) && is_array( $_POST['event_links'] ) ) {
+				foreach ( $_POST['event_links'] as $link ) {
+					$text = sanitize_text_field( $link['text'] ?? '' );
+					$url = sanitize_url( $link['url'] ?? '' );
+					if ( ! empty( $text ) && ! empty( $url ) ) {
+						$links[ $text ] = $url;
+					}
+				}
+			}
+
 			$event = array(
 				'name' => sanitize_text_field( $_POST['event_name'] ?? '' ),
 				'start_date' => sanitize_text_field( $_POST['start_date'] ?? '' ),
 				'end_date' => sanitize_text_field( $_POST['end_date'] ?? '' ),
 				'type' => sanitize_text_field( $_POST['event_type'] ?? 'team' ),
 				'location' => sanitize_text_field( $_POST['location'] ?? '' ),
-				'description' => sanitize_textarea_field( $_POST['description'] ?? '' )
+				'description' => sanitize_textarea_field( $_POST['description'] ?? '' ),
+				'links' => $links
 			);
 			
 			$config['events'][] = $event;
 			if ( save_config( $config, $config_file ) ) {
 				$message = 'Event added successfully!';
+				// Reload config to get the latest data
+				$config = load_or_create_config( $config_file );
 			} else {
 				$error = 'Failed to save event.';
 			}
@@ -561,6 +593,7 @@ function create_person_data_from_form() {
 
 	return array(
 		'name' => sanitize_text_field( $_POST['name'] ?? '' ),
+		'nickname' => sanitize_text_field( $_POST['nickname'] ?? '' ),
 		'role' => sanitize_text_field( $_POST['role'] ?? '' ),
 		'github' => sanitize_text_field( $_POST['github'] ?? '' ),
 		'linear' => sanitize_text_field( $_POST['linear'] ?? '' ),
@@ -816,6 +849,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>name">Full Name<?php echo $privacy_mode ? ' (Privacy Mode - Last name will be masked)' : ''; ?></label>
 			<input type="text" id="<?php echo $prefix; ?>name" name="name" value="<?php echo $is_editing ? htmlspecialchars( $privacy_mode ? mask_name( $edit_data['name'] ?? '', true ) : ( $edit_data['name'] ?? '' ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="First name visible only"' : ''; ?> autofocus>
+		</div>
+
+		<div class="form-group">
+			<label for="<?php echo $prefix; ?>nickname">Nickname <small style="color: #666; font-weight: normal;">(optional)</small></label>
+			<input type="text" id="<?php echo $prefix; ?>nickname" name="nickname" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['nickname'] ?? '' ) : ''; ?>" placeholder="e.g., Mike, Lizzy, DJ">
 		</div>
 
 		<div class="form-group">
@@ -1257,17 +1295,6 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     <a href="<?php echo build_team_url( 'admin.php', array( 'create_team' => 'new' ) ); ?>" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Team</a>
                 </div>
                 
-                <?php
-                $current_params = $_GET;
-                if ( $privacy_mode ) {
-                    $current_params['privacy'] = '0';
-                    echo '<a href="?' . http_build_query( $current_params ) . '" class="nav-link" style="background: #28a745;">🔒 Privacy Mode ON</a>';
-                } else {
-                    $current_params['privacy'] = '1';
-                    echo '<a href="?' . http_build_query( $current_params ) . '" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>';
-                }
-                ?>
-                <a href="<?php echo build_team_url( 'index.php' ); ?>" class="nav-link">👥 Team Overview</a>
             </div>
         </div>
 
@@ -1565,6 +1592,15 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                 <div class="person-info">
                                     <h4><?php echo htmlspecialchars( $event['name'] ); ?></h4>
                                     <small><?php echo htmlspecialchars( $event['start_date'] ); ?> • <?php echo htmlspecialchars( $event['location'] ); ?> • <?php echo ucfirst( $event['type'] ); ?></small>
+                                    <?php if ( ! empty( $event['links'] ) ) : ?>
+                                        <div class="person-links" style="margin-top: 8px;">
+                                            <?php foreach ( $event['links'] as $link_text => $link_url ) : ?>
+                                                <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank" style="margin-right: 10px; color: #007cba; text-decoration: none; font-size: 12px;">
+                                                    <?php echo htmlspecialchars( $link_text ); ?> →
+                                                </a>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
                                     <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events', 'edit_event' => $index ) ); ?>" class="btn">Edit</a>
@@ -1612,8 +1648,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     <div class="form-group">
                         <label for="event-type">Event Type</label>
                         <select id="event-type" name="event_type" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
-                            <option value="team" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'team' ? 'selected' : ''; ?>>Team</option>
-                            <option value="company" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'company' ? 'selected' : ''; ?>>Company</option>
+                            <option value="team" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'team' ? 'selected' : ''; ?>>Team Meetup</option>
+                            <option value="company" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'company' ? 'selected' : ''; ?>>Company Meetup</option>
                             <option value="conference" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'conference' ? 'selected' : ''; ?>>Conference</option>
                             <option value="training" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'training' ? 'selected' : ''; ?>>Training</option>
                             <option value="other" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'other' ? 'selected' : ''; ?>>Other</option>
@@ -1629,6 +1665,37 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <div class="form-group">
                     <label for="event-description">Description</label>
                     <textarea id="event-description" name="description"><?php echo $is_editing_event ? htmlspecialchars( $edit_data['description'] ?? '' ) : ''; ?></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <div class="event-links-section" style="border: 1px solid #ddd; border-radius: 6px; padding: 15px; background: #f9f9f9; margin-top: 15px;">
+                        <label style="font-weight: bold; color: #333; margin-bottom: 10px; display: block;">🔗 Event Links</label>
+                        <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Add links for Zoom calls, agendas, documents, etc. You can paste rich text links and they'll be auto-parsed.</p>
+                        
+                        <div id="event-links-container" style="margin-bottom: 15px;">
+                            <?php if ( $is_editing_event && ! empty( $edit_data['links'] ) ) : ?>
+                                <?php $link_index = 0; foreach ( $edit_data['links'] as $link_text => $link_url ) : ?>
+                                    <div class="link-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                                        <input type="text" name="event_links[<?php echo $link_index; ?>][text]" 
+                                               value="<?php echo htmlspecialchars( $link_text ); ?>" 
+                                               placeholder="Link text (e.g., Zoom, Agenda)" 
+                                               style="flex: 0 0 200px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                                        <input type="url" name="event_links[<?php echo $link_index; ?>][url]" 
+                                               value="<?php echo htmlspecialchars( $link_url ); ?>" 
+                                               placeholder="URL" 
+                                               style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                                        <button type="button" class="remove-link-btn" 
+                                                style="padding: 8px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
+                                    </div>
+                                <?php $link_index++; endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <button type="button" id="add-event-link-btn" 
+                                style="padding: 8px 16px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                            + Add Link
+                        </button>
+                    </div>
                 </div>
                 
                 <button type="submit" class="btn" id="event-submit-btn"><?php echo $is_editing_event ? 'Update Event' : 'Add Event'; ?></button>
@@ -2021,6 +2088,226 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             }
         }
 
+        // Event links management
+        let eventLinkCounter = 0;
+        function addEventLink() {
+            const container = document.getElementById('event-links-container');
+            const newRow = document.createElement('div');
+            newRow.className = 'link-row';
+            newRow.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
+            newRow.innerHTML = `
+                <input type="text" name="event_links[${eventLinkCounter}][text]" 
+                       placeholder="Link text (e.g., Zoom, Agenda)" 
+                       style="flex: 0 0 200px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                <input type="url" name="event_links[${eventLinkCounter}][url]" 
+                       placeholder="URL" 
+                       style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                <button type="button" onclick="removeEventLink(this)" 
+                        style="padding: 8px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
+            `;
+            container.appendChild(newRow);
+            
+            // Setup rich text parsing for the new inputs
+            const textInput = newRow.querySelector('input[type="text"]');
+            const urlInput = newRow.querySelector('input[type="url"]');
+            setupRichTextLinkParsing(textInput, urlInput);
+            
+            eventLinkCounter++;
+        }
+
+        function removeEventLink(button) {
+            button.parentNode.remove();
+        }
+
+        // Rich text link parser
+        function parseRichTextLink(pastedText) {
+            // Try to extract URL from various formats
+            const urlRegex = /(https?:\/\/[^\s]+)/gi;
+            const matches = pastedText.match(urlRegex);
+            
+            if (matches && matches.length > 0) {
+                // Extract the URL
+                const url = matches[0];
+                // Extract text by removing the URL and cleaning up
+                let text = pastedText.replace(url, '').trim();
+                
+                // Remove common markdown link formatting if present
+                text = text.replace(/^\[|\]$/g, ''); // Remove [ and ]
+                text = text.replace(/^\(|\)$/g, ''); // Remove ( and )
+                
+                // If no meaningful text remains, try to get domain from URL
+                if (!text || text.length < 2) {
+                    try {
+                        const urlObj = new URL(url);
+                        text = urlObj.hostname.replace('www.', '');
+                    } catch (e) {
+                        text = 'Link';
+                    }
+                }
+                
+                return { text: text, url: url };
+            }
+            
+            // Check if the entire pasted content looks like a URL
+            if (urlRegex.test(pastedText.trim())) {
+                try {
+                    const urlObj = new URL(pastedText.trim());
+                    return { 
+                        text: urlObj.hostname.replace('www.', ''),
+                        url: pastedText.trim()
+                    };
+                } catch (e) {
+                    return null;
+                }
+            }
+            
+            return null;
+        }
+
+        function setupRichTextLinkParsing(textInput, urlInput) {
+            textInput.addEventListener('paste', async function(e) {
+                e.preventDefault();
+                
+                try {
+                    // Try to read from clipboard with rich text support
+                    if (navigator.clipboard && navigator.clipboard.read) {
+                        const clipboardItems = await navigator.clipboard.read();
+                        
+                        for (const clipboardItem of clipboardItems) {
+                            // Try HTML format first (rich text)
+                            if (clipboardItem.types.includes('text/html')) {
+                                const htmlBlob = await clipboardItem.getType('text/html');
+                                const htmlText = await htmlBlob.text();
+                                
+                                // Parse HTML for links
+                                const tempDiv = document.createElement('div');
+                                tempDiv.innerHTML = htmlText;
+                                const links = tempDiv.querySelectorAll('a[href]');
+                                
+                                if (links.length > 0 && !urlInput.value) {
+                                    // Use the first link found
+                                    const link = links[0];
+                                    const linkText = link.textContent.trim();
+                                    const linkUrl = link.href;
+                                    
+                                    textInput.value = linkText || linkUrl;
+                                    urlInput.value = linkUrl;
+                                    
+                                    // Add visual feedback
+                                    urlInput.style.background = '#e8f5e8';
+                                    setTimeout(() => {
+                                        urlInput.style.background = '';
+                                    }, 1500);
+                                    return;
+                                }
+                            }
+                            
+                            // Fallback to plain text
+                            if (clipboardItem.types.includes('text/plain')) {
+                                const textBlob = await clipboardItem.getType('text/plain');
+                                const plainText = await textBlob.text();
+                                
+                                const parsed = parseRichTextLink(plainText);
+                                if (parsed && !urlInput.value) {
+                                    textInput.value = parsed.text;
+                                    urlInput.value = parsed.url;
+                                    
+                                    // Add visual feedback
+                                    urlInput.style.background = '#e8f5e8';
+                                    setTimeout(() => {
+                                        urlInput.style.background = '';
+                                    }, 1500);
+                                    return;
+                                }
+                                
+                                // If no URL found, just paste the text normally
+                                textInput.value = plainText;
+                            }
+                        }
+                    } else {
+                        // Fallback for older browsers - use clipboardData
+                        const clipboardData = e.clipboardData || window.clipboardData;
+                        if (clipboardData) {
+                            // Try HTML first
+                            let htmlData = clipboardData.getData('text/html');
+                            if (htmlData) {
+                                const tempDiv = document.createElement('div');
+                                tempDiv.innerHTML = htmlData;
+                                const links = tempDiv.querySelectorAll('a[href]');
+                                
+                                if (links.length > 0 && !urlInput.value) {
+                                    const link = links[0];
+                                    const linkText = link.textContent.trim();
+                                    const linkUrl = link.href;
+                                    
+                                    textInput.value = linkText || linkUrl;
+                                    urlInput.value = linkUrl;
+                                    
+                                    // Add visual feedback
+                                    urlInput.style.background = '#e8f5e8';
+                                    setTimeout(() => {
+                                        urlInput.style.background = '';
+                                    }, 1500);
+                                    return;
+                                }
+                            }
+                            
+                            // Fallback to plain text
+                            const plainText = clipboardData.getData('text/plain') || clipboardData.getData('text');
+                            if (plainText) {
+                                const parsed = parseRichTextLink(plainText);
+                                if (parsed && !urlInput.value) {
+                                    textInput.value = parsed.text;
+                                    urlInput.value = parsed.url;
+                                    
+                                    // Add visual feedback
+                                    urlInput.style.background = '#e8f5e8';
+                                    setTimeout(() => {
+                                        urlInput.style.background = '';
+                                    }, 1500);
+                                } else {
+                                    textInput.value = plainText;
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.log('Clipboard API failed, falling back to normal paste:', error);
+                    // Allow default paste behavior
+                    textInput.focus();
+                    document.execCommand('paste');
+                }
+            });
+        }
+
+        // Initialize event link handlers
+        document.addEventListener('DOMContentLoaded', function() {
+            const addEventLinkBtn = document.getElementById('add-event-link-btn');
+            if (addEventLinkBtn) {
+                addEventLinkBtn.addEventListener('click', addEventLink);
+            }
+
+            // Initialize counter based on existing links
+            const existingLinks = document.querySelectorAll('#event-links-container .link-row');
+            eventLinkCounter = existingLinks.length;
+
+            // Add remove handlers to existing links
+            document.querySelectorAll('.remove-link-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    removeEventLink(this);
+                });
+            });
+
+            // Setup rich text parsing for existing link inputs
+            document.querySelectorAll('#event-links-container .link-row').forEach(row => {
+                const textInput = row.querySelector('input[type="text"]');
+                const urlInput = row.querySelector('input[type="url"]');
+                if (textInput && urlInput) {
+                    setupRichTextLinkParsing(textInput, urlInput);
+                }
+            });
+        });
+
         // Initialize timezone autocomplete when page loads
         document.addEventListener('DOMContentLoaded', initTimezoneAutocomplete);
 
@@ -2055,5 +2342,21 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             }
         }
     </script>
+    
+    <!-- Footer with admin/privacy links -->
+    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 14px;">
+        <?php
+        $current_params = $_GET;
+        if ( $privacy_mode ) {
+            $current_params['privacy'] = '0';
+            echo '<a href="?' . http_build_query( $current_params ) . '" style="color: #666; text-decoration: none; margin-right: 15px;">🔒 Privacy Mode ON</a>';
+        } else {
+            $current_params['privacy'] = '1';
+            echo '<a href="?' . http_build_query( $current_params ) . '" style="color: #666; text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>';
+        }
+        ?>
+        <a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: #666; text-decoration: none;">👥 Team Overview</a>
+    </footer>
+    
 </body>
 </html>

@@ -27,7 +27,7 @@ window.CmdK = {
             ...this.allPeople.map(person => ({
                 ...person,
                 itemType: 'person',
-                searchText: `${person.name} ${person.username} ${person.role} ${person.type} ${person.team}`.toLowerCase()
+                searchText: `${person.name} ${person.nickname || ''} ${person.username} ${person.role} ${person.type} ${person.team}`.toLowerCase()
             }))
         ];
         
@@ -296,7 +296,7 @@ window.CmdK = {
                         <div class="cmd-k-item-header">
                             <div class="cmd-k-item-name">
                                 <span class="cmd-k-item-icon">👤</span>
-                                ${this.escapeHtml(item.name)}
+                                ${this.escapeHtml(item.name)}${item.nickname ? ' "' + this.escapeHtml(item.nickname) + '"' : ''}
                             </div>
                             <div class="cmd-k-person-role">${this.escapeHtml(item.type)}${item.role ? ' • ' + this.escapeHtml(item.role) : ''}</div>
                         </div>
