@@ -2,7 +2,7 @@
 /**
  * HR Monthly Reports Tool
  * 
- * Tool for creating and managing monthly HR feedback reports with LLM assistance.
+ * Tool for creating and managing monthly HR feedback reports with local LLM feedback.
  */
 
 require_once __DIR__ . '/includes/common.php';
@@ -41,7 +41,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 }
 
 /**
- * Create backup of existing file
+ * Create backup of existing file (max one per minute)
  */
 function create_backup( $file_path ) {
     if ( ! file_exists( $file_path ) ) {
@@ -54,11 +54,17 @@ function create_backup( $file_path ) {
         mkdir( $backups_dir, 0755, true );
     }
 
-    // Generate backup filename in backups directory
+    // Generate backup filename in backups directory (minute precision only)
     $filename = basename( $file_path );
-    $backup_filename = substr( $filename, 0, -4 ) . 'bak' . date( '-Y-m-d-H-i-s' ) . '.json';
+    $backup_timestamp = date( '-Y-m-d-H-i' ); // No seconds - only minute precision
+    $backup_filename = substr( $filename, 0, -4 ) . 'bak' . $backup_timestamp . '.json';
     $backup_path = $backups_dir . '/' . $backup_filename;
     
+    // Only create backup if one doesn't already exist for this minute
+    if ( file_exists( $backup_path ) ) {
+        return true; // Backup for this minute already exists
+    }
+
     return copy( $file_path, $backup_path );
 }
 
@@ -332,6 +338,7 @@ function get_llm_feedback_assessment( $feedback_text ) {
 $selected_person = $_GET['person'] ?? '';
 $selected_month = $_GET['month'] ?? get_hr_feedback_month();
 $view_mode = $_GET['view'] ?? 'form'; // 'form' or 'overview'
+$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
 // Load existing feedback if available
 $existing_feedback = array();
@@ -345,7 +352,7 @@ if ( $selected_person && $selected_month ) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HR Monthly Reports - <?php echo htmlspecialchars( $team_data['team_name'] ); ?></title>
+    <title><?php echo htmlspecialchars( $_GET['person'] ?? $team_data['team_name'] ); ?> - HR Monthly Report</title>
     <link rel="stylesheet" href="assets/style.css">
     <link rel="stylesheet" href="assets/hr-reports.css">
 </head>
@@ -357,11 +364,10 @@ if ( $selected_person && $selected_month ) {
 
         <div class="header">
             <h1>HR Monthly Reports</h1>
-            <p>Create and manage monthly feedback reports with LLM assistance</p>
             <div class="header-nav">
-                <a href="<?php echo build_team_url( 'hr-reports.php', array( 'view' => 'overview', 'month' => $selected_month ) ); ?>"
-                   class="btn <?php echo $view_mode === 'overview' ? 'btn-primary' : 'btn-secondary'; ?>">📋 Overview</a>
-                <a href="<?php echo build_team_url( 'hr-config.php' ); ?>" class="btn btn-secondary">⚙️ Configure AI Settings</a>
+                <a href="<?php echo build_team_url( 'hr-reports.php', array( 'view' => 'overview', 'month' => $selected_month, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
+                   class="btn <?php echo $view_mode === 'overview' || $privacy_mode ? 'btn-primary' : 'btn-secondary'; ?>">📋 Overview</a>
+                <a href="<?php echo build_team_url( 'hr-config.php' ); ?>" class="btn btn-secondary">⚙️ Configure Ollama Settings</a>
             </div>
         </div>
 
@@ -371,7 +377,7 @@ if ( $selected_person && $selected_month ) {
             </div>
         <?php endif; ?>
 
-        <?php if ( $view_mode === 'overview' ) : ?>
+        <?php if ( $view_mode === 'overview' || ( $privacy_mode && empty( $selected_person ) ) ) : ?>
             <!-- Overview Mode -->
             <?php
             $overview_data = get_monthly_overview( $team_data, $selected_month );
@@ -381,14 +387,18 @@ if ( $selected_person && $selected_month ) {
                 <div class="overview-header">
                     <h2>📋 Monthly Reports Overview - <?php echo date( 'F Y', strtotime( $selected_month . '-01' ) ); ?>
                     <?php
-                    $current_feedback_month = get_hr_feedback_month();
-                    if ( $selected_month === $current_feedback_month ) {
-                        $today = new DateTime();
-                        $day = (int) $today->format('d');
-                        if ( $day >= 15 ) {
-                            echo ' <small>(Current Month)</small>';
-                        } else {
-                            echo ' <small>(Previous Month)</small>';
+                    if ( $privacy_mode ) {
+                        echo ' <small style="color: #666;">(Privacy Mode - Content Hidden)</small>';
+                    } else {
+                        $current_feedback_month = get_hr_feedback_month();
+                        if ( $selected_month === $current_feedback_month ) {
+                            $today = new DateTime();
+                            $day = (int) $today->format('d');
+                            if ( $day >= 15 ) {
+                                echo ' <small>(Current Month)</small>';
+                            } else {
+                                echo ' <small>(Previous Month)</small>';
+                            }
                         }
                     }
                     ?>
@@ -396,7 +406,7 @@ if ( $selected_person && $selected_month ) {
                     <div class="month-selector">
                         <label for="overview_month">Month:</label>
                         <input type="month" id="overview_month" value="<?php echo htmlspecialchars( $selected_month ); ?>" 
-                               onchange="window.location.href='<?php echo build_team_url( 'hr-reports.php', array( 'view' => 'overview', 'month' => '' ) ); ?>'.replace('month=', 'month=' + this.value)">
+                               onchange="window.location.href='<?php echo build_team_url( 'hr-reports.php', array( 'view' => 'overview', 'month' => '', 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>'.replace('month=', 'month=' + this.value)">
                     </div>
                 </div>
 
@@ -461,13 +471,21 @@ if ( $selected_person && $selected_month ) {
                                 <?php endif; ?>
 
                                 <div class="card-actions">
-                                    <a href="<?php echo build_team_url( 'hr-reports.php', array( 'view' => 'form', 'person' => $username, 'month' => $selected_month ) ); ?>" 
+                                    <a href="<?php echo build_team_url( 'hr-reports.php', array( 'view' => 'form', 'person' => $username, 'month' => $selected_month, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
                                        class="btn btn-small btn-primary">
                                         <?php echo $feedback ? '✏️ Edit' : '📝 Create'; ?>
                                     </a>
                                     <?php if ( $hr_monthly_link ) : ?>
                                         <a href="<?php echo htmlspecialchars( $hr_monthly_link ); ?>" 
                                            target="_blank" class="btn btn-small btn-secondary">📄 Google Doc</a>
+                                    <?php endif; ?>
+                                    <?php if ( isset( $team_data['activity_url_prefix'] ) ) :
+                                        $month_start = date( 'Y-m-d', strtotime( $selected_month . '-01' ) );
+                                        $month_end = date( 'Y-m-t', strtotime( $selected_month . '-01' ) );
+                                        $activity_url = $team_data['activity_url_prefix'] . '&member=' . urlencode( $username ) . '&start=' . $month_start . '&end=' . $month_end;
+                                    ?>
+                                        <a href="<?php echo htmlspecialchars( $activity_url ); ?>"
+                                           target="_blank" class="btn btn-small btn-secondary">📊 Activity</a>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -543,6 +561,23 @@ if ( $selected_person && $selected_month ) {
                     <div class="form-group">
                         <label for="month">Month:</label>
                         <input type="month" name="month" id="month" value="<?php echo htmlspecialchars( $selected_month ); ?>" required>
+                        <?php if ( $selected_person && $selected_month ) : ?>
+                            <?php
+                            $member = $team_data['team_members'][$selected_person] ?? $team_data['leadership'][$selected_person] ?? null;
+                            if ( $member && isset( $team_data['activity_url_prefix'] ) ) :
+                                $month_start = date( 'Y-m-d', strtotime( $selected_month . '-01' ) );
+                                $month_end = date( 'Y-m-t', strtotime( $selected_month . '-01' ) );
+                                $activity_url = $team_data['activity_url_prefix'] . '&member=' . urlencode( $selected_person ) . '&start=' . $month_start . '&end=' . $month_end;
+                            ?>
+                                <div style="margin-top: 8px;">
+                                    <a href="<?php echo htmlspecialchars( $activity_url ); ?>"
+                                       target="_blank"
+                                       class="btn btn-secondary btn-small">
+                                        📊 View Activity for <?php echo date( 'F Y', strtotime( $selected_month . '-01' ) ); ?>
+                                    </a>
+                                </div>
+                            <?php endif; ?>
+                        <?php endif; ?>
                     </div>
 
                     <div class="form-group">
@@ -601,10 +636,21 @@ if ( $selected_person && $selected_month ) {
                 </div>
             </div>
 
-            <!-- Auto-save indicator -->
+
+            <!-- Auto-save indicator with privacy toggle -->
             <div class="auto-save-indicator" id="save-status" style="text-align: center; margin: 20px 0; font-size: 14px; color: #666;">
-                <span id="save-message">Changes are saved automatically</span>
-                <span id="save-checkmark" style="display: none; color: #28a745; margin-left: 5px;">✅</span>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
+                    <div>
+                        <span id="save-message">Changes are saved automatically</span>
+                        <span id="save-checkmark" style="display: none; color: #28a745; margin-left: 5px;">✅</span>
+                    </div>
+                    <div style="border-left: 1px solid #ddd; padding-left: 20px;">
+                        <label style="cursor: pointer; font-size: 13px; color: #666;">
+                            <input type="checkbox" id="privacy-mode-checkbox" style="margin-right: 6px; transform: scale(0.9);">
+                            🔐 Privacy Mode
+                        </label>
+                    </div>
+                </div>
             </div>
 
 
@@ -619,42 +665,11 @@ if ( $selected_person && $selected_month ) {
             </div>
         </form>
 
-        <?php if ( $selected_person ) : ?>
-            <!-- HR Google Doc Link Configuration -->
-            <div class="hr-config-section">
-                <h3>📄 HR Google Doc Configuration</h3>
-                <form method="post" class="hr-link-form">
-                    <input type="hidden" name="action" value="save_hr_link">
-                    <input type="hidden" name="username" value="<?php echo htmlspecialchars( $selected_person ); ?>">
-                    
-                    <div class="form-group">
-                        <label for="hr_monthly_link">HR Monthly Google Doc URL:</label>
-                        <input type="url" 
-                               name="hr_monthly_link" 
-                               id="hr_monthly_link" 
-                               value="<?php echo htmlspecialchars( $existing_feedback['hr_monthly_link'] ?? '' ); ?>"
-                               placeholder="https://drive.google.com/open?id="
-                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        <small style="color: #666; margin-top: 5px; display: block;">
-                            This is the Google Doc where the final HR feedback will be posted. Leave empty to remove the link.
-                        </small>
-                    </div>
-                    
-                    <div style="text-align: right; margin-top: 15px;">
-                        <button type="submit" class="btn btn-secondary">💾 Save HR Doc Link</button>
-                        <?php if ( ! empty( $existing_feedback['hr_monthly_link'] ) ) : ?>
-                            <a href="<?php echo htmlspecialchars( $existing_feedback['hr_monthly_link'] ); ?>" 
-                               target="_blank" class="btn btn-secondary" style="margin-left: 10px;">🔗 Open Doc</a>
-                        <?php endif; ?>
-                    </div>
-                </form>
-            </div>
-        <?php endif; ?>
 
         <!-- AI Chat Sidebar -->
         <div id="ai-chat-sidebar" class="ai-chat-sidebar" style="display: none;">
             <div class="ai-chat-header">
-                <h3>💬 AI Feedback Assistant</h3>
+                <h3>💬 Ollama</h3>
                 <div class="chat-controls">
                     <button type="button" class="btn btn-secondary btn-small" onclick="analyzeCurrentFeedback()">🔍 Analyze Current</button>
                     <button type="button" class="btn btn-secondary btn-small" onclick="clearChat()">🗑️ Clear</button>
@@ -769,6 +784,19 @@ if ( $selected_person && $selected_month ) {
         
         <?php endif; // End form mode ?>
     </div>
+
+    <!-- Footer with privacy mode toggle -->
+    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 14px;">
+        <?php if ( $privacy_mode ) : ?>
+            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔒 Privacy Mode ON</a>
+        <?php else : ?>
+            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>
+        <?php endif; ?>
+        <a href="<?php echo build_team_url( 'admin.php' ); ?>" style="color: #666; text-decoration: none;">⚙️ Admin Panel</a>
+        <?php if ( $selected_person ) : ?>
+            | <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'team', 'edit_person' => $selected_person ) ); ?>" style="color: #666; text-decoration: none;">✏️ Edit Person</a>
+        <?php endif; ?>
+    </footer>
 
     <script>
         // Pass PHP variable to JavaScript - use HR feedback month, not current calendar month

@@ -7,6 +7,18 @@ let ollamaModel = 'gpt-oss';
 let autoSaveTimeout;
 let isAutoSaving = false;
 
+// Privacy mode variables
+let privacyMode = false;
+let originalContent = {
+    feedback_to_person: '',
+    feedback_to_hr: ''
+};
+let originalDropdownOptions = [];
+const privacyPlaceholders = {
+    feedback_to_person: 'This feedback content is hidden in privacy mode. This protects confidential information when someone else might see your screen. The actual content is preserved and will be restored when privacy mode is disabled.',
+    feedback_to_hr: 'These HR notes are hidden in privacy mode. This protects confidential information when someone else might see your screen. The actual content is preserved and will be restored when privacy mode is disabled.'
+};
+
 // Form functions
 function resetForm(currentMonth) {
     if (confirm('Are you sure you want to clear the form? Any unsaved changes will be lost.')) {
@@ -32,6 +44,8 @@ function addLink(editorId) {
             // Text is selected - prompt for URL
             const url = prompt('Enter URL:', 'https://');
             if (url && url.trim()) {
+                // Save state for undo
+                saveEditorState(editorId);
                 document.execCommand('createLink', false, url.trim());
             }
         } else {
@@ -40,6 +54,9 @@ function addLink(editorId) {
             if (text && text.trim()) {
                 const url = prompt('Enter URL:', 'https://');
                 if (url && url.trim()) {
+                    // Save state for undo
+                    saveEditorState(editorId);
+                    
                     const link = document.createElement('a');
                     link.href = url.trim();
                     link.textContent = text.trim();
@@ -58,11 +75,113 @@ function addLink(editorId) {
     }
 }
 
+// Undo/Redo functionality
+let editorHistory = {};
+
+function saveEditorState(editorId) {
+    const editor = document.getElementById(editorId);
+    if (!editorHistory[editorId]) {
+        editorHistory[editorId] = {
+            states: [],
+            currentIndex: -1
+        };
+    }
+    
+    const history = editorHistory[editorId];
+    const currentContent = editor.innerHTML;
+    
+    // Only save if content is different
+    if (history.states.length === 0 || history.states[history.currentIndex] !== currentContent) {
+        // Remove any states after current index (when user made changes after undo)
+        history.states = history.states.slice(0, history.currentIndex + 1);
+        
+        // Add new state
+        history.states.push(currentContent);
+        history.currentIndex++;
+        
+        // Limit history to 50 states
+        if (history.states.length > 50) {
+            history.states.shift();
+            history.currentIndex--;
+        }
+    }
+}
+
+function undoEditor(editorId) {
+    const editor = document.getElementById(editorId);
+    const history = editorHistory[editorId];
+    
+    if (history && history.currentIndex > 0) {
+        history.currentIndex--;
+        editor.innerHTML = history.states[history.currentIndex];
+        updateHiddenField(editorId);
+        return true;
+    }
+    return false;
+}
+
+function redoEditor(editorId) {
+    const editor = document.getElementById(editorId);
+    const history = editorHistory[editorId];
+    
+    if (history && history.currentIndex < history.states.length - 1) {
+        history.currentIndex++;
+        editor.innerHTML = history.states[history.currentIndex];
+        updateHiddenField(editorId);
+        return true;
+    }
+    return false;
+}
+
+// Smart link pasting
+function handleSmartPaste(editor, clipboardData) {
+    const selection = window.getSelection();
+    const selectedText = selection.toString();
+    
+    // Get clipboard content
+    const clipboardText = clipboardData.getData('text/plain');
+    const clipboardHtml = clipboardData.getData('text/html');
+    
+    // Check if clipboard contains a URL
+    const urlRegex = /^https?:\/\/[^\s]+$/;
+    let pastedUrl = null;
+    
+    // Try to extract URL from plain text
+    if (urlRegex.test(clipboardText.trim())) {
+        pastedUrl = clipboardText.trim();
+    } else if (clipboardHtml) {
+        // Try to extract URL from HTML (e.g., when copying a link)
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = clipboardHtml;
+        const firstLink = tempDiv.querySelector('a[href]');
+        if (firstLink) {
+            pastedUrl = firstLink.href;
+        }
+    }
+    
+    // If we have selected text and pasted content is a URL, make the selected text a link
+    if (selectedText && pastedUrl) {
+        // Save state for undo
+        saveEditorState(editor.id);
+        
+        // Prevent default paste
+        document.execCommand('createLink', false, pastedUrl);
+        return true; // Indicate we handled the paste
+    }
+    
+    return false; // Let default paste behavior happen
+}
+
 function updateHiddenField(editorId) {
     const editor = document.getElementById(editorId);
     const hiddenField = document.getElementById(editorId + '_html');
     if (hiddenField) {
-        hiddenField.value = editor.innerHTML;
+        // In privacy mode, use original content, not placeholder content
+        if (privacyMode && originalContent[editorId]) {
+            hiddenField.value = originalContent[editorId];
+        } else {
+            hiddenField.value = editor.innerHTML;
+        }
     }
 }
 
@@ -408,11 +527,8 @@ function editCurrentDraft() {
 
 // Auto-save functionality
 function initAutoSave() {
-    console.log('initAutoSave function called');
     const form = document.querySelector('.hr-form');
-    console.log('Found form:', form);
     if (!form) {
-        console.log('No form found with class .hr-form');
         return;
     }
     const inputs = form.querySelectorAll('input, select, textarea, .rich-editor');
@@ -431,10 +547,8 @@ function initAutoSave() {
 
     // Specifically handle checklist checkboxes
     const checkboxes = form.querySelectorAll('input[type="checkbox"]');
-    console.log('Found checkboxes:', checkboxes.length);
     checkboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function () {
-            console.log('Checkbox changed:', this.name, this.checked);
             // Update visual state immediately
             const span = this.nextElementSibling;
             if (span && span.tagName === 'SPAN') {
@@ -446,7 +560,6 @@ function initAutoSave() {
 }
 
 function scheduleAutoSave() {
-    console.log('scheduleAutoSave called');
     clearTimeout(autoSaveTimeout);
 
     // Show saving indicator
@@ -458,8 +571,14 @@ function scheduleAutoSave() {
 }
 
 function performAutoSave() {
-    console.log('performAutoSave called');
     if (isAutoSaving) return;
+    
+    // Don't save when privacy mode is active
+    if (isPrivacyModeActive()) {
+        showSaveStatus('saved'); // Show as saved but don't actually save
+        return;
+    }
+    
     isAutoSaving = true;
 
     // Update hidden fields for rich editors
@@ -495,22 +614,24 @@ function showSaveStatus(status) {
 
     if (status === 'saving') {
         saveMessage.textContent = 'Saving...';
-        saveMessage.style.color = '#666';
+        saveMessage.style.color = '#999';
+        saveMessage.style.opacity = '0.7';
         if (saveCheckmark) saveCheckmark.style.display = 'none';
     } else if (status === 'saved') {
-        saveMessage.textContent = 'Saved';
-        saveMessage.style.color = '#28a745';
-        if (saveCheckmark) saveCheckmark.style.display = 'inline';
+        saveMessage.textContent = '';
+        if (saveCheckmark) {
+            saveCheckmark.style.display = 'inline';
+            saveCheckmark.style.color = '#28a745';
+        }
 
-        // Hide checkmark after 2 seconds
+        // Hide checkmark after 1 second
         setTimeout(() => {
-            saveMessage.textContent = 'Changes are saved automatically';
-            saveMessage.style.color = '#666';
             if (saveCheckmark) saveCheckmark.style.display = 'none';
-        }, 2000);
+        }, 1000);
     } else if (status === 'error') {
         saveMessage.textContent = 'Save failed - please refresh';
         saveMessage.style.color = '#dc3545';
+        saveMessage.style.opacity = '1';
         if (saveCheckmark) saveCheckmark.style.display = 'none';
     }
 }
@@ -530,9 +651,103 @@ function uncheckGoogleDocUpdated() {
     }
 }
 
+// Privacy mode functions
+function togglePrivacyMode() {
+    const editors = ['feedback_to_person', 'feedback_to_hr'];
+    
+    // Handle text editors
+    editors.forEach(editorId => {
+        const editor = document.getElementById(editorId);
+        if (!editor) return;
+        
+        if (privacyMode) {
+            // Store original content and replace with placeholder
+            originalContent[editorId] = editor.innerHTML;
+            editor.innerHTML = privacyPlaceholders[editorId];
+            editor.style.fontStyle = 'italic';
+            editor.style.color = '#666';
+            editor.style.backgroundColor = '#f8f9fa';
+            // Keep editor editable in privacy mode
+        } else {
+            // Restore original content
+            editor.innerHTML = originalContent[editorId];
+            editor.style.fontStyle = '';
+            editor.style.color = '';
+            editor.style.backgroundColor = '';
+        }
+        
+        // Update hidden field
+        updateHiddenField(editorId);
+    });
+    
+    // Handle dropdown redaction
+    toggleDropdownPrivacy();
+}
+
+function toggleDropdownPrivacy() {
+    const dropdown = document.getElementById('username');
+    if (!dropdown) return;
+    
+    if (privacyMode) {
+        // Store original options if not already stored
+        if (originalDropdownOptions.length === 0) {
+            Array.from(dropdown.options).forEach(option => {
+                originalDropdownOptions.push({
+                    value: option.value,
+                    text: option.textContent,
+                    selected: option.selected
+                });
+            });
+        }
+        
+        // Redact option text while preserving values
+        Array.from(dropdown.options).forEach((option, index) => {
+            if (option.value && option.value !== '') {
+                // Generate redacted name like "Person A", "Person B", etc.
+                const letter = String.fromCharCode(65 + (index - 1)); // Start from A (skip empty option)
+                option.textContent = `Person ${letter}`;
+            }
+        });
+    } else {
+        // Restore original option text
+        originalDropdownOptions.forEach((originalOption, index) => {
+            if (dropdown.options[index]) {
+                dropdown.options[index].textContent = originalOption.text;
+            }
+        });
+    }
+}
+
+// Prevent saving when in privacy mode
+function isPrivacyModeActive() {
+    return privacyMode;
+}
+
+// Store content before entering privacy mode
+function storeCurrentContent() {
+    const editors = ['feedback_to_person', 'feedback_to_hr'];
+    editors.forEach(editorId => {
+        const editor = document.getElementById(editorId);
+        if (editor && !privacyMode) {
+            originalContent[editorId] = editor.innerHTML;
+        }
+    });
+    
+    // Store dropdown options if not already stored
+    const dropdown = document.getElementById('username');
+    if (dropdown && originalDropdownOptions.length === 0) {
+        Array.from(dropdown.options).forEach(option => {
+            originalDropdownOptions.push({
+                value: option.value,
+                text: option.textContent,
+                selected: option.selected
+            });
+        });
+    }
+}
+
 // Initialize everything when DOM loads
 document.addEventListener('DOMContentLoaded', function () {
-    console.log('DOMContentLoaded fired');
 
     // Initialize rich editors
     const editors = document.querySelectorAll('.rich-editor');
@@ -544,9 +759,20 @@ document.addEventListener('DOMContentLoaded', function () {
             uncheckGoogleDocUpdated();
         });
 
-        // Handle paste events to preserve rich text and auto-link URLs
+        // Handle paste events with smart link functionality
         editor.addEventListener('paste', function (e) {
+            // Check for smart paste first
+            if (handleSmartPaste(editor, e.clipboardData)) {
+                e.preventDefault();
+                updateHiddenField(editor.id);
+                uncheckGoogleDocUpdated();
+                return;
+            }
+
             e.preventDefault();
+
+            // Save state for undo
+            saveEditorState(editor.id);
 
             // Try to get HTML content first (preserves links from Google Docs, etc.)
             let htmlContent = '';
@@ -634,6 +860,34 @@ document.addEventListener('DOMContentLoaded', function () {
             uncheckGoogleDocUpdated();
         });
 
+        // Add keyboard shortcuts for undo/redo
+        editor.addEventListener('keydown', function (e) {
+            // Undo: Cmd+Z (Mac) or Ctrl+Z (Windows/Linux)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                if (undoEditor(editor.id)) {
+                    uncheckGoogleDocUpdated();
+                }
+            }
+            // Redo: Cmd+Shift+Z (Mac) or Ctrl+Y (Windows/Linux)
+            else if (((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) || 
+                     (e.ctrlKey && e.key === 'y')) {
+                e.preventDefault();
+                if (redoEditor(editor.id)) {
+                    uncheckGoogleDocUpdated();
+                }
+            }
+        });
+
+        // Save editor state on input for undo functionality
+        editor.addEventListener('input', function () {
+            // Debounce saving state to avoid too many saves during typing
+            clearTimeout(editor.saveStateTimeout);
+            editor.saveStateTimeout = setTimeout(() => {
+                saveEditorState(editor.id);
+            }, 500);
+        });
+
         // Show placeholder
         if (editor.innerHTML.trim() === '') {
             editor.classList.add('empty');
@@ -673,6 +927,34 @@ document.addEventListener('DOMContentLoaded', function () {
     loadConfig();
 
     // Initialize auto-save
-    console.log('About to initialize auto-save');
     initAutoSave();
+    
+    // Initialize privacy mode from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const privacyModeFromUrl = urlParams.get('privacy') === '1';
+    
+    // Store initial content when page loads
+    storeCurrentContent();
+    
+    // Set privacy mode based on URL parameter
+    if (privacyModeFromUrl && !privacyMode) {
+        privacyMode = true;
+        togglePrivacyMode();
+    }
+    
+    // Initialize JavaScript privacy mode checkbox
+    const privacyCheckbox = document.getElementById('privacy-mode-checkbox');
+    if (privacyCheckbox) {
+        // Set checkbox state based on current privacy mode
+        privacyCheckbox.checked = privacyMode;
+        
+        privacyCheckbox.addEventListener('change', function() {
+            // Store content before toggling (if turning on privacy mode)
+            if (this.checked && !privacyMode) {
+                storeCurrentContent();
+            }
+            privacyMode = this.checked;
+            togglePrivacyMode();
+        });
+    }
 });

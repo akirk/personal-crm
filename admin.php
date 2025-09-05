@@ -98,7 +98,7 @@ function load_or_create_config( $file_path ) {
 
 
 /**
- * Create backup of existing configuration file
+ * Create backup of existing configuration file (max one per minute)
  */
 function create_backup( $file_path ) {
 	if ( ! file_exists( $file_path ) ) {
@@ -111,10 +111,16 @@ function create_backup( $file_path ) {
 		mkdir( $backups_dir, 0755, true );
 	}
 
-	// Generate backup filename in backups directory
+	// Generate backup filename in backups directory (minute precision only)
 	$filename = basename( $file_path );
-	$backup_filename = substr( $filename, 0, -4 ) . 'bak' . date( '-Y-m-d-H-i-s' ) . '.json';
+	$backup_timestamp = date( '-Y-m-d-H-i' ); // No seconds - only minute precision
+	$backup_filename = substr( $filename, 0, -4 ) . 'bak' . $backup_timestamp . '.json';
 	$backup_path = $backups_dir . '/' . $backup_filename;
+	
+	// Only create backup if one doesn't already exist for this minute
+	if ( file_exists( $backup_path ) ) {
+		return true; // Backup for this minute already exists
+	}
 	
 	return copy( $file_path, $backup_path );
 }

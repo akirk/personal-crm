@@ -18,12 +18,6 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
     if ( isset( $_POST['action'] ) && $_POST['action'] === 'save_config' ) {
         $result = save_hr_config( $_POST );
         $message = $result['message'];
-    } elseif ( isset( $_POST['action'] ) && $_POST['action'] === 'migrate_hr_links' ) {
-        $result = migrate_hr_monthly_links();
-        $message = $result['message'];
-    } elseif ( isset( $_POST['action'] ) && $_POST['action'] === 'cleanup_hr_links' ) {
-        $result = cleanup_hr_links_from_team_json();
-        $message = $result['message'];
     }
 }
 
@@ -86,117 +80,6 @@ function load_hr_config() {
     );
 }
 
-/**
- * Migrate HR monthly links from team JSONs to hr-feedback.json
- */
-function migrate_hr_monthly_links() {
-    $feedback_file = __DIR__ . '/hr-feedback.json';
-    $feedback_data = array();
-    
-    if ( file_exists( $feedback_file ) ) {
-        $content = file_get_contents( $feedback_file );
-        $feedback_data = json_decode( $content, true ) ?: array();
-    }
-    
-    if ( ! isset( $feedback_data['feedback'] ) ) {
-        $feedback_data['feedback'] = array();
-    }
-    
-    $migrated_links = 0;
-    $team_files = glob( __DIR__ . '/*.json' );
-    
-    foreach ( $team_files as $team_file ) {
-        $basename = basename( $team_file, '.json' );
-        
-        // Skip hr-feedback.json and backup files
-        if ( $basename === 'hr-feedback' || strpos( $basename, '.bak' ) !== false || strpos( $basename, 'bak-' ) !== false ) {
-            continue;
-        }
-        
-        $team_content = file_get_contents( $team_file );
-        $team_data = json_decode( $team_content, true );
-        
-        if ( ! $team_data || ! isset( $team_data['team_members'] ) ) {
-            continue;
-        }
-        
-        foreach ( $team_data['team_members'] as $username => $member_data ) {
-            if ( isset( $member_data['links']['HR monthly'] ) && ! empty( $member_data['links']['HR monthly'] ) ) {
-                // Initialize user in feedback data if not exists
-                if ( ! isset( $feedback_data['feedback'][$username] ) ) {
-                    $feedback_data['feedback'][$username] = array();
-                }
-                
-                // Add HR monthly link
-                $feedback_data['feedback'][$username]['hr_monthly_link'] = $member_data['links']['HR monthly'];
-                $migrated_links++;
-            }
-        }
-    }
-    
-    // Save updated hr-feedback.json
-    if ( $migrated_links > 0 ) {
-        $feedback_data['updated_at'] = date( 'Y-m-d H:i:s' );
-        $success = file_put_contents( $feedback_file, json_encode( $feedback_data, JSON_PRETTY_PRINT ) );
-        
-        if ( $success ) {
-            return array( 'success' => true, 'message' => "Successfully migrated {$migrated_links} HR monthly links to hr-feedback.json!" );
-        } else {
-            return array( 'success' => false, 'message' => 'Failed to save hr-feedback.json after migration.' );
-        }
-    } else {
-        return array( 'success' => true, 'message' => 'No HR monthly links found to migrate.' );
-    }
-}
-
-/**
- * Remove HR monthly links from team JSON files after migration
- */
-function cleanup_hr_links_from_team_json() {
-    $removed_links = 0;
-    $updated_files = array();
-    $team_files = glob( __DIR__ . '/*.json' );
-    
-    foreach ( $team_files as $team_file ) {
-        $basename = basename( $team_file, '.json' );
-        
-        // Skip hr-feedback.json and backup files
-        if ( $basename === 'hr-feedback' || strpos( $basename, '.bak' ) !== false || strpos( $basename, 'bak-' ) !== false ) {
-            continue;
-        }
-        
-        $team_content = file_get_contents( $team_file );
-        $team_data = json_decode( $team_content, true );
-        
-        if ( ! $team_data || ! isset( $team_data['team_members'] ) ) {
-            continue;
-        }
-        
-        $file_modified = false;
-        
-        foreach ( $team_data['team_members'] as $username => &$member_data ) {
-            if ( isset( $member_data['links']['HR monthly'] ) ) {
-                unset( $member_data['links']['HR monthly'] );
-                $removed_links++;
-                $file_modified = true;
-            }
-        }
-        
-        if ( $file_modified ) {
-            $success = file_put_contents( $team_file, json_encode( $team_data, JSON_PRETTY_PRINT ) );
-            if ( $success ) {
-                $updated_files[] = $basename;
-            }
-        }
-    }
-    
-    if ( $removed_links > 0 ) {
-        $file_list = implode( ', ', $updated_files );
-        return array( 'success' => true, 'message' => "Successfully removed {$removed_links} HR monthly links from team JSON files: {$file_list}" );
-    } else {
-        return array( 'success' => true, 'message' => 'No HR monthly links found in team JSON files to remove.' );
-    }
-}
 
 $current_config = load_hr_config();
 
@@ -349,20 +232,6 @@ $current_config = load_hr_config();
             </div>
         </form>
 
-        <div style="margin-top: 30px; padding: 20px; background: #fff3cd; border-radius: 4px; border-left: 4px solid #ffc107;">
-            <h3>🚀 HR Monthly Links Management</h3>
-            <p><strong>Step 1:</strong> Migrate existing HR monthly links from team JSON files to hr-feedback.json structure:</p>
-            <form method="post" style="display: inline; margin-right: 10px;">
-                <input type="hidden" name="action" value="migrate_hr_links">
-                <button type="submit" class="btn" style="background: #ffc107; color: #212529;" onclick="return confirm('This will migrate HR monthly links from team JSONs to hr-feedback.json. Continue?')">🔗 Migrate HR Links</button>
-            </form>
-            
-            <p style="margin-top: 15px;"><strong>Step 2:</strong> Remove HR monthly links from team JSON files (run after migration):</p>
-            <form method="post" style="display: inline;">
-                <input type="hidden" name="action" value="cleanup_hr_links">
-                <button type="submit" class="btn" style="background: #dc3545; color: white;" onclick="return confirm('This will permanently remove HR monthly links from team JSON files. Make sure migration is complete first. Continue?')">🗑️ Cleanup Team JSONs</button>
-            </form>
-        </div>
 
         <div class="test-section" id="test-section" style="display: none;">
             <h3>🧪 Configuration Test</h3>
