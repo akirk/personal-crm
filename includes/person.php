@@ -16,6 +16,7 @@ class Person {
 	public $notes; // Additional personal notes
 	public $location; // Location/town
 	public $timezone; // Timezone identifier (e.g., "America/New_York")
+	public $needs_hr_monthly; // Whether this person needs monthly HR feedback
 	public $privacy_mode; // Whether privacy mode is enabled for this person
 
 	public function __construct( $name, $username = '', $links = array(), $role = '', $privacy_mode = false ) {
@@ -32,6 +33,7 @@ class Person {
 		$this->notes = '';
 		$this->location = '';
 		$this->timezone = '';
+		$this->needs_hr_monthly = false; // Default to false - HR feedback not needed by default
 		$this->privacy_mode = $privacy_mode;
 	}
 
@@ -43,11 +45,11 @@ class Person {
 		if ( count( $parts ) <= 1 ) {
 			return $full_name; // Only first name, no masking needed
 		}
-		
+
 		// Return first name + masked last name
 		$first_name = $parts[0];
 		$last_name_initial = isset( $parts[ count( $parts ) - 1 ] ) ? substr( $parts[ count( $parts ) - 1 ], 0, 1 ) . '.' : '';
-		
+
 		return $first_name . ' ' . $last_name_initial;
 	}
 
@@ -58,7 +60,7 @@ class Person {
 		if ( strlen( $username ) <= 3 ) {
 			return $username; // Too short to mask meaningfully
 		}
-		
+
 		return substr( $username, 0, 3 ) . '...';
 	}
 
@@ -75,7 +77,7 @@ class Person {
 		// Birthday
 		if ( ! empty( $this->birthday ) ) {
 			$birthday_date = null;
-			
+
 			// Check if it's full YYYY-MM-DD format
 			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->birthday ) ) {
 				$birth_date = DateTime::createFromFormat( 'Y-m-d', $this->birthday );
@@ -86,7 +88,7 @@ class Person {
 				// Legacy MM-DD format
 				$birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->birthday );
 			}
-			
+
 			if ( isset( $birthday_this_year ) && $birthday_this_year ) {
 				if ( $birthday_this_year >= $current_date && $birthday_this_year <= $cutoff_date ) {
 					// Calculate the person's age on this birthday
@@ -251,7 +253,7 @@ class Person {
 		if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->birthday ) ) {
 			$birth_date = DateTime::createFromFormat( 'Y-m-d', $this->birthday );
 			$current_date = new DateTime();
-			
+
 			if ( $birth_date ) {
 				$age = $current_date->diff( $birth_date )->y;
 				return $age;
@@ -350,5 +352,110 @@ class Person {
 				return 'in ' . $months . ' months';
 			}
 		}
+	}
+
+
+	/**
+	 * Get monthly feedback status for this person
+	 */
+	public function get_monthly_feedback_status( $month = null ) {
+		$feedback_file = __DIR__ . '/../hr-feedback.json';
+
+		if ( ! file_exists( $feedback_file ) ) {
+			return array(
+				'status' => 'not-started',
+				'updated' => null,
+				'text' => 'Feedback not started',
+				'css_class' => 'not-started'
+			);
+		}
+
+		$content = file_get_contents( $feedback_file );
+		$feedback_data = json_decode( $content, true ) ?: array();
+
+		$target_month = $month ?: get_hr_feedback_month();
+		$feedback = $feedback_data['feedback'][$this->username][$target_month] ?? null;
+
+		if ( ! $feedback ) {
+			return array(
+				'status' => 'not-started',
+				'updated' => null,
+				'text' => 'Feedback not started',
+				'css_class' => 'not-started'
+			);
+		}
+
+		// Deduce status from checklist todos
+		$submitted_to_hr = $feedback['submitted_to_hr'] ?? false;
+		$draft_complete = $feedback['draft_complete'] ?? false;
+		$google_doc_updated = $feedback['google_doc_updated'] ?? false;
+		$has_feedback_content = !empty($feedback['feedback_to_person']) || !empty($feedback['feedback_to_hr']);
+
+		// 5. Submitted
+		if ( $submitted_to_hr ) {
+			return array(
+				'status' => 'submitted',
+				'updated' => $feedback['updated_at'],
+				'text' => '✅ Submitted',
+				'css_class' => 'completed'
+			);
+		}
+
+		// 4. Google doc updated = Ready for review
+		if ( $google_doc_updated ) {
+			return array(
+				'status' => 'ready-for-review',
+				'updated' => $feedback['updated_at'],
+				'text' => '📤 Ready for review',
+				'css_class' => 'review'
+			);
+		}
+
+		// 3. First draft finalized
+		if ( $draft_complete ) {
+			return array(
+				'status' => 'draft-finalized',
+				'updated' => $feedback['updated_at'],
+				'text' => '📋 Draft finalized',
+				'css_class' => 'draft-finalized'
+			);
+		}
+
+		// 2. Feedback started (has content but draft not marked complete)
+		if ( $has_feedback_content ) {
+			return array(
+				'status' => 'started',
+				'updated' => $feedback['updated_at'],
+				'text' => '📝 Started',
+				'css_class' => 'draft'
+			);
+		}
+
+		// Fallback to legacy status field for backwards compatibility
+		if ( isset( $feedback['status'] ) ) {
+			if ( $feedback['status'] === 'submitted' ) {
+				return array(
+					'status' => 'submitted',
+					'updated' => $feedback['submitted_at'] ?? $feedback['updated_at'],
+					'text' => 'Submitted',
+					'css_class' => 'completed'
+				);
+			} elseif ( $feedback['status'] === 'review' ) {
+				return array(
+					'status' => 'ready-for-review',
+					'updated' => $feedback['review_at'] ?? $feedback['updated_at'],
+					'text' => 'Ready for review',
+					'css_class' => 'review'
+				);
+			}
+		}
+
+		// 1. Default fallback - feedback not started
+		return array(
+			'status' => 'not-started',
+			'updated' => null,
+			'text' => 'Feedback not started',
+			'css_class' => 'not-started'
+		);
 	}
 }

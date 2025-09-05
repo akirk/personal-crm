@@ -4,6 +4,24 @@
  */
 require_once __DIR__ . '/event.php';
 
+
+/**
+ * Get the appropriate month for HR feedback based on current date
+ * HR feedback is for the previous month, but starting on the 15th we start feedback for current month
+ */
+function get_hr_feedback_month() {
+	$today = new DateTime();
+	$day = (int) $today->format('d');
+	
+	if ( $day >= 15 ) {
+		// On or after 15th: feedback for current month
+		return $today->format('Y-m');
+	} else {
+		// Before 15th: feedback for previous month
+		return $today->modify('-1 month')->format('Y-m');
+	}
+}
+
 /**
  * Build URL with team parameter
  */
@@ -31,7 +49,7 @@ function get_available_teams() {
 	foreach ( $json_files as $file ) {
 		$basename = basename( $file, '.json' );
 		// Skip backup files
-		if ( strpos( $basename, '.bak' ) === false && strpos( $basename, 'bak-' ) === false ) {
+		if ( $basename !== 'hr-feedback' && strpos( $basename, '.bak' ) === false && strpos( $basename, 'bak-' ) === false ) {
 			$teams[] = $basename;
 		}
 	}
@@ -369,6 +387,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->notes = $member_data['notes'] ?? '';
 		$person->location = $member_data['location'] ?? $member_data['town'] ?? ''; // Support both 'location' and legacy 'town'
 		$person->timezone = $member_data['timezone'] ?? '';
+		$person->needs_hr_monthly = $member_data['needs_hr_monthly'] ?? false;
 
 		$team_members[$username] = $person;
 	}
@@ -404,6 +423,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->notes = $leader_data['notes'] ?? '';
 		$person->location = $leader_data['location'] ?? $leader_data['town'] ?? ''; // Support both 'location' and legacy 'town'
 		$person->timezone = $leader_data['timezone'] ?? '';
+		$person->needs_hr_monthly = $leader_data['needs_hr_monthly'] ?? false;
 
 		$leadership[$username] = $person;
 	}
@@ -442,6 +462,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->notes = $alumni_data['notes'] ?? '';
 		$person->location = $alumni_data['location'] ?? $alumni_data['town'] ?? '';
 		$person->timezone = $alumni_data['timezone'] ?? '';
+		$person->needs_hr_monthly = $alumni_data['needs_hr_monthly'] ?? false;
 
 		$alumni[$username] = $person;
 	}

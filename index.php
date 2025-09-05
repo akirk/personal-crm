@@ -222,6 +222,29 @@ $available_teams = get_available_teams();
                                             </a>
                                             <div class="person-links">
                                                 <?php render_person_links( $member->links ); ?>
+                                                <?php
+                                                $needs_hr = $member->needs_hr_monthly ?? false;
+                                                if ( $needs_hr ) :
+                                                    $feedback_status = $member->get_monthly_feedback_status();
+                                                ?>
+                                                <a href="<?php echo build_team_url( 'hr-reports.php', array( 'person' => $username, 'month' => get_hr_feedback_month() ) ); ?>" class="feedback-status-link">
+                                                    <?php if ( $feedback_status['status'] === 'submitted' ) : ?>
+                                                        <span class="feedback-status submitted">✅ Submitted</span>
+                                                    <?php elseif ( $feedback_status['status'] === 'ready-for-review' ) : ?>
+                                                        <span class="feedback-status review">📤 Ready for review</span>
+                                                    <?php elseif ( $feedback_status['status'] === 'draft-finalized' ) : ?>
+                                                        <span class="feedback-status draft-finalized">📋 Draft finalized</span>
+                                                    <?php elseif ( $feedback_status['status'] === 'started' ) : ?>
+                                                        <span class="feedback-status draft">📝 Started</span>
+                                                    <?php else : ?>
+                                                        <span class="feedback-status none">🔴 Not started</span>
+                                                    <?php endif; ?>
+                                                </a>
+                                                <?php else : ?>
+                                                <div class="feedback-status-checkbox">
+                                                    <span class="feedback-status no-feedback">☑️ HR</span>
+                                                </div>
+                                                <?php endif; ?>
                                             </div>
                                         </div>
                                     </li>
@@ -247,6 +270,7 @@ $available_teams = get_available_teams();
                                             </a>
                                             <div class="person-links">
                                                 <?php render_person_links( $leader->links ); ?>
+                                                <!-- Leaders don't need monthly HR feedback -->
                                             </div>
                                         </div>
                                     </li>

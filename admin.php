@@ -105,7 +105,17 @@ function create_backup( $file_path ) {
 		return true; // No file to backup
 	}
 
-	$backup_path = substr( $file_path, 0, -4 ) . 'bak' . date( '-Y-m-d-H-i-s' ) . '.json';
+	// Create backups directory if it doesn't exist
+	$backups_dir = __DIR__ . '/backups';
+	if ( ! file_exists( $backups_dir ) ) {
+		mkdir( $backups_dir, 0755, true );
+	}
+
+	// Generate backup filename in backups directory
+	$filename = basename( $file_path );
+	$backup_filename = substr( $filename, 0, -4 ) . 'bak' . date( '-Y-m-d-H-i-s' ) . '.json';
+	$backup_path = $backups_dir . '/' . $backup_filename;
+	
 	return copy( $file_path, $backup_path );
 }
 
@@ -604,7 +614,8 @@ function create_person_data_from_form() {
 		'company_anniversary' => sanitize_text_field( $_POST['company_anniversary'] ?? '' ),
 		'partner' => sanitize_text_field( $_POST['partner'] ?? '' ),
 		'kids' => parse_kids_data( $_POST['kids'] ?? '' ),
-		'notes' => sanitize_textarea_field( $_POST['notes'] ?? '' )
+		'notes' => sanitize_textarea_field( $_POST['notes'] ?? '' ),
+		'needs_hr_monthly' => isset( $_POST['needs_hr_monthly'] ) && $_POST['needs_hr_monthly'] === '1'
 	);
 }
 
@@ -700,12 +711,7 @@ function get_missing_data_points( $person, $person_type = 'member' ) {
 	}
 
 	// Links - check for key links
-	$expected_links = array();
-	if ( $person_type === 'member' ) {
-		$expected_links = array( '1:1 doc', 'HR monthly' );
-	} elseif ( $person_type === 'leader' || $person_type === 'alumni' ) {
-		$expected_links = array( '1:1 doc' );
-	}
+	$expected_links = array( '1:1 doc' );
 
 	foreach ( $expected_links as $expected_link ) {
 		if ( ! isset( $person['links'][ $expected_link ] ) || empty( $person['links'][ $expected_link ] ) ) {
@@ -831,7 +837,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
 	$form_id = $config['form_id'];
 	$action = $is_editing ? $config['edit_action'] : $config['add_action'];
-	$submit_text = $is_editing ? $config['edit_text'] : $config['add_text'];
+	$submit_text = 'Save';
 	$prefix = $config['form_prefix'];
 	$show_hr_feedback = $config['show_hr_feedback'];
 	$show_alumni_actions = $config['show_alumni_actions'];
@@ -842,6 +848,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<?php global $current_team; if ( $current_team !== 'team' ) : ?>
 		<input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
 	<?php endif; ?>
+	<button type="submit" class="btn" style="float: right; margin-top: -3em"><?php echo $submit_text; ?></button>
 
 	<!-- Personal Information -->
 	<h4 style="margin: 20px 0 10px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Personal Information</h4>
@@ -985,6 +992,21 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			<input type="date" id="<?php echo $prefix; ?>company_anniversary" name="company_anniversary" value="<?php echo $is_editing ? htmlspecialchars( mask_date_input( $edit_data['company_anniversary'] ?? '', $privacy_mode ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="Hidden for privacy"' : ''; ?>>
 		</div>
 
+		<!-- HR Monthly Section -->
+		<?php if ( $show_hr_feedback ) : ?>
+		<div class="form-group" style="grid-column: 1 / -1;">
+			<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+				<input type="checkbox"
+					   name="needs_hr_monthly"
+					   value="1"
+					   <?php echo $is_editing && ($edit_data['needs_hr_monthly'] ?? false) ? 'checked' : ''; ?>
+					   style="margin: 0; width: auto;">
+				<span>Needs HR Monthly Feedback</span>
+			</label>
+			<small style="color: #666; margin-top: 4px; display: block;">Check this if the person should receive monthly HR feedback reports</small>
+		</div>
+		<?php endif; ?>
+
 		<!-- Links Section -->
 		<div class="form-group" style="grid-column: 1 / -1;">
 			<label>Links</label>
@@ -996,19 +1018,9 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 					$current_links = $edit_data['links'];
 				}
 
-				// Ensure default links are always present for team members
-				if ( $show_hr_feedback ) {
-					if ( ! isset( $current_links['1:1 doc'] ) ) {
-						$current_links['1:1 doc'] = '';
-					}
-					if ( ! isset( $current_links['HR monthly'] ) ) {
-						$current_links['HR monthly'] = '';
-					}
-				} else {
-					// For leadership and alumni, just ensure 1:1 doc is present
-					if ( ! isset( $current_links['1:1 doc'] ) ) {
-						$current_links['1:1 doc'] = '';
-					}
+				// Ensure 1:1 doc link is always present for all person types
+				if ( ! isset( $current_links['1:1 doc'] ) ) {
+					$current_links['1:1 doc'] = '';
 				}
 
 				// Add one empty row if no links exist
