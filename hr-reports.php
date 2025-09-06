@@ -21,6 +21,14 @@ if ( isset( $_GET['get_config'] ) ) {
     exit;
 }
 
+// Handle AJAX request for previous month feedback
+if ( isset( $_GET['get_previous_feedback'] ) && isset( $_GET['username'] ) && isset( $_GET['month'] ) ) {
+    header( 'Content-Type: application/json' );
+    $previous_feedback = get_previous_month_feedback( $_GET['username'], $_GET['month'] );
+    echo json_encode( $previous_feedback );
+    exit;
+}
+
 // Handle form submissions
 $message = '';
 $chat_response = '';
@@ -195,6 +203,47 @@ function load_feedback( $username, $month ) {
     }
     
     return $feedback;
+}
+
+/**
+ * Get previous month's feedback for comparison
+ */
+function get_previous_month_feedback( $username, $current_month ) {
+    $feedback_file = __DIR__ . '/hr-feedback.json';
+
+    if ( ! file_exists( $feedback_file ) ) {
+        return null;
+    }
+
+    $content = file_get_contents( $feedback_file );
+    $feedback_data = json_decode( $content, true ) ?: array();
+
+    if ( ! isset( $feedback_data['feedback'][$username] ) ) {
+        return null;
+    }
+
+    $user_feedback = $feedback_data['feedback'][$username];
+
+    // Get all month keys and sort them in descending order
+    $months = array();
+    foreach ( $user_feedback as $key => $value ) {
+        if ( is_array( $value ) && $key !== 'hr_monthly_link' ) {
+            $months[] = $key;
+        }
+    }
+    rsort( $months );
+
+    // Find the previous month
+    $current_index = array_search( $current_month, $months );
+    if ( $current_index !== false && isset( $months[$current_index + 1] ) ) {
+        $previous_month = $months[$current_index + 1];
+        return array(
+            'month' => $previous_month,
+            'feedback' => $user_feedback[$previous_month]
+        );
+    }
+
+    return null;
 }
 
 
@@ -671,7 +720,7 @@ if ( $selected_person && $selected_month ) {
             <div class="ai-chat-header">
                 <h3>💬 Ollama</h3>
                 <div class="chat-controls">
-                    <button type="button" class="btn btn-secondary btn-small" onclick="analyzeCurrentFeedback()">🔍 Analyze Current</button>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="analyzeCurrentFeedback()">🔍 Analyze</button>
                     <button type="button" class="btn btn-secondary btn-small" onclick="clearChat()">🗑️ Clear</button>
                     <button type="button" class="btn btn-secondary btn-small" onclick="toggleAIChat()">✕</button>
                 </div>

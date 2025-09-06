@@ -207,7 +207,7 @@ function toggleAIChat() {
     }
 }
 
-function analyzeCurrentFeedback() {
+async function analyzeCurrentFeedback() {
     const feedbackDiv = document.getElementById('feedback_to_person');
     const feedbackText = feedbackDiv.textContent || feedbackDiv.innerText || '';
 
@@ -216,7 +216,56 @@ function analyzeCurrentFeedback() {
         return;
     }
 
-    const analysisPrompt = `Please analyze this HR feedback: "${feedbackText}"`;
+    // Get current username and month for fetching previous feedback
+    const username = document.getElementById('username')?.value;
+    const month = document.getElementById('month')?.value;
+    
+    let analysisPrompt = `Please analyze this HR feedback: "${feedbackText}"`;
+    
+    // Try to fetch previous month's feedback for comparison
+    if (username && month) {
+        try {
+            const urlParams = new URLSearchParams({
+                get_previous_feedback: '1',
+                username: username,
+                month: month
+            });
+            
+            const response = await fetch(window.location.href.split('?')[0] + '?' + urlParams);
+            const previousData = await response.json();
+            
+            if (previousData && previousData.feedback) {
+                const previousMonth = previousData.month;
+                const previousFeedback = previousData.feedback.feedback_to_person || '';
+                const previousPerformance = previousData.feedback.performance || '';
+                
+                // Strip HTML tags from previous feedback for cleaner comparison
+                const previousFeedbackText = previousFeedback.replace(/<[^>]*>/g, '');
+                
+                analysisPrompt = `Please analyze this HR feedback and assess the improvements compared to the previous month:
+
+**CURRENT FEEDBACK (${month}):**
+"${feedbackText}"
+
+**PREVIOUS FEEDBACK (${previousMonth}) for comparison:**
+"${previousFeedbackText}"
+Previous performance rating: ${previousPerformance}
+
+Please provide:
+1. Analysis of the current feedback quality
+2. Comparison with the previous month's feedback 
+3. What improvements were made in the writing/approach
+4. What aspects remained consistent or regressed
+5. Suggestions for further enhancement
+
+Focus on improvements in specificity, actionability, tone, and structure between the versions.`;
+            }
+        } catch (error) {
+            console.log('Could not fetch previous feedback for comparison:', error);
+            // Fall back to regular analysis without comparison
+        }
+    }
+    
     sendChatMessageToAI(analysisPrompt, false);
 }
 
