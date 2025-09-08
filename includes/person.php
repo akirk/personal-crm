@@ -18,11 +18,19 @@ class Person {
 	public $timezone; // Timezone identifier (e.g., "America/New_York")
 	public $needs_hr_monthly; // Whether this person needs monthly HR feedback
 	public $privacy_mode; // Whether privacy mode is enabled for this person
+	public $github; // GitHub username
+	public $github_repos; // Array of GitHub repositories
+	public $wordpress; // WordPress.org username
+	public $linkedin; // LinkedIn username
+	public $personal_events; // Array of personal events like "return from AFK", "vacation end", etc.
+
+	private $original_username; // Store original username for data lookups
 
 	public function __construct( $name, $username = '', $links = array(), $role = '', $privacy_mode = false ) {
 		// Apply privacy masking at the Person level
 		$this->name = $privacy_mode ? $this->mask_name( $name ) : $name;
 		$this->nickname = $privacy_mode ? '' : ''; // Will be set later
+		$this->original_username = $username; // Always store the original username for data lookups
 		$this->username = $privacy_mode ? $this->mask_username( $username ) : $username;
 		$this->links = $links;
 		$this->role = $role;
@@ -35,6 +43,11 @@ class Person {
 		$this->timezone = '';
 		$this->needs_hr_monthly = false; // Default to false - HR feedback not needed by default
 		$this->privacy_mode = $privacy_mode;
+		$this->github = '';
+		$this->github_repos = array();
+		$this->wordpress = '';
+		$this->linkedin = '';
+		$this->personal_events = array();
 	}
 
 	/**
@@ -65,14 +78,82 @@ class Person {
 	}
 
 	/**
-	 * Get upcoming events for this person (within next 3 months)
+	 * Get display name with nickname
+	 */
+	public function get_display_name_with_nickname() {
+		$name = $this->name; // Already masked in constructor if privacy mode is on
+
+		if ( ! empty( $this->nickname ) && ! $this->privacy_mode ) {
+			// Split name into parts and insert nickname between first and last name
+			$name_parts = explode( ' ', $name );
+			if ( count( $name_parts ) >= 2 ) {
+				// Insert nickname after first name: "John 'Johnny' Smith"
+				$first_name = array_shift( $name_parts );
+				$last_parts = implode( ' ', $name_parts );
+				return $first_name . ' "' . htmlspecialchars( $this->nickname ) . '" ' . $last_parts;
+			} else {
+				// Fallback for single name: "John 'Johnny'"
+				return $name . ' "' . htmlspecialchars( $this->nickname ) . '"';
+			}
+		}
+
+		return $name;
+	}
+
+	/**
+	 * Get username (automatically handles privacy mode)
+	 */
+	public function get_username() {
+		return $this->username; // Already masked in constructor if privacy mode is on
+	}
+
+	/**
+	 * Get URL to this person's profile page
+	 */
+	public function get_profile_url( $additional_params = array() ) {
+		global $current_team;
+		$params = array( 'person' => $this->original_username );
+		
+		if ( $current_team !== 'team' ) {
+			$params['team'] = $current_team;
+		}
+		
+		if ( $this->privacy_mode ) {
+			$params['privacy'] = '1';
+		}
+		
+		$params = array_merge( $params, $additional_params );
+		return 'index.php?' . http_build_query( $params );
+	}
+
+	/**
+	 * Get URL to edit this person in admin
+	 */
+	public function get_edit_url( $additional_params = array() ) {
+		global $current_team;
+		$params = array( 'edit_member' => $this->original_username );
+		
+		if ( $current_team !== 'team' ) {
+			$params['team'] = $current_team;
+		}
+		
+		if ( $this->privacy_mode ) {
+			$params['privacy'] = '1';
+		}
+		
+		$params = array_merge( $params, $additional_params );
+		return 'admin.php?' . http_build_query( $params );
+	}
+
+	/**
+	 * Get upcoming events for this person (within next year)
 	 */
 	public function get_upcoming_events() {
 		$events = array();
 		$current_date = new DateTime();
 		$current_year = (int) $current_date->format( 'Y' );
 		$cutoff_date = clone $current_date;
-		$cutoff_date->add( new DateInterval( 'P3M' ) ); // 3 months from now
+		$cutoff_date->add( new DateInterval( 'P1Y' ) )->sub( new DateInterval( 'P1D' ) ); // 1 year minus 1 day from now
 
 		// Birthday
 		if ( ! empty( $this->birthday ) ) {
@@ -159,9 +240,26 @@ class Person {
 			}
 		}
 
+		// Personal events (return from AFK, vacation end, etc.)
+		if ( ! empty( $this->personal_events ) && is_array( $this->personal_events ) ) {
+			foreach ( $this->personal_events as $personal_event ) {
+				if ( ! empty( $personal_event['date'] ) && ! empty( $personal_event['description'] ) ) {
+					$event_date = DateTime::createFromFormat( 'Y-m-d', $personal_event['date'] );
+					if ( $event_date && $event_date >= $current_date && $event_date <= $cutoff_date ) {
+						$events[] = Event::from_person_event( 
+							$personal_event['type'] ?? 'personal', 
+							$event_date, 
+							$this, 
+							array( 'description' => $personal_event['description'] )
+						);
+					}
+				}
+			}
+		}
+
 		// Sort events by date
 		usort( $events, function( $a, $b ) {
-			return $a['date'] <=> $b['date'];
+			return $a->date <=> $b->date;
 		} );
 
 		return $events;
@@ -271,6 +369,16 @@ class Person {
 			return '';
 		}
 
+		// Handle privacy mode
+		if ( $this->privacy_mode ) {
+			// Show only age if full birthday is available
+			$age = $this->get_age();
+			if ( $age !== null ) {
+				return 'Age ' . $age;
+			}
+			return '[Hidden]';
+		}
+
 		$current_date = new DateTime();
 		$current_year = (int) $current_date->format( 'Y' );
 
@@ -329,6 +437,11 @@ class Person {
 	 * Get human-readable time until a date
 	 */
 	private function get_time_until_date( $from_date, $to_date ) {
+		// Hide time calculations in privacy mode
+		if ( $this->privacy_mode ) {
+			return '';
+		}
+
 		$diff = $from_date->diff( $to_date );
 
 		if ( $diff->days <= 0 ) {
@@ -336,20 +449,20 @@ class Person {
 		} elseif ( $diff->days == 1 ) {
 			return 'tomorrow';
 		} elseif ( $diff->days <= 7 ) {
-			return 'in ' . $diff->days . ' days';
+			return 'in ' . $diff->days . 'd';
 		} elseif ( $diff->days <= 30 ) {
 			$weeks = floor( $diff->days / 7 );
 			if ( $weeks == 1 ) {
-				return 'in 1 week';
+				return 'in 1w';
 			} else {
-				return 'in ' . $weeks . ' weeks';
+				return 'in ' . $weeks . 'w';
 			}
 		} else {
 			$months = $diff->m + ( $diff->y * 12 );
 			if ( $months == 1 ) {
-				return 'in 1 month';
+				return 'in 1mo';
 			} else {
-				return 'in ' . $months . ' months';
+				return 'in ' . $months . 'mo';
 			}
 		}
 	}
@@ -374,7 +487,7 @@ class Person {
 		$feedback_data = json_decode( $content, true ) ?: array();
 
 		$target_month = $month ?: get_hr_feedback_month();
-		$feedback = $feedback_data['feedback'][$this->username][$target_month] ?? null;
+		$feedback = $feedback_data['feedback'][$this->original_username][$target_month] ?? null;
 
 		if ( ! $feedback ) {
 			return array(

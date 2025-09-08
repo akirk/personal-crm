@@ -12,8 +12,9 @@ class Event {
 	public DateTime $date;
 	public ?DateTime $end_date = null;
 	public ?Person $person = null; // Optional Person object
+	public $privacy_mode = false; // Privacy mode for masking sensitive data
 
-	public function __construct( $type, $date, $description, $person = null ) {
+	public function __construct( $type, $date, $description, $person = null, $privacy_mode = false ) {
 		$this->type = $type;
 		$this->description = $description;
 		$this->location = '';
@@ -21,6 +22,7 @@ class Event {
 		$this->links = array();
 		$this->date = $date;
 		$this->person = $person;
+		$this->privacy_mode = $privacy_mode;
 	}
 
 	/**
@@ -83,18 +85,133 @@ class Event {
 		return $this->person ? $this->person->username : null;
 	}
 
+	/**
+	 * Get privacy-aware display description
+	 */
+	public function get_display_description() {
+		// Simply return the description as-is since the Person object already handles
+		// masking its own name in the constructor when privacy_mode is enabled
+		return $this->description;
+	}
+
+	/**
+	 * Get privacy-aware display date
+	 */
+	public function get_display_date() {
+		if ( ! $this->privacy_mode ) {
+			return $this->date->format( 'M j' );
+		}
+
+		// For privacy mode, only show month/day for birthdays and anniversaries
+		// Hide exact dates for other personal events
+		if ( in_array( $this->type, ['birthday', 'anniversary'] ) ) {
+			return $this->date->format( 'M j' );
+		}
+
+		return '***';
+	}
+
+	/**
+	 * Get privacy-aware full date display
+	 */
+	public function get_display_full_date() {
+		if ( ! $this->privacy_mode ) {
+			return $this->date->format( 'M j, Y' );
+		}
+
+		// For privacy mode, mask the year for personal events
+		if ( in_array( $this->type, ['birthday', 'anniversary'] ) ) {
+			return $this->date->format( 'M j' ) . ', ****';
+		}
+
+		return '*** **, ****';
+	}
+
 	public function is_past() {
 		return $this->date < new DateTime();
 	}
 
 	public function get_title() {
+		// Use privacy-aware description
+		$description = $this->get_display_description();
+
 		// Add duration info if it's a multi-day event
 		$duration = '';
 		if ( ! empty( $this->end_date ) && $this->date !== $this->end_date ) {
-			$duration = ' → ' . $this->end_date->format( 'M j' );
+			if ( $this->privacy_mode ) {
+				$duration = ' → ***';
+			} else {
+				$duration = ' → ' . $this->end_date->format( 'M j' );
+			}
 		}
 
-		return $this->description . $duration;
+		return $description . $duration;
+	}
+
+	/**
+	 * Get title without person name (for displaying on person's own page)
+	 */
+	public function get_title_without_person_name() {
+		// Start with privacy-aware description
+		$description = $this->get_display_description();
+
+		// Handle birthday events - remove the person's name prefix
+		if ( $this->person && $this->type === 'birthday' ) {
+			// Check for emoji prefix + person's name
+			$person_prefix_with_emoji = $this->person->name . "'s ";
+			if ( strpos( $description, $person_prefix_with_emoji ) === 0 ) {
+				$description = substr( $description, strlen( $person_prefix_with_emoji ) );
+			} else {
+				// Fallback for old format without emojis
+				$person_prefix = $this->person->name . "'s ";
+				if ( strpos( $description, $person_prefix ) === 0 ) {
+					$description = substr( $description, strlen( $person_prefix ) );
+				}
+			}
+		}
+
+		// Handle anniversary events - remove the person's name prefix
+		if ( $this->person && $this->type === 'anniversary' ) {
+			// Check for emoji prefix + person's name
+			$person_prefix_with_emoji = $this->person->name . "'s ";
+			if ( strpos( $description, $person_prefix_with_emoji ) === 0 ) {
+				$description = substr( $description, strlen( $person_prefix_with_emoji ) );
+			} else {
+				// Fallback for old format without emojis
+				$person_prefix = $this->person->name . "'s ";
+				if ( strpos( $description, $person_prefix ) === 0 ) {
+					$description = substr( $description, strlen( $person_prefix ) );
+				}
+			}
+		}
+
+		// If this is a personal event and has a person, remove the person's name from the description
+		if ( $this->person && $this->type === 'other' ) {
+			// Use actual name (not masked) for removal since we're on the person's own page
+			$person_prefix = $this->person->name . ': ';
+			if ( strpos( $this->description, $person_prefix ) === 0 ) {
+				$clean_description = substr( $this->description, strlen( $person_prefix ) );
+				// For privacy mode, we still need to mask any other names that might be in the description
+				if ( $this->privacy_mode ) {
+					// This is a simplified approach - in practice you might want more sophisticated name masking
+					$description = $clean_description;
+				} else {
+					$description = $clean_description;
+				}
+			}
+		}
+
+		// Add duration info if it's a multi-day event
+		$duration = '';
+		if ( ! empty( $this->end_date ) && $this->date !== $this->end_date ) {
+			if ( $this->privacy_mode ) {
+				$duration = ' → ***';
+			} else {
+				$duration = ' → ' . $this->end_date->format( 'M j' );
+			}
+		}
+
+		return $description . $duration;
 	}
 
 	public function get_color() {
@@ -110,12 +227,20 @@ class Event {
 
 		return isset( $colors[$this->type] ) ? $colors[$this->type] : '#95a5a6';
 	}
+
+	/**
+	 * Get ordinal number (1st, 2nd, 3rd, 4th, etc.)
+	 */
+	private static function get_ordinal_number( $number ) {
+		$formatter = new NumberFormatter( 'en_US', NumberFormatter::ORDINAL );
+		return $formatter->format( $number );
+	}
 	/**
 	 * Create Event from team event data
 	 */
-	public static function from_team_event( $event_data ) {
+	public static function from_team_event( $event_data, $privacy_mode = false ) {
 		$start_date = DateTime::createFromFormat( 'Y-m-d', $event_data['start_date'] );
-		$event = new self( $event_data['type'], $start_date, $event_data['name'] );
+		$event = new self( $event_data['type'], $start_date, $event_data['name'], null, $privacy_mode );
 		
 		$event->set_location( $event_data['location'] ?? '' );
 		$event->set_details( $event_data['description'] ?? '' );
@@ -139,11 +264,12 @@ class Event {
 			case 'birthday':
 				// Handle kid's birthday differently
 				if ( isset( $additional_info['kid_name'] ) ) {
-					$description = $additional_info['kid_name'] . "'s Birthday";
-					
-					// Add age information if not in privacy mode and we have age
 					if ( ! $privacy_mode && isset( $additional_info['age'] ) ) {
-						$description .= ' (turning ' . $additional_info['age'] . ')';
+						$age = $additional_info['age'];
+						$ordinal = self::get_ordinal_number( $age );
+						$description = $additional_info['kid_name'] . "'s " . $ordinal . " Birthday 🎈";
+					} else {
+						$description = $additional_info['kid_name'] . "'s Birthday 🎈";
 					}
 					
 					// Add parent info if not in privacy mode
@@ -152,29 +278,40 @@ class Event {
 					}
 				} else {
 					// Regular person birthday
-					$description = $person->name . "'s Birthday";
-					
-					// Add age information if not in privacy mode and we have birth year
 					if ( ! $privacy_mode && isset( $additional_info['age'] ) ) {
-						$description .= ' (turning ' . $additional_info['age'] . ')';
+						$age = $additional_info['age'];
+						$ordinal = self::get_ordinal_number( $age );
+						$description = $person->name . "'s " . $ordinal . " Birthday 🎈";
+					} else {
+						$description = $person->name . "'s Birthday 🎈";
 					}
 				}
 				break;
 				
 			case 'anniversary':
-				$description = $person->name . "'s Anniversary";
-				
-				// Add years information if not in privacy mode
 				if ( ! $privacy_mode && isset( $additional_info['years'] ) ) {
-					$description .= ' (' . $additional_info['years'] . ' years)';
+					$years = $additional_info['years'];
+					$ordinal = self::get_ordinal_number( $years );
+					$description = $person->name . "'s " . $ordinal . " Anniversary 🎉";
+				} else {
+					$description = $person->name . "'s Anniversary 🎉";
 				}
 				break;
 				
+			case 'other':
+				// For personal events, use the custom description with person's name
+				if ( isset( $additional_info['description'] ) ) {
+					$description = $person->name . ': ' . $additional_info['description'];
+				} else {
+					$description = $person->name . "'s Other Event";
+				}
+				break;
+
 			default:
 				// For other event types, use person's name + type
 				$description = $person->name . "'s " . ucfirst( $type );
 		}
 		
-		return new self( $type, $date, $description, $person );
+		return new self( $type, $date, $description, $person, $privacy_mode );
 	}
 }

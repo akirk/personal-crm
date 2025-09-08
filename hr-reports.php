@@ -9,7 +9,8 @@ require_once __DIR__ . '/includes/common.php';
 require_once __DIR__ . '/includes/person.php';
 
 $current_team = $_GET['team'] ?? get_default_team();
-$team_data = load_team_config_with_objects( $current_team, false );
+$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
+$team_data = load_team_config_with_objects( $current_team, $privacy_mode );
 
 // Handle AJAX config request
 if ( isset( $_GET['get_config'] ) ) {
@@ -247,69 +248,8 @@ function get_previous_month_feedback( $username, $current_month ) {
 }
 
 
-/**
- * Get all feedback for a person
- */
-function get_person_feedback_history( $username ) {
-    $feedback_file = __DIR__ . '/hr-feedback.json';
-    
-    if ( ! file_exists( $feedback_file ) ) {
-        return array();
-    }
-    
-    $content = file_get_contents( $feedback_file );
-    $feedback_data = json_decode( $content, true ) ?: array();
-    
-    return $feedback_data['feedback'][$username] ?? array();
-}
 
-/**
- * Get overview data for all team members for a specific month
- */
-function get_monthly_overview( $team_data, $month ) {
-    $feedback_file = __DIR__ . '/hr-feedback.json';
-    $overview = array();
-    
-    $feedback_data = array();
-    if ( file_exists( $feedback_file ) ) {
-        $content = file_get_contents( $feedback_file );
-        $feedback_data = json_decode( $content, true ) ?: array();
-    }
-    
-    // Process team members
-    foreach ( $team_data['team_members'] as $username => $member ) {
-        if ( ! $member->needs_hr_monthly ) {
-            continue; // Skip members who don't need HR feedback
-        }
-        
-        $user_feedback = $feedback_data['feedback'][$username] ?? array();
-        $monthly_feedback = $user_feedback[$month] ?? null;
-        $hr_monthly_link = $user_feedback['hr_monthly_link'] ?? '';
-        
-        $overview[$username] = array(
-            'person' => $member,
-            'feedback' => $monthly_feedback,
-            'hr_monthly_link' => $hr_monthly_link,
-            'status' => $member->get_monthly_feedback_status( $month ),
-        );
-    }
-    
-    return $overview;
-}
 
-/**
- * Simple HTML sanitizer - only allows links
- */
-function sanitize_html( $html ) {
-    // Allow only <a> tags with href and target attributes
-    $allowed_tags = '<a>';
-    $clean_html = strip_tags( $html, $allowed_tags );
-    
-    // Additional safety: ensure all links have target="_blank"
-    $clean_html = preg_replace( '/<a\s+([^>]*?)href="([^"]*?)"([^>]*?)>/i', '<a href="$2" target="_blank">', $clean_html );
-    
-    return $clean_html;
-}
 
 /**
  * Get system prompt from JSON file
@@ -386,8 +326,6 @@ function get_llm_feedback_assessment( $feedback_text ) {
 // Get current person and month from URL params
 $selected_person = $_GET['person'] ?? '';
 $selected_month = $_GET['month'] ?? get_hr_feedback_month();
-$view_mode = $_GET['view'] ?? 'form'; // 'form' or 'overview'
-$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
 // Load existing feedback if available
 $existing_feedback = array();
@@ -404,7 +342,7 @@ if ( $selected_person && $selected_month ) {
     <title><?php 
         if ( $selected_person ) {
             $person = $team_data['team_members'][$selected_person] ?? $team_data['leadership'][$selected_person] ?? null;
-            echo htmlspecialchars( $person ? $person->name : $selected_person );
+            echo htmlspecialchars( $person ? $person->get_display_name_with_nickname() : $selected_person );
         } else {
             echo htmlspecialchars( $team_data['team_name'] );
         }
@@ -414,18 +352,51 @@ if ( $selected_person && $selected_month ) {
 </head>
 <body>
     <div class="container">
-        <div class="back-link">
-            <a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to Team Overview</a>
-        </div>
+        <?php if ( $selected_person ) : ?>
+            <?php
+            $person = $team_data['team_members'][$selected_person] ?? $team_data['leadership'][$selected_person] ?? null;
+            if ( $person ) :
+            ?>
+            <div class="header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                <div>
+                    <h1 style="margin: 0; font-size: 24px;">
+                        <?php echo htmlspecialchars( $person->get_display_name_with_nickname() ); ?>
+                        <span style="color: #666; font-size: 16px; font-weight: normal;">
+                            @<?php echo htmlspecialchars( $person->get_username() ); ?>
+                            <?php if ( ! empty( $person->role ) ) : ?>
+                                • <?php echo htmlspecialchars( $person->role ); ?>
+                            <?php endif; ?>
+                            <?php
+                            $is_alumni = isset( $team_data['alumni'][$selected_person] );
+                            if ( $is_alumni ) :
+                            ?>
+                                • Alumni
+                            <?php endif; ?>
+                        </span>
+                    </h1>
+                    <div style="margin-top: 5px;">
+                        <a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Overview</a>
+                    </div>
+                </div>
 
-        <div class="header">
-            <h1>HR Monthly Reports</h1>
-            <div class="header-nav">
-                <a href="<?php echo build_team_url( 'hr-reports.php', array( 'view' => 'overview', 'month' => $selected_month, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
-                   class="btn <?php echo $view_mode === 'overview' || $privacy_mode ? 'btn-primary' : 'btn-secondary'; ?>">📋 Overview</a>
-                <a href="<?php echo build_team_url( 'hr-config.php' ); ?>" class="btn btn-secondary">⚙️ Configure Ollama Settings</a>
+                <!-- Tab Navigation -->
+                <div class="person-tabs">
+                    <a href="<?php echo build_team_url( 'index.php', array( 'person' => $selected_person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
+                       class="tab-link">👤 Member Overview</a>
+                    <a href="<?php echo build_team_url( 'hr-reports.php', array( 'person' => $selected_person, 'month' => get_hr_feedback_month(), 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
+                       class="tab-link active">📝 HR Feedback</a>
+                </div>
             </div>
-        </div>
+            <?php endif; ?>
+        <?php else : ?>
+            <div class="header">
+                <h1 style="margin: 0; font-size: 24px;">HR Monthly Reports</h1>
+                <div style="margin-top: 5px;">
+                    <a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Overview</a>
+                </div>
+                <p style="color: #666; margin: 10px 0 0 0;">Select a team member to manage their feedback</p>
+            </div>
+        <?php endif; ?>
 
         <?php if ( $message ) : ?>
             <div class="message <?php echo strpos( $message, 'success' ) !== false ? 'success' : 'error'; ?>">
@@ -433,164 +404,6 @@ if ( $selected_person && $selected_month ) {
             </div>
         <?php endif; ?>
 
-        <?php if ( $view_mode === 'overview' || ( $privacy_mode && empty( $selected_person ) ) ) : ?>
-            <!-- Overview Mode -->
-            <?php
-            $overview_data = get_monthly_overview( $team_data, $selected_month );
-            ?>
-            
-            <div class="overview-section">
-                <div class="overview-header">
-                    <h2>📋 Monthly Reports Overview - <?php echo date( 'F Y', strtotime( $selected_month . '-01' ) ); ?>
-                    <?php
-                    if ( $privacy_mode ) {
-                        echo ' <small style="color: #666;">(Privacy Mode - Content Hidden)</small>';
-                    } else {
-                        $current_feedback_month = get_hr_feedback_month();
-                        if ( $selected_month === $current_feedback_month ) {
-                            $today = new DateTime();
-                            $day = (int) $today->format('d');
-                            if ( $day >= 15 ) {
-                                echo ' <small>(Current Month)</small>';
-                            } else {
-                                echo ' <small>(Previous Month)</small>';
-                            }
-                        }
-                    }
-                    ?>
-                    </h2>
-                    <div class="month-selector">
-                        <label for="overview_month">Month:</label>
-                        <input type="month" id="overview_month" value="<?php echo htmlspecialchars( $selected_month ); ?>" 
-                               onchange="window.location.href='<?php echo build_team_url( 'hr-reports.php', array( 'view' => 'overview', 'month' => '', 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>'.replace('month=', 'month=' + this.value)">
-                    </div>
-                </div>
-
-                <?php if ( empty( $overview_data ) ) : ?>
-                    <div class="no-data">
-                        <p>No team members require HR feedback for this month, or no team data available.</p>
-                    </div>
-                <?php else : ?>
-                    <div class="overview-grid">
-                        <?php foreach ( $overview_data as $username => $data ) : 
-                            $person = $data['person'];
-                            $feedback = $data['feedback'];
-                            $status_info = $data['status'];
-                            $hr_monthly_link = $data['hr_monthly_link'];
-                        ?>
-                            <div class="overview-card <?php echo $status_info['css_class']; ?>">
-                                <div class="card-header">
-                                    <h3><?php echo htmlspecialchars( $person->name ); ?></h3>
-                                    <span class="username">@<?php echo htmlspecialchars( $username ); ?></span>
-                                </div>
-                                
-                                <div class="card-status">
-                                    <span class="status-badge <?php echo $status_info['css_class']; ?>">
-                                        <?php echo $status_info['text']; ?>
-                                    </span>
-                                </div>
-
-                                <?php if ( $feedback ) : ?>
-                                    <div class="card-details">
-                                        <div class="performance-rating">
-                                            <span class="performance-badge performance-<?php echo $feedback['performance']; ?>">
-                                                <?php echo ucfirst( $feedback['performance'] ); ?> Performance
-                                            </span>
-                                        </div>
-                                        
-                                        <div class="progress-indicators">
-                                            <?php
-                                            $indicators = [
-                                                'draft_complete' => ['✅', '📋', 'First Draft Finalized'],
-                                                'google_doc_updated' => ['✅', '📤', 'Ready for Review'],
-                                                'submitted_to_hr' => ['✅', '📥', 'Submitted to HR']
-                                            ];
-                                            
-                                            foreach ( $indicators as $key => $icons ) :
-                                                $completed = isset( $feedback[$key] ) && $feedback[$key];
-                                            ?>
-                                                <span class="indicator <?php echo $completed ? 'completed' : 'pending'; ?>" 
-                                                      title="<?php echo $icons[2]; ?>">
-                                                    <?php echo $completed ? $icons[0] : $icons[1]; ?>
-                                                </span>
-                                            <?php endforeach; ?>
-                                        </div>
-                                        
-                                        <div class="card-meta">
-                                            <small>Updated: <?php echo $feedback['updated_at']; ?></small>
-                                        </div>
-                                    </div>
-                                <?php else : ?>
-                                    <div class="card-details">
-                                        <p class="no-feedback">No feedback created yet</p>
-                                    </div>
-                                <?php endif; ?>
-
-                                <div class="card-actions">
-                                    <a href="<?php echo build_team_url( 'hr-reports.php', array( 'view' => 'form', 'person' => $username, 'month' => $selected_month, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
-                                       class="btn btn-small btn-primary">
-                                        <?php echo $feedback ? '✏️ Edit' : '📝 Create'; ?>
-                                    </a>
-                                    <?php if ( $hr_monthly_link ) : ?>
-                                        <a href="<?php echo htmlspecialchars( $hr_monthly_link ); ?>" 
-                                           target="_blank" class="btn btn-small btn-secondary">📄 Google Doc</a>
-                                    <?php endif; ?>
-                                    <?php if ( isset( $team_data['activity_url_prefix'] ) ) :
-                                        $month_start = date( 'Y-m-d', strtotime( $selected_month . '-01' ) );
-                                        $month_end = date( 'Y-m-t', strtotime( $selected_month . '-01' ) );
-                                        $activity_url = $team_data['activity_url_prefix'] . '&member=' . urlencode( $username ) . '&start=' . $month_start . '&end=' . $month_end;
-                                    ?>
-                                        <a href="<?php echo htmlspecialchars( $activity_url ); ?>"
-                                           target="_blank" class="btn btn-small btn-secondary">📊 Activity</a>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                    
-                    <div class="overview-summary">
-                        <?php
-                        $total = count( $overview_data );
-                        $completed = 0;
-                        $draft = 0;
-                        $not_started = 0;
-                        
-                        foreach ( $overview_data as $data ) {
-                            $status = $data['status']['css_class'];
-                            if ( $status === 'completed' ) {
-                                $completed++;
-                            } elseif ( $status === 'draft' || $status === 'draft-finalized' || $status === 'review' ) {
-                                $draft++;
-                            } else {
-                                $not_started++;
-                            }
-                        }
-                        ?>
-                        <h3>Summary</h3>
-                        <div class="summary-stats">
-                            <div class="stat">
-                                <span class="stat-number"><?php echo $completed; ?></span>
-                                <span class="stat-label">Completed</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-number"><?php echo $draft; ?></span>
-                                <span class="stat-label">In Progress</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-number"><?php echo $not_started; ?></span>
-                                <span class="stat-label">Not Started</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-number"><?php echo $total; ?></span>
-                                <span class="stat-label">Total</span>
-                            </div>
-                        </div>
-                    </div>
-                <?php endif; ?>
-            </div>
-
-        <?php else : ?>
-            <!-- Form Mode -->
 
         <form method="post" class="hr-form">
             <input type="hidden" name="action" value="save_feedback">
@@ -603,12 +416,12 @@ if ( $selected_person && $selected_month ) {
                             <option value="">Select a team member...</option>
                             <?php foreach ( $team_data['team_members'] as $username => $member ) : ?>
                                 <option value="<?php echo htmlspecialchars( $username ); ?>" <?php echo $selected_person === $username ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars( $member->name ); ?> (@<?php echo htmlspecialchars( $username ); ?>)
+                                    <?php echo htmlspecialchars( $member->get_display_name_with_nickname() ); ?> (@<?php echo htmlspecialchars( $member->get_username() ); ?>)
                                 </option>
                             <?php endforeach; ?>
                             <?php foreach ( $team_data['leadership'] as $username => $leader ) : ?>
                                 <option value="<?php echo htmlspecialchars( $username ); ?>" <?php echo $selected_person === $username ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars( $leader->name ); ?> (@<?php echo htmlspecialchars( $username ); ?>) - <?php echo htmlspecialchars( $leader->role ); ?>
+                                    <?php echo htmlspecialchars( $leader->get_display_name_with_nickname() ); ?> (@<?php echo htmlspecialchars( $leader->get_username() ); ?>) - <?php echo htmlspecialchars( $leader->role ); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -694,21 +507,15 @@ if ( $selected_person && $selected_month ) {
             </div>
 
 
-            <!-- Auto-save indicator with privacy toggle -->
+            <?php if ( ! $privacy_mode ) : ?>
+            <!-- Auto-save indicator -->
             <div class="auto-save-indicator" id="save-status" style="text-align: center; margin: 20px 0; font-size: 14px; color: #666;">
-                <div style="display: flex; align-items: center; justify-content: center; gap: 20px;">
-                    <div>
-                        <span id="save-message">Changes are saved automatically</span>
-                        <span id="save-checkmark" style="display: none; color: #28a745; margin-left: 5px;">✅</span>
-                    </div>
-                    <div style="border-left: 1px solid #ddd; padding-left: 20px;">
-                        <label style="cursor: pointer; font-size: 13px; color: #666;">
-                            <input type="checkbox" id="privacy-mode-checkbox" style="margin-right: 6px; transform: scale(0.9);">
-                            🔐 Privacy Mode
-                        </label>
-                    </div>
+                <div>
+                    <span id="save-message">Changes are saved automatically</span>
+                    <span id="save-checkmark" style="display: none; color: #28a745; margin-left: 5px;">✅</span>
                 </div>
             </div>
+            <?php endif; ?>
 
 
             <div class="form-group">
@@ -800,37 +607,58 @@ if ( $selected_person && $selected_month ) {
 
             <?php if ( $past_feedback ) : ?>
                 <div class="history-section">
-                    <h3>📋 Submitted Feedback History for <?php echo htmlspecialchars( $team_data['team_members'][$selected_person]->name ?? $team_data['leadership'][$selected_person]->name ?? $selected_person ); ?></h3>
+                    <h3>📋 Submitted Feedback History for <?php echo htmlspecialchars( $team_data['team_members'][$selected_person]->get_display_name_with_nickname() ?? $team_data['leadership'][$selected_person]->get_display_name_with_nickname() ?? $selected_person ); ?></h3>
                     
                     <?php foreach ( $past_feedback as $month => $feedback ) : ?>
-                        <div class="feedback-item <?php echo ( $feedback['submitted'] ?? false ) ? 'submitted' : 'draft'; ?>">
+                        <?php
+                        $feedback_text = sanitize_html( $feedback['feedback_to_person'] ) ?: htmlspecialchars( $feedback['feedback_to_person'] );
+                        $feedback_plain = strip_tags( $feedback_text );
+                        $teaser = strlen( $feedback_plain ) > 150 ? substr( $feedback_plain, 0, 150 ) . '...' : $feedback_plain;
+                        ?>
+                        <div class="feedback-item <?php echo ( $feedback['submitted_to_hr'] ?? false ) ? 'submitted' : 'draft'; ?>" style="cursor: pointer;" onclick="toggleFeedbackDetails('<?php echo $month; ?>')">
                             <div class="feedback-header">
                                 <span><?php echo date( 'F Y', strtotime( $month . '-01' ) ); ?></span>
                                 <span class="performance-badge performance-<?php echo $feedback['performance']; ?>"><?php echo ucfirst( $feedback['performance'] ); ?></span>
-                                <?php if ( $feedback['submitted'] ?? false ) : ?>
+                                <?php if ( $feedback['submitted_to_hr'] ?? false ) : ?>
                                     <span class="status-badge submitted">✅ Submitted</span>
                                 <?php else : ?>
                                     <span class="status-badge draft">📝 Draft</span>
                                 <?php endif; ?>
+                                <span class="expand-toggle" id="toggle-<?php echo $month; ?>" style="margin-left: auto; color: #666; font-size: 14px;">▼ Expand</span>
                             </div>
-                            <div>
-                                <strong>To Person:</strong><br>
-                                <?php echo sanitize_html( $feedback['feedback_to_person'] ) ?: nl2br( htmlspecialchars( $feedback['feedback_to_person'] ) ); ?>
-                            </div>
-                            <?php if ( ! empty( $feedback['feedback_to_hr'] ) ) : ?>
-                                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
-                                    <strong>HR Notes:</strong><br>
-                                    <?php echo sanitize_html( $feedback['feedback_to_hr'] ) ?: nl2br( htmlspecialchars( $feedback['feedback_to_hr'] ) ); ?>
+
+                            <!-- Teaser -->
+                            <div class="feedback-teaser" id="teaser-<?php echo $month; ?>">
+                                <div style="background: #f9f9f9; padding: 10px; border-radius: 4px; margin-top: 8px; font-style: italic; color: #666;">
+                                    <?php echo htmlspecialchars( $teaser ); ?>
                                 </div>
-                            <?php endif; ?>
-                            <div style="margin-top: 10px; color: #666; font-size: 12px;">
-                                Created: <?php echo $feedback['created_at']; ?>
-                                <?php if ( $feedback['updated_at'] !== $feedback['created_at'] ) : ?>
-                                    | Updated: <?php echo $feedback['updated_at']; ?>
+                            </div>
+
+                            <!-- Full content (initially hidden) -->
+                            <div class="feedback-full-content" id="content-<?php echo $month; ?>" style="display: none;">
+                                <div style="margin-top: 8px;">
+                                    <strong>To Person:</strong><br>
+                                    <div style="background: #f9f9f9; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                                        <?php echo $feedback_text; ?>
+                                    </div>
+                                </div>
+                                <?php if ( ! empty( $feedback['feedback_to_hr'] ) ) : ?>
+                                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
+                                        <strong>HR Notes:</strong><br>
+                                        <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                                            <?php echo sanitize_html( $feedback['feedback_to_hr'] ) ?: nl2br( htmlspecialchars( $feedback['feedback_to_hr'] ) ); ?>
+                                        </div>
+                                    </div>
                                 <?php endif; ?>
-                                <?php if ( $feedback['submitted'] ?? false ) : ?>
-                                    | Submitted: <?php echo $feedback['submitted_at']; ?>
-                                <?php endif; ?>
+                                <div style="margin-top: 10px; color: #666; font-size: 12px;">
+                                    Created: <?php echo $feedback['created_at']; ?>
+                                    <?php if ( $feedback['updated_at'] !== $feedback['created_at'] ) : ?>
+                                        | Updated: <?php echo $feedback['updated_at']; ?>
+                                    <?php endif; ?>
+                                    <?php if ( $feedback['submitted'] ?? false ) : ?>
+                                        | Submitted: <?php echo $feedback['submitted_at']; ?>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -839,8 +667,52 @@ if ( $selected_person && $selected_month ) {
                 <p>No feedback history found for this person.</p>
             <?php endif; ?>
         <?php endif; ?>
-        
-        <?php endif; // End form mode ?>
+
+        <!-- Historical Feedback Helper (bottom of page) -->
+        <div style="margin-top: 30px; padding: 15px; background: #f0f8ff; border-radius: 8px; border-left: 4px solid #007cba;">
+            <div style="font-size: 13px; color: #666;">
+                💡 <strong>Add historical feedback:</strong> Select any previous month to add older feedback entries
+                <div style="margin-top: 8px;">
+                    <strong>Quick select:</strong>
+                    <?php
+                    // Get existing feedback for selected person to check which months already have feedback
+                    $existing_months = array();
+                    if ( $selected_person ) {
+                        $person_feedback = get_person_feedback_history( $selected_person );
+                        $existing_months = array_keys( array_filter( $person_feedback, function( $key ) {
+                            return $key !== 'hr_monthly_link';
+                        }, ARRAY_FILTER_USE_KEY ) );
+                    }
+
+                    $current_date = new DateTime();
+                    $months_shown = 0;
+                    for ( $i = 1; $i <= 12 && $months_shown < 3; $i++ ) { // Check up to 12 months back to find 3 without feedback
+                        $past_month = clone $current_date;
+                        $past_month->modify( "-{$i} month" );
+                        $month_value = $past_month->format( 'Y-m' );
+
+                        // Only show if no feedback exists for this month
+                        if ( ! in_array( $month_value, $existing_months ) ) {
+                            $month_display = $past_month->format( 'M Y' );
+                            $url_params = array_merge( $_GET, array( 'month' => $month_value ) );
+                            $quick_url = '?' . http_build_query( $url_params );
+                            ?>
+                            <a href="<?php echo htmlspecialchars( $quick_url ); ?>"
+                               style="display: inline-block; margin-right: 8px; padding: 4px 8px; background: #fff; border: 1px solid #007cba; border-radius: 4px; text-decoration: none; color: #007cba; font-size: 12px;">
+                                <?php echo $month_display; ?>
+                            </a>
+                            <?php
+                            $months_shown++;
+                        }
+                    }
+
+                    if ( $months_shown === 0 ) {
+                        echo '<span style="color: #666; font-size: 12px; font-style: italic;">All recent months have feedback</span>';
+                    }
+                    ?>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Footer with privacy mode toggle -->
@@ -850,7 +722,8 @@ if ( $selected_person && $selected_month ) {
         <?php else : ?>
             <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>
         <?php endif; ?>
-        <a href="<?php echo build_team_url( 'admin.php' ); ?>" style="color: #666; text-decoration: none;">⚙️ Admin Panel</a>
+        <a href="<?php echo build_team_url( 'admin.php' ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">⚙️ Admin Panel</a>
+        <a href="<?php echo build_team_url( 'hr-config.php' ); ?>" style="color: #666; text-decoration: none;">🤖 Ollama Settings</a>
         <?php if ( $selected_person ) : ?>
             | <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'team', 'edit_person' => $selected_person ) ); ?>" style="color: #666; text-decoration: none;">✏️ Edit Person</a>
         <?php endif; ?>
@@ -859,6 +732,25 @@ if ( $selected_person && $selected_month ) {
     <script>
         // Pass PHP variable to JavaScript - use HR feedback month, not current calendar month
         window.currentMonth = '<?php echo get_hr_feedback_month(); ?>';
+
+        // Function to toggle feedback details
+        function toggleFeedbackDetails(month) {
+            const teaser = document.getElementById('teaser-' + month);
+            const content = document.getElementById('content-' + month);
+            const toggle = document.getElementById('toggle-' + month);
+
+            if (content.style.display === 'none') {
+                // Show full content
+                teaser.style.display = 'none';
+                content.style.display = 'block';
+                toggle.innerHTML = '▲ Collapse';
+            } else {
+                // Show teaser
+                teaser.style.display = 'block';
+                content.style.display = 'none';
+                toggle.innerHTML = '▼ Expand';
+            }
+        }
     </script>
     <script src="assets/hr-reports.js"></script>
     <script>
@@ -877,16 +769,5 @@ if ( $selected_person && $selected_month ) {
         }
     </script>
 
-    <style>
-        .performance-badge {
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 12px;
-            text-transform: uppercase;
-        }
-        .performance-high { background: #cce5ff; color: #004085; }
-        .performance-good { background: #d4edda; color: #155724; }
-        .performance-low { background: #f8d7da; color: #721c24; }
-    </style>
 </body>
 </html>

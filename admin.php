@@ -77,7 +77,7 @@ if ( ! empty( $edit_member ) ) {
  * Load existing configuration or return empty structure
  */
 function load_or_create_config( $file_path ) {
-	if ( file_exists( $file_path ) ) {
+	if ( $file_path && file_exists( $file_path ) ) {
 		$content = file_get_contents( $file_path );
 		$config = json_decode( $content, true );
 		if ( json_last_error() === JSON_ERROR_NONE ) {
@@ -613,6 +613,8 @@ function create_person_data_from_form() {
 		'role' => sanitize_text_field( $_POST['role'] ?? '' ),
 		'github' => sanitize_text_field( $_POST['github'] ?? '' ),
 		'linear' => sanitize_text_field( $_POST['linear'] ?? '' ),
+		'wordpress' => sanitize_text_field( $_POST['wordpress'] ?? '' ),
+		'linkedin' => sanitize_text_field( $_POST['linkedin'] ?? '' ),
 		'location' => sanitize_text_field( $_POST['location'] ?? '' ),
 		'timezone' => sanitize_text_field( $_POST['timezone'] ?? '' ),
 		'links' => $links,
@@ -621,7 +623,9 @@ function create_person_data_from_form() {
 		'partner' => sanitize_text_field( $_POST['partner'] ?? '' ),
 		'kids' => parse_kids_data( $_POST['kids'] ?? '' ),
 		'notes' => sanitize_textarea_field( $_POST['notes'] ?? '' ),
-		'needs_hr_monthly' => isset( $_POST['needs_hr_monthly'] ) && $_POST['needs_hr_monthly'] === '1'
+		'github_repos' => isset( $_POST['github_repos'] ) ? array_filter( array_map( 'sanitize_text_field', $_POST['github_repos'] ) ) : array(),
+		'needs_hr_monthly' => isset( $_POST['needs_hr_monthly'] ) && $_POST['needs_hr_monthly'] === '1',
+		'personal_events' => parse_personal_events_data( $_POST['personal_events'] ?? array() )
 	);
 }
 
@@ -684,6 +688,40 @@ function parse_kids_data( $kids_input ) {
 	}
 
 	return $kids;
+}
+
+/**
+ * Parse personal events data from form input
+ */
+function parse_personal_events_data( $events_data ) {
+	if ( empty( $events_data ) || ! is_array( $events_data ) ) {
+		return array();
+	}
+
+	$personal_events = array();
+
+	foreach ( $events_data as $event ) {
+		if ( empty( $event['date'] ) || empty( $event['description'] ) ) {
+			continue; // Skip incomplete events
+		}
+
+		$date = sanitize_text_field( $event['date'] );
+		$type = sanitize_text_field( $event['type'] ?? 'other' );
+		$description = sanitize_text_field( $event['description'] );
+
+		// Validate date format (YYYY-MM-DD)
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+			continue; // Skip invalid dates
+		}
+
+		$personal_events[] = array(
+			'date' => $date,
+			'type' => $type,
+			'description' => $description
+		);
+	}
+
+	return $personal_events;
 }
 
 /**
@@ -1059,7 +1097,192 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			<label for="<?php echo $prefix; ?>linear">Linear Username</label>
 			<input type="text" id="<?php echo $prefix; ?>linear" name="linear" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['linear'] ?? '' ) : ''; ?>">
 		</div>
+
+		<div class="form-group">
+			<label for="<?php echo $prefix; ?>wordpress">WordPress.org Username</label>
+			<input type="text" id="<?php echo $prefix; ?>wordpress" name="wordpress" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['wordpress'] ?? '' ) : ''; ?>">
+		</div>
+
+		<div class="form-group">
+			<label for="<?php echo $prefix; ?>linkedin">LinkedIn Username</label>
+			<input type="text" id="<?php echo $prefix; ?>linkedin" name="linkedin" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['linkedin'] ?? '' ) : ''; ?>">
+		</div>
 	</div>
+
+	<!-- GitHub Repositories -->
+	<div class="form-group">
+		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+			<label>GitHub Repositories <small style="color: #666; font-weight: normal;">(optional)</small></label>
+			<button type="button" onclick="addRepoField('<?php echo $prefix; ?>')" style="padding: 4px 8px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">+ Add Repository</button>
+		</div>
+		
+		<div id="<?php echo $prefix; ?>repo_fields">
+			<?php
+			// Get existing repos for editing
+			$existing_repos = array();
+			if ( $is_editing && ! empty( $edit_data['github_repos'] ) ) {
+				$existing_repos = is_array( $edit_data['github_repos'] ) ? $edit_data['github_repos'] : array_filter( array_map( 'trim', explode( ',', $edit_data['github_repos'] ) ) );
+			}
+			
+			if ( empty( $existing_repos ) ) {
+				// Show one empty field for new entries
+				?>
+				<div class="repo-field" style="display: flex; gap: 8px; margin-bottom: 8px;">
+					<input type="text" name="github_repos[]" placeholder="org/repo-name" style="width: 300px;">
+					<button type="button" onclick="removeRepoField(this)" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+				</div>
+				<?php
+			} else {
+				foreach ( $existing_repos as $repo ) :
+				?>
+					<div class="repo-field" style="display: flex; gap: 8px; margin-bottom: 8px;">
+						<input type="text" name="github_repos[]" value="<?php echo htmlspecialchars( $repo ); ?>" placeholder="org/repo-name" style="width: 300px;">
+						<button type="button" onclick="removeRepoField(this)" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+					</div>
+				<?php
+				endforeach;
+			}
+			?>
+		</div>
+		
+		<?php
+		// Get all repos used across the team for tag display
+		global $config_file;
+		$team_config = load_or_create_config( $config_file );
+		$all_repos = array();
+		$all_people = array_merge( $team_config['team_members'] ?? array(), $team_config['leadership'] ?? array(), $team_config['alumni'] ?? array() );
+		foreach ( $all_people as $person ) {
+			if ( ! empty( $person['github_repos'] ) ) {
+				$person_repos = is_array( $person['github_repos'] ) ? $person['github_repos'] : array_filter( array_map( 'trim', explode( ',', $person['github_repos'] ?? '' ) ) );
+				$all_repos = array_merge( $all_repos, $person_repos );
+			}
+		}
+		$all_repos = array_unique( array_filter( $all_repos ) );
+		
+		// Filter out repos the current user already has
+		$user_repos = array();
+		if ( $is_editing && ! empty( $edit_data['github_repos'] ) ) {
+			$user_repos = is_array( $edit_data['github_repos'] ) ? $edit_data['github_repos'] : array_filter( array_map( 'trim', explode( ',', $edit_data['github_repos'] ) ) );
+		}
+		$available_repos = array_diff( $all_repos, $user_repos );
+		sort( $available_repos );
+		
+		if ( ! empty( $available_repos ) ) :
+		?>
+			<div style="margin-top: 12px;">
+				<small style="color: #666; font-size: 12px;">Team repositories (click to add):</small>
+				<div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
+					<?php foreach ( $available_repos as $repo ) : ?>
+						<button type="button" onclick="addRepoToField('<?php echo $prefix; ?>', '<?php echo htmlspecialchars( $repo, ENT_QUOTES ); ?>')" 
+								style="padding: 2px 6px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 12px; cursor: pointer; font-size: 11px; color: #555;">
+							<?php echo htmlspecialchars( $repo ); ?>
+						</button>
+					<?php endforeach; ?>
+				</div>
+			</div>
+		<?php endif; ?>
+	</div>
+
+	<script>
+		function addRepoField(prefix) {
+			const container = document.getElementById(prefix + 'repo_fields');
+			const div = document.createElement('div');
+			div.className = 'repo-field';
+			div.style.display = 'flex';
+			div.style.gap = '8px';
+			div.style.marginBottom = '8px';
+			
+			div.innerHTML = '<input type="text" name="github_repos[]" placeholder="org/repo-name" style="width: 300px;">' +
+							'<button type="button" onclick="removeRepoField(this)" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>';
+			
+			container.appendChild(div);
+		}
+		
+		function removeRepoField(button) {
+			const container = button.closest('.repo-field').parentNode;
+			button.closest('.repo-field').remove();
+			
+			// Ensure at least one field remains
+			if (container.children.length === 0) {
+				addRepoField('<?php echo $prefix; ?>');
+			}
+		}
+		
+		function addRepoToField(prefix, repo) {
+			// Find an empty field or create a new one
+			const container = document.getElementById(prefix + 'repo_fields');
+			const inputs = container.querySelectorAll('input[name="github_repos[]"]');
+			
+			// Check if repo already exists
+			for (let input of inputs) {
+				if (input.value.trim() === repo) {
+					return; // Already exists
+				}
+			}
+			
+			// Find empty field
+			for (let input of inputs) {
+				if (input.value.trim() === '') {
+					input.value = repo;
+					return;
+				}
+			}
+			
+			// No empty field found, add new one
+			addRepoField(prefix);
+			const newInputs = container.querySelectorAll('input[name="github_repos[]"]');
+			newInputs[newInputs.length - 1].value = repo;
+		}
+	</script>
+
+	<!-- Personal Events -->
+	<h4 style="margin: 30px 0 10px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Personal Events</h4>
+	<div class="form-group">
+		<label>Personal Events <small style="color: #666; font-weight: normal;">(e.g., return from vacation, end of sabbatical)</small></label>
+		<div id="personal-events-container">
+			<?php 
+			$personal_events = $is_editing && isset( $edit_data['personal_events'] ) ? $edit_data['personal_events'] : array();
+			if ( ! empty( $personal_events ) ) :
+				foreach ( $personal_events as $index => $event ) :
+			?>
+				<div class="personal-event-row" style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; background: #f9f9f9; border-radius: 4px;">
+					<input type="date" name="personal_events[<?php echo $index; ?>][date]" value="<?php echo htmlspecialchars( $event['date'] ?? '' ); ?>" style="flex: 0 0 150px;">
+					<input type="hidden" name="personal_events[<?php echo $index; ?>][type]" value="other">
+					<input type="text" name="personal_events[<?php echo $index; ?>][description]" value="<?php echo htmlspecialchars( $event['description'] ?? '' ); ?>" placeholder="Event description" style="flex: 1;">
+					<button type="button" onclick="removePersonalEvent(this)" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">×</button>
+				</div>
+			<?php 
+				endforeach;
+			endif;
+			?>
+		</div>
+		<button type="button" onclick="addPersonalEvent()" style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">+ Add Personal Event</button>
+	</div>
+
+	<script>
+		let personalEventIndex = <?php echo $is_editing && ! empty( $personal_events ) ? count( $personal_events ) : 0; ?>;
+
+		function addPersonalEvent() {
+			const container = document.getElementById('personal-events-container');
+			const eventRow = document.createElement('div');
+			eventRow.className = 'personal-event-row';
+			eventRow.style.cssText = 'display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; background: #f9f9f9; border-radius: 4px;';
+			
+			eventRow.innerHTML = `
+				<input type="date" name="personal_events[${personalEventIndex}][date]" style="flex: 0 0 150px;">
+				<input type="hidden" name="personal_events[${personalEventIndex}][type]" value="other">
+				<input type="text" name="personal_events[${personalEventIndex}][description]" placeholder="Event description" style="flex: 1;">
+				<button type="button" onclick="removePersonalEvent(this)" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">×</button>
+			`;
+			
+			container.appendChild(eventRow);
+			personalEventIndex++;
+		}
+
+		function removePersonalEvent(button) {
+			button.parentElement.remove();
+		}
+	</script>
 
 	<div class="form-group">
 		<label for="<?php echo $prefix; ?>notes">Notes</label>

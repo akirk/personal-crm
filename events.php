@@ -104,7 +104,7 @@ $available_teams = get_available_teams();
         <div class="header">
             <div style="flex-grow: 1;">
                 <h1><a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a></h1>
-                <p style="color: #666;">All team events, meetings, and activities</p>
+                <a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Overview</a>
             </div>
             <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
                 <!-- Team Switcher -->
@@ -119,7 +119,6 @@ $available_teams = get_available_teams();
                 </select>
                 
                 <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events', 'add' => 'new' ) ); ?>" class="nav-link" style="background: #28a745;">+ Add Event</a>
-                <a href="<?php echo build_team_url( 'index.php' ); ?>" class="nav-link">← Back to Team</a>
             </div>
         </div>
 

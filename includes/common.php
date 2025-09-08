@@ -4,6 +4,125 @@
  */
 require_once __DIR__ . '/event.php';
 
+/**
+ * Get SVG icon for a link based on its text or URL
+ */
+function get_link_icon( $link_text, $link_url, $size = 16 ) {
+	if ( 0 === strpos( $link_url, 'https://linear.app/' ) ) {
+		return '<svg xmlns="http://www.w3.org/2000/svg" fill="none" width="' . $size . '" height="' . $size . '" viewBox="0 0 100 100" style="vertical-align: middle; margin-bottom: 4px; margin-right: 4px"><path fill="#222326" d="M1.22541 61.5228c-.2225-.9485.90748-1.5459 1.59638-.857L39.3342 97.1782c.6889.6889.0915 1.8189-.857 1.5964C20.0515 94.4522 5.54779 79.9485 1.22541 61.5228ZM.00189135 46.8891c-.01764375.2833.08887215.5599.28957165.7606L52.3503 99.7085c.2007.2007.4773.3075.7606.2896 2.3692-.1476 4.6938-.46 6.9624-.9259.7645-.157 1.0301-1.0963.4782-1.6481L2.57595 39.4485c-.55186-.5519-1.49117-.2863-1.648174.4782-.465915 2.2686-.77832 4.5932-.92588465 6.9624ZM4.21093 29.7054c-.16649.3738-.08169.8106.20765 1.1l64.77602 64.776c.2894.2894.7262.3742 1.1.2077 1.7861-.7956 3.5171-1.6927 5.1855-2.684.5521-.328.6373-1.0867.1832-1.5407L8.43566 24.3367c-.45409-.4541-1.21271-.3689-1.54074.1832-.99132 1.6684-1.88843 3.3994-2.68399 5.1855ZM12.6587 18.074c-.3701-.3701-.393-.9637-.0443-1.3541C21.7795 6.45931 35.1114 0 49.9519 0 77.5927 0 100 22.4073 100 50.0481c0 14.8405-6.4593 28.1724-16.7199 37.3375-.3903.3487-.984.3258-1.3542-.0443L12.6587 18.074Z"/></svg> ';
+	} elseif ( $link_text === '1:1 doc' ) {
+		return '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#222326" style="vertical-align: middle; margin-bottom: 2px; margin-right: 4px"><path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/><circle cx="9" cy="13" r="1.5"/><circle cx="15" cy="13" r="1.5"/><path d="M9,16H15V18H9V16Z"/></svg>';
+	} elseif ( $link_text === 'HR monthly' ) {
+		return '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#222326" style="vertical-align: middle; margin-right: 4px"><path d="M19,3H18V1H16V3H8V1H6V3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M19,19H5V8H19V19M5,6V5H19V6H5Z"/><rect x="7" y="10" width="2" height="2"/><rect x="11" y="10" width="2" height="2"/><rect x="15" y="10" width="2" height="2"/><rect x="7" y="14" width="2" height="2"/><rect x="11" y="14" width="2" height="2"/></svg>';
+	} elseif ( $link_text === 'WordPress.org' ) {
+		return '<svg fill="#222326" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"  width="' . $size . '" height="' . $size . '"  viewBox="0 0 512 512" enable-background="new 0 0 512 512" xml:space="preserve" style="vertical-align: middle; margin-bottom: 4px; margin-right: 4px"><g id="5151e0c8492e5103c096af88a51f5fb6"><path display="inline" d="M256,0.5C115.117,0.5,0.5,115.109,0.5,255.992C0.5,396.874,115.117,511.5,256,511.5
+		c140.879,0,255.5-114.626,255.5-255.508C511.5,115.109,396.879,0.5,256,0.5z M26.287,255.992c0-33.306,7.145-64.923,19.89-93.488
+		l109.582,300.225C79.117,425.502,26.287,346.914,26.287,255.992z M256,485.722c-22.547,0-44.309-3.307-64.898-9.361l68.932-200.274
+		l70.604,193.446c0.466,1.135,1.035,2.179,1.646,3.165C308.406,481.102,282.748,485.722,256,485.722z M287.659,148.286
+		c13.827-0.724,26.29-2.179,26.29-2.179c12.376-1.464,10.916-19.658-1.468-18.93c0,0-37.207,2.919-61.23,2.919
+		c-22.568,0-60.494-2.919-60.494-2.919c-12.388-0.728-13.839,18.198-1.456,18.93c0,0,11.715,1.455,24.095,2.179l35.784,98.063
+		l-50.277,150.767l-83.649-248.83c13.84-0.724,26.286-2.179,26.286-2.179c12.372-1.464,10.912-19.658-1.468-18.93
+		c0,0-37.198,2.919-61.222,2.919c-4.309,0-9.386-0.108-14.784-0.283C105.141,67.457,175.745,26.274,256,26.274
+		c59.8,0,114.251,22.868,155.121,60.315c-0.989-0.058-1.958-0.183-2.978-0.183c-22.563,0-38.574,19.653-38.574,40.771
+		c0,18.93,10.92,34.948,22.564,53.874c8.737,15.299,18.938,34.953,18.938,63.355c0,19.657-7.56,42.475-17.479,74.259l-22.917,76.554
+		L287.659,148.286z M371.486,454.545l70.163-202.861c13.104-32.77,17.47-58.977,17.47-82.272c0-8.458-0.558-16.31-1.547-23.625
+		c17.932,32.715,28.137,70.262,28.137,110.205C485.709,340.738,439.782,414.727,371.486,454.545z"></path></g></svg>';
+	} elseif ( $link_text === 'LinkedIn' ) {
+		return '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#222326" style="vertical-align: middle; margin-right: 4px"><path d="M19 3A2 2 0 0 1 21 5V19A2 2 0 0 1 19 21H5A2 2 0 0 1 3 19V5A2 2 0 0 1 5 3H19M18.5 18.5V13.2A3.26 3.26 0 0 0 15.24 9.94C14.39 9.94 13.4 10.46 12.92 11.24V10.13H10.13V18.5H12.92V13.57C12.92 12.8 13.54 12.17 14.31 12.17A1.4 1.4 0 0 1 15.71 13.57V18.5H18.5M6.88 8.56A1.68 1.68 0 0 0 8.56 6.88C8.56 5.95 7.81 5.19 6.88 5.19S5.19 5.95 5.19 6.88A1.69 1.69 0 0 0 6.88 8.56M8.27 18.5V10.13H5.5V18.5H8.27Z"/></svg>';
+	} elseif ( $link_text === 'GitHub' ) {
+		return '<svg xmlns="http://www.w3.org/2000/svg" width="' . $size . '" height="' . $size . '" viewBox="0 0 24 24" fill="#222326" style="vertical-align: middle; margin-right: 4px"><rect width="24" height="24" fill="none"/><path d="M12,2A10,10,0,0,0,8.84,21.5c.5.08.66-.23.66-.5V19.31C6.73,19.91,6.14,18,6.14,18A2.69,2.69,0,0,0,5,16.5c-.91-.62.07-.6.07-.6a2.1,2.1,0,0,1,1.53,1,2.15,2.15,0,0,0,2.91.83,2.16,2.16,0,0,1,.63-1.34C8,16.17,5.62,15.31,5.62,11.5a3.87,3.87,0,0,1,1-2.71,3.58,3.58,0,0,1,.1-2.64s.84-.27,2.75,1a9.63,9.63,0,0,1,5,0c1.91-1.29,2.75-1,2.75-1a3.58,3.58,0,0,1,.1,2.64,3.87,3.87,0,0,1,1,2.71c0,3.82-2.34,4.66-4.57,4.91a2.39,2.39,0,0,1,.69,1.85V21c0,.27.16.59.67.5A10,10,0,0,0,12,2Z"/></svg>';
+	}
+	return '';
+}
+
+/**
+ * Render person links with icons
+ */
+function render_person_links( $links, $icon_size = 12 ) {
+	foreach ( $links as $link_text => $link_url ) {
+		if ( ! empty( $link_url ) && ! in_array( $link_text, array( 'WordPress.org', 'LinkedIn', 'Matticspace' )) ) {
+			echo '<a href="' . htmlspecialchars( $link_url ) . '" target="_blank">';
+			echo get_link_icon( $link_text, $link_url, $icon_size );
+			echo htmlspecialchars( $link_text );
+			echo '</a>';
+		}
+	}
+}
+
+/**
+ * Get all upcoming events (personal + team/company) - within next 3 months
+ */
+function get_all_upcoming_events( $team_data ) {
+	$all_events = array();
+	$current_date = new DateTime();
+	$cutoff_date = clone $current_date;
+	$cutoff_date->add( new DateInterval( 'P3M' ) ); // 3 months from now
+
+	// Get personal events from all team members, leadership, and alumni
+	$all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['alumni'] );
+	foreach ( $all_people as $person ) {
+		$personal_events = $person->get_upcoming_events();
+		$all_events = array_merge( $all_events, $personal_events );
+	}
+
+	// Add team and company events (within 3 months)
+	foreach ( $team_data['events'] as $event ) {
+		$start_date = DateTime::createFromFormat( 'Y-m-d', $event->start_date );
+		if ( $start_date && $start_date >= $current_date && $start_date <= $cutoff_date ) {
+			$end_date = DateTime::createFromFormat( 'Y-m-d', $event->end_date );
+			$duration = '';
+			if ( $end_date && $start_date->format( 'Y-m-d' ) !== $end_date->format( 'Y-m-d' ) ) {
+				$duration = ' - ' . $end_date->format( 'M j' );
+			}
+
+			$all_events[] = array(
+				'type' => $event->type,
+				'date' => $start_date,
+				'description' => $event->name . $duration,
+				'location' => $event->location ?? '',
+				'details' => $event->description ?? '',
+			);
+		}
+	}
+
+	// Sort all events by date
+	usort( $all_events, function( $a, $b ) {
+		return $a['date'] <=> $b['date'];
+	} );
+
+	return $all_events;
+}
+
+function mask_date( $date, $privacy_mode, $show_year = false ) {
+	if ( ! $privacy_mode || empty( $date ) ) {
+		return $date;
+	}
+
+	if ( $show_year ) {
+		// For birthdays, show just the year
+		if ( preg_match( '/^(\d{4})-\d{2}-\d{2}$/', $date, $matches ) ) {
+			return $matches[1];
+		}
+	}
+
+	return '****-**-**';
+}
+
+function mask_event_description( $description, $privacy_mode, $all_people ) {
+	if ( ! $privacy_mode ) {
+		return $description;
+	}
+
+	// Mask names in event descriptions
+	foreach ( $all_people as $person ) {
+		$full_name = $person->name;
+		$masked_name = mask_name( $full_name, true );
+		$description = str_replace( $full_name, $masked_name, $description );
+	}
+
+	return $description;
+}
+
 
 /**
  * Get the appropriate month for HR feedback based on current date
@@ -370,6 +489,14 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 			$links['Linear'] = 'https://linear.app/a8c/profiles/' . $member_data['linear'];
 		}
 
+		if ( isset( $member_data['wordpress'] ) && ! empty( $member_data['wordpress'] ) ) {
+			$links['WordPress.org'] = 'https://profiles.wordpress.org/' . $member_data['wordpress'];
+		}
+
+		if ( isset( $member_data['linkedin'] ) && ! empty( $member_data['linkedin'] ) ) {
+			$links['LinkedIn'] = 'https://linkedin.com/in/' . $member_data['linkedin'];
+		}
+
 		$person = new Person(
 			$member_data['name'],
 			$username,
@@ -388,6 +515,11 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->location = $member_data['location'] ?? $member_data['town'] ?? ''; // Support both 'location' and legacy 'town'
 		$person->timezone = $member_data['timezone'] ?? '';
 		$person->needs_hr_monthly = $member_data['needs_hr_monthly'] ?? false;
+		$person->github = $member_data['github'] ?? '';
+		$person->github_repos = $member_data['github_repos'] ?? array();
+		$person->wordpress = $member_data['wordpress'] ?? '';
+		$person->linkedin = $member_data['linkedin'] ?? '';
+		$person->personal_events = $member_data['personal_events'] ?? array();
 
 		$team_members[$username] = $person;
 	}
@@ -404,6 +536,14 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 			if ( ! empty( $leader_data['one_on_one'] ) ) {
 				$links['1:1 doc'] = $leader_data['one_on_one'];
 			}
+		}
+
+		if ( isset( $leader_data['wordpress'] ) && ! empty( $leader_data['wordpress'] ) ) {
+			$links['WordPress.org'] = 'https://profiles.wordpress.org/' . $leader_data['wordpress'];
+		}
+
+		if ( isset( $leader_data['linkedin'] ) && ! empty( $leader_data['linkedin'] ) ) {
+			$links['LinkedIn'] = 'https://linkedin.com/in/' . $leader_data['linkedin'];
 		}
 
 		$person = new Person(
@@ -424,6 +564,11 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->location = $leader_data['location'] ?? $leader_data['town'] ?? ''; // Support both 'location' and legacy 'town'
 		$person->timezone = $leader_data['timezone'] ?? '';
 		$person->needs_hr_monthly = $leader_data['needs_hr_monthly'] ?? false;
+		$person->github = $leader_data['github'] ?? '';
+		$person->github_repos = $leader_data['github_repos'] ?? array();
+		$person->wordpress = $leader_data['wordpress'] ?? '';
+		$person->linkedin = $leader_data['linkedin'] ?? '';
+		$person->personal_events = $leader_data['personal_events'] ?? array();
 
 		$leadership[$username] = $person;
 	}
@@ -445,6 +590,14 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 			}
 		}
 
+		if ( isset( $alumni_data['wordpress'] ) && ! empty( $alumni_data['wordpress'] ) ) {
+			$links['WordPress.org'] = 'https://profiles.wordpress.org/' . $alumni_data['wordpress'];
+		}
+
+		if ( isset( $alumni_data['linkedin'] ) && ! empty( $alumni_data['linkedin'] ) ) {
+			$links['LinkedIn'] = 'https://linkedin.com/in/' . $alumni_data['linkedin'];
+		}
+
 		$person = new Person(
 			$alumni_data['name'],
 			$username,
@@ -463,6 +616,11 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->location = $alumni_data['location'] ?? $alumni_data['town'] ?? '';
 		$person->timezone = $alumni_data['timezone'] ?? '';
 		$person->needs_hr_monthly = $alumni_data['needs_hr_monthly'] ?? false;
+		$person->github = $alumni_data['github'] ?? '';
+		$person->github_repos = $alumni_data['github_repos'] ?? array();
+		$person->wordpress = $alumni_data['wordpress'] ?? '';
+		$person->linkedin = $alumni_data['linkedin'] ?? '';
+		$person->personal_events = $alumni_data['personal_events'] ?? array();
 
 		$alumni[$username] = $person;
 	}
@@ -554,7 +712,44 @@ function get_upcoming_events_for_display( $team_data ) {
 /**
  * Render upcoming events sidebar content
  */
-function render_upcoming_events_sidebar( $upcoming_events, $privacy_mode = false, $limit = 10 ) {
+function render_upcoming_events_sidebar( $upcoming_events_or_person = null, $privacy_mode = null, $limit = 6, $current_person = null ) {
+	// Handle different call signatures for backward compatibility
+	if ( is_array( $upcoming_events_or_person ) ) {
+		// Old signature: render_upcoming_events_sidebar( $upcoming_events, $privacy_mode, $limit, $current_person )
+		$upcoming_events = $upcoming_events_or_person;
+		if ( $privacy_mode === null ) {
+			$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
+		}
+	} elseif ( is_string( $upcoming_events_or_person ) || $upcoming_events_or_person === null ) {
+		// New signature: render_upcoming_events_sidebar( $current_person, $limit )
+		$current_person = $upcoming_events_or_person;
+		if ( is_numeric( $privacy_mode ) ) {
+			$limit = $privacy_mode; // Second param was actually limit in new signature
+		}
+		$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
+		
+		// Get upcoming events based on whether we have a specific person or need team-wide events
+		if ( $current_person ) {
+			// Get events for specific person
+			global $team_data;
+			$person_data = null;
+			if ( isset( $team_data['team_members'][ $current_person ] ) ) {
+				$person_data = $team_data['team_members'][ $current_person ];
+			} elseif ( isset( $team_data['leadership'][ $current_person ] ) ) {
+				$person_data = $team_data['leadership'][ $current_person ];
+			} elseif ( isset( $team_data['alumni'][ $current_person ] ) ) {
+				$person_data = $team_data['alumni'][ $current_person ];
+			}
+			
+			$upcoming_events = $person_data ? $person_data->get_upcoming_events() : array();
+		} else {
+			// Get team-wide events
+			global $team_data;
+			$upcoming_events = get_upcoming_events_for_display( $team_data );
+		}
+	} else {
+		$upcoming_events = array();
+	}
 	if ( empty( $upcoming_events ) ) {
 		echo '<p style="color: #666; font-style: italic; margin: 0;">No upcoming events</p>';
 		return;
@@ -564,11 +759,40 @@ function render_upcoming_events_sidebar( $upcoming_events, $privacy_mode = false
 	$all_people = array(); // We would need this for masking, but for now keeping it simple
 
 	foreach ( $displayed_events as $event ) {
+		// Calculate days until event
+		$today = new DateTime();
+		$today->setTime( 0, 0, 0 ); // Reset to start of day for accurate comparison
+		$event_date = clone $event->date;
+		$event_date->setTime( 0, 0, 0 );
+		$days_until = $today->diff( $event_date )->days;
+		$is_past = $event_date < $today;
 		?>
 		<div class="event-item">
-			<div class="event-date"><?php echo $privacy_mode && in_array( $event->type, array( 'birthday', 'anniversary' ) ) ? '[Hidden]' : $event->date->format( 'M j, Y' ); ?></div>
+			<div style="display: flex; justify-content: space-between; align-items: flex-start;">
+				<div class="event-date"><?php echo $privacy_mode && in_array( $event->type, array( 'birthday', 'anniversary' ) ) ? '[Hidden]' : $event->date->format( 'M j, Y' ); ?></div>
+				<?php if ( ! $is_past && $days_until <= 120 ) : // Show for events within 30 days ?>
+					<div style="font-size: 11px; color: #999; font-weight: normal;">
+						<?php
+						if ( $days_until == 0 ) {
+							echo 'today';
+						} elseif ( $days_until == 1 ) {
+							echo 'in 1d';
+						} else {
+							echo 'in ' . $days_until . 'd';
+						}
+						?>
+					</div>
+				<?php endif; ?>
+			</div>
 			<div class="event-description"><?php 
-				$description = $event->description;
+				// Use title without person name if this event belongs to the current person
+				if ( $current_person && $event->person ) {
+					// Since we're viewing this person's own events, remove their name
+					$description = $event->get_title_without_person_name();
+				} else {
+					$description = $event->description;
+				}
+				
 				// Remove age information from birthday descriptions when in privacy mode
 				if ( $privacy_mode && $event->type === 'birthday' && strpos( $description, '(turning ' ) !== false ) {
 					$description = preg_replace( '/\s*\(turning \d+\)/', '', $description );
@@ -577,7 +801,7 @@ function render_upcoming_events_sidebar( $upcoming_events, $privacy_mode = false
 			?></div>
 			<span class="event-type <?php echo htmlspecialchars( $event->type ); ?>"><?php echo ucfirst( $event->type ); ?></span>
 			<?php if ( ! empty( $event->location ) ) : ?>
-				<div style="font-size: 12px; color: #666; margin-top: 4px;">📍 <?php echo htmlspecialchars( $event->location ); ?></div>
+				<div style="font-size: 12px; color: #666; margin-top: 4px;">📍 <a href="https://maps.google.com/maps?q=<?php echo urlencode( $event->location ); ?>" target="_blank" style="color: #666; text-decoration: none;"><?php echo htmlspecialchars( $event->location ); ?></a></div>
 			<?php endif; ?>
 			<?php if ( ! empty( $event->links ) ) : ?>
 				<div style="font-size: 12px; margin-top: 4px;">
@@ -591,4 +815,34 @@ function render_upcoming_events_sidebar( $upcoming_events, $privacy_mode = false
 		</div>
 		<?php
 	}
+}
+
+/**
+ * Get all feedback for a person
+ */
+function get_person_feedback_history( $username ) {
+    $feedback_file = __DIR__ . '/../hr-feedback.json';
+
+    if ( ! file_exists( $feedback_file ) ) {
+        return array();
+    }
+
+    $content = file_get_contents( $feedback_file );
+    $feedback_data = json_decode( $content, true ) ?: array();
+
+    return $feedback_data['feedback'][$username] ?? array();
+}
+
+/**
+ * Simple HTML sanitizer - only allows links
+ */
+function sanitize_html( $html ) {
+    // Allow only <a> tags with href and target attributes
+    $allowed_tags = '<a>';
+    $clean_html = strip_tags( $html, $allowed_tags );
+
+    // Additional security: ensure href attributes don't contain javascript
+    $clean_html = preg_replace('/javascript:/i', '', $clean_html);
+
+    return $clean_html;
 }

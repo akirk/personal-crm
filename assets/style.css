@@ -7,47 +7,143 @@ body {
 }
 
 .feedback-status-link {
-    display: block;
-    margin-top: 5px;
+    padding: 4px 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 12px;
     text-decoration: none;
+    transition: background 0.2s;
 }
 
 .feedback-status {
     display: inline-block;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 11px;
     text-transform: uppercase;
     font-weight: bold;
-    text-decoration: none;
 }
 
-.feedback-status.submitted {
+.feedback-status-link.submitted {
     background: #d4edda;
     color: #155724;
 }
 
-.feedback-status.draft {
+.feedback-status-link.draft {
     background: #fff3cd;
     color: #856404;
 }
 
-.feedback-status.none {
+.feedback-status-link.none {
     background: #e2e3e5;
     color: #495057;
 }
 
-.feedback-status.no-feedback {
+.feedback-status-link.no-feedback {
+    background: #f8f9fa;
+    color: #495057;
     text-decoration: line-through;
 }
 
-.feedback-status.none:hover {
+.feedback-status-link.none:hover {
     background: #007cba;
     color: white;
 }
 
-.feedback-status-link:hover .feedback-status {
+.feedback-status-link.review {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.feedback-status-link.draft-finalized {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.feedback-status-link:hover {
     opacity: 0.8;
+}
+
+/* Person tabs navigation */
+.person-tabs {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.tab-link {
+    padding: 8px 16px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #495057;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.tab-link:hover {
+    background: #e9ecef;
+    color: #212529;
+}
+
+.tab-link.active {
+    background: #007cba;
+    color: white;
+    border-color: #007cba;
+}
+
+.tab-link.active:hover {
+    background: #006ba3;
+    border-color: #006ba3;
+}
+
+/* Tab status indicators */
+.tab-link.tab-status-submitted {
+    background: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.tab-link.tab-status-review {
+    background: #cce5ff;
+    color: #004085;
+    border-color: #b3d7ff;
+}
+
+.tab-link.tab-status-draft-finalized {
+    background: #d1ecf1;
+    color: #0c5460;
+    border-color: #bee5eb;
+}
+
+.tab-link.tab-status-draft {
+    background: #fff3cd;
+    color: #856404;
+    border-color: #ffeaa7;
+}
+
+.tab-link.tab-status-none {
+    background: #f8d7da;
+    color: #721c24;
+    border-color: #f5c6cb;
+}
+
+/* Quick links inline styling */
+.quick-links-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.quick-links-header strong {
+    white-space: nowrap;
+}
+
+.quick-links-header .links {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
 }
 
 .container {
@@ -61,9 +157,17 @@ body {
 
 .overview-layout {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     gap: 30px;
     align-items: start;
+    width: 100%;
+    max-width: 100%;
+}
+
+.people-section {
+    min-width: 0; /* Allow content to shrink */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 @media (max-width: 768px) {
@@ -152,6 +256,9 @@ body {
 
 .section {
     margin-bottom: 30px;
+    min-width: 0; /* Prevent overflow */
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .section h3 {
@@ -259,13 +366,13 @@ body {
 }
 
 .person-links a {
-    padding: 6px 12px;
+    padding: 4px 8px;
     background: #f8f9fa;
     border: 1px solid #dee2e6;
     color: #495057;
     text-decoration: none;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 12px;
     transition: background 0.2s;
 }
 
@@ -347,4 +454,49 @@ body {
 .feedback-status.draft-finalized {
     background: #d1ecf1;
     color: #0c5460;
+}
+
+/* Performance badge styles */
+.performance-badge {
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.performance-high { 
+    background: #cce5ff; 
+    color: #004085; 
+}
+
+.performance-good { 
+    background: #d4edda; 
+    color: #155724; 
+}
+
+.performance-low { 
+    background: #f8d7da; 
+    color: #721c24; 
+}
+
+/* HR Feedback History Details */
+details[open] summary span:last-child {
+    transform: rotate(90deg);
+    transition: transform 0.2s ease;
+}
+
+details summary span:last-child {
+    transition: transform 0.2s ease;
+}
+
+/* Event Type Badge for 'other' */
+.event-type.other {
+    background-color: #95a5a6;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    display: inline-block;
 }
