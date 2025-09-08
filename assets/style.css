@@ -491,8 +491,8 @@ details summary span:last-child {
 
 /* Event Type Badge for 'other' */
 .event-type.other {
-    background-color: #95a5a6;
-    color: white;
+    background-color: #ccc;
+    color: black;
     padding: 2px 8px;
     border-radius: 12px;
     font-size: 11px;

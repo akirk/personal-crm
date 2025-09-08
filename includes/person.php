@@ -16,7 +16,6 @@ class Person {
 	public $notes; // Additional personal notes
 	public $location; // Location/town
 	public $timezone; // Timezone identifier (e.g., "America/New_York")
-	public $needs_hr_monthly; // Whether this person needs monthly HR feedback
 	public $privacy_mode; // Whether privacy mode is enabled for this person
 	public $github; // GitHub username
 	public $github_repos; // Array of GitHub repositories
@@ -41,7 +40,6 @@ class Person {
 		$this->notes = '';
 		$this->location = '';
 		$this->timezone = '';
-		$this->needs_hr_monthly = false; // Default to false - HR feedback not needed by default
 		$this->privacy_mode = $privacy_mode;
 		$this->github = '';
 		$this->github_repos = array();

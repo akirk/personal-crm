@@ -624,7 +624,6 @@ function create_person_data_from_form() {
 		'kids' => parse_kids_data( $_POST['kids'] ?? '' ),
 		'notes' => sanitize_textarea_field( $_POST['notes'] ?? '' ),
 		'github_repos' => isset( $_POST['github_repos'] ) ? array_filter( array_map( 'sanitize_text_field', $_POST['github_repos'] ) ) : array(),
-		'needs_hr_monthly' => isset( $_POST['needs_hr_monthly'] ) && $_POST['needs_hr_monthly'] === '1',
 		'personal_events' => parse_personal_events_data( $_POST['personal_events'] ?? array() )
 	);
 }
@@ -1036,20 +1035,6 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			<input type="date" id="<?php echo $prefix; ?>company_anniversary" name="company_anniversary" value="<?php echo $is_editing ? htmlspecialchars( mask_date_input( $edit_data['company_anniversary'] ?? '', $privacy_mode ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="Hidden for privacy"' : ''; ?>>
 		</div>
 
-		<!-- HR Monthly Section -->
-		<?php if ( $show_hr_feedback ) : ?>
-		<div class="form-group" style="grid-column: 1 / -1;">
-			<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-				<input type="checkbox"
-					   name="needs_hr_monthly"
-					   value="1"
-					   <?php echo $is_editing && ($edit_data['needs_hr_monthly'] ?? false) ? 'checked' : ''; ?>
-					   style="margin: 0; width: auto;">
-				<span>Needs HR Monthly Feedback</span>
-			</label>
-			<small style="color: #666; margin-top: 4px; display: block;">Check this if the person should receive monthly HR feedback reports</small>
-		</div>
-		<?php endif; ?>
 
 		<!-- Links Section -->
 		<div class="form-group" style="grid-column: 1 / -1;">

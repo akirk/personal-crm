@@ -51,6 +51,57 @@ $action = 'overview';
 // Get available teams for switcher
 $available_teams = get_available_teams();
 
+// Collect HR feedback statistics for overview (all team members need HR feedback by default)
+$team_members_needing_hr = $team_data['team_members'];
+
+$hr_monthly_stats = array();
+if ( ! empty( $team_members_needing_hr ) ) {
+	$all_months = array();
+	
+	// Collect all feedback months from all team members
+	foreach ( $team_members_needing_hr as $username => $person ) {
+		$feedback_history = get_person_feedback_history( $username );
+		if ( ! empty( $feedback_history ) ) {
+			foreach ( $feedback_history as $month => $feedback ) {
+				if ( $month !== 'hr_monthly_link' && is_array( $feedback ) ) {
+					$all_months[ $month ] = true;
+				}
+			}
+		}
+	}
+	
+	// Sort months newest first and take the 6 most recent
+	$sorted_months = array_keys( $all_months );
+	rsort( $sorted_months );
+	$recent_months = array_slice( $sorted_months, 0, 6 );
+	
+	// Calculate completion stats for each recent month
+	foreach ( $recent_months as $month ) {
+		$completed = 0;
+		$not_necessary = 0;
+		
+		foreach ( $team_members_needing_hr as $username => $person ) {
+			$feedback_history = get_person_feedback_history( $username );
+			
+			// Check if person has "not necessary" status for this month
+			if ( isset( $feedback_history[ $month . '_not_necessary' ] ) ) {
+				$not_necessary++;
+			} elseif ( isset( $feedback_history[ $month ] ) && is_array( $feedback_history[ $month ] ) ) {
+				$completed++;
+			}
+		}
+		
+		// Calculate total people who actually needed to submit feedback
+		$people_needing_feedback = count( $team_members_needing_hr ) - $not_necessary;
+		
+		$hr_monthly_stats[ $month ] = array(
+			'completed' => $completed,
+			'total' => $people_needing_feedback,
+			'not_necessary' => $not_necessary
+		);
+	}
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -120,18 +171,31 @@ $available_teams = get_available_teams();
 											<div class="person-links">
 												<?php render_person_links( $member->links ); ?>
 												<?php
-												$needs_hr = $member->needs_hr_monthly ?? false;
-												if ( $needs_hr ) :
+												// Check if person is marked as "not necessary" for current month
+												$current_month = get_hr_feedback_month();
+												$person_feedback = get_person_feedback_history( $username );
+												$not_necessary_key = $current_month . '_not_necessary';
+												$is_not_necessary = isset( $person_feedback[ $not_necessary_key ] );
+												
+												if ( $is_not_necessary ) {
+													$not_necessary_reason = $person_feedback[ $not_necessary_key ];
+													$reason_display = str_replace( '_', ' ', $not_necessary_reason );
+													$reason_display = ucwords( $reason_display );
+												} else {
+													// All team members need HR feedback by default
 													$feedback_status = $member->get_monthly_feedback_status();
+												}
 												?>
 												<?php
 												$hr_params = array(
 													'person' => $username,
-													'month' => get_hr_feedback_month(),
+													'month' => $current_month,
 													'privacy' => $privacy_mode ? '1' : '0'
 												);
 												?>
-												<?php if ( $feedback_status['status'] === 'submitted' ) : ?>
+												<?php if ( $is_not_necessary ) : ?>
+													<span class="feedback-status-link not-necessary" title="<?php echo htmlspecialchars( $reason_display ); ?>">➖ Not needed</span>
+												<?php elseif ( $feedback_status['status'] === 'submitted' ) : ?>
 													<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link submitted">✅ Submitted</a>
 												<?php elseif ( $feedback_status['status'] === 'ready-for-review' ) : ?>
 													<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link review">📤 Ready for review</a>
@@ -141,9 +205,6 @@ $available_teams = get_available_teams();
 													<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link draft">📝 Started</a>
 												<?php else : ?>
 													<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link none">🔴 Not started</a>
-												<?php endif; ?>
-												<?php else : ?>
-												<span class="feedback-status-link no-feedback">☑️ HR</span>
 												<?php endif; ?>
 											</div>
 										</div>
@@ -224,6 +285,30 @@ $available_teams = get_available_teams();
 					<?php
 					render_upcoming_events_sidebar( null, 6 );
 					?>
+
+					<!-- HR Feedback Overview -->
+					<?php if ( ! empty( $team_members_needing_hr ) ) : ?>
+						<div style="margin-top: 30px;">
+							<a href="<?php echo build_team_url( 'hr-stats.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" style="color: inherit; text-decoration: none; display: block; margin-bottom: 15px;">
+								<h3 style="margin: 0; color: #007cba; cursor: pointer; transition: color 0.2s;">📊 HR Feedback Overview →</h3>
+							</a>
+							<?php if ( ! empty( $hr_monthly_stats ) ) : ?>
+								<div style="display: flex; flex-direction: column; gap: 8px;">
+									<?php foreach ( $hr_monthly_stats as $month => $stats ) : ?>
+										<div style="font-size: 0.9em;">
+											<strong><?php echo date( 'M Y', strtotime( $month . '-01' ) ); ?>:</strong>
+											<?php echo $stats['completed']; ?> of <?php echo $stats['total']; ?> submitted
+											<?php if ( isset( $stats['not_necessary'] ) && $stats['not_necessary'] > 0 ) : ?>
+												<span style="color: #666; font-size: 0.85em;">(<?php echo $stats['not_necessary']; ?> not needed)</span>
+											<?php endif; ?>
+										</div>
+									<?php endforeach; ?>
+								</div>
+							<?php else : ?>
+								<p style="color: #666; font-style: italic; font-size: 0.9em;">No HR feedback data available yet.</p>
+							<?php endif; ?>
+						</div>
+					<?php endif; ?>
 				</div>
 			</div>
 

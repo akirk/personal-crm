@@ -36,16 +36,40 @@ $chat_response = '';
 
 if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
     if ( isset( $_POST['action'] ) && $_POST['action'] === 'save_feedback' ) {
-        // Use the HTML content from hidden fields
-        $_POST['feedback_to_person'] = $_POST['feedback_to_person_html'] ?? '';
-        $_POST['feedback_to_hr'] = $_POST['feedback_to_hr_html'] ?? '';
-        $result = save_feedback( $_POST );
-        $message = $result['message'];
+        // Check if this is a "not necessary" selection
+        $performance = $_POST['performance'] ?? '';
+        if ( strpos( $performance, 'not_necessary_' ) === 0 ) {
+            // Extract the reason from the performance value
+            $reason = str_replace( 'not_necessary_', '', $performance );
+            $_POST['reason'] = $reason;
+            $_POST['action'] = 'set_not_necessary';
+            $result = set_feedback_not_necessary( $_POST );
+            $message = $result['message'];
+            // Debug: Add more details to the message
+            if ( $result['success'] ) {
+                $message = "✅ " . $message . " (Reason: " . $reason . ")";
+            } else {
+                $message = "❌ " . $message;
+            }
+        } else {
+            // Regular feedback submission
+            // Use the HTML content from hidden fields
+            $_POST['feedback_to_person'] = $_POST['feedback_to_person_html'] ?? '';
+            $_POST['feedback_to_hr'] = $_POST['feedback_to_hr_html'] ?? '';
+            $result = save_feedback( $_POST );
+            $message = $result['message'];
+        }
     } elseif ( isset( $_POST['action'] ) && $_POST['action'] === 'save_hr_link' ) {
         $result = save_hr_google_doc_link( $_POST );
         $message = $result['message'];
     } elseif ( isset( $_POST['action'] ) && $_POST['action'] === 'get_feedback_assessment' ) {
         $chat_response = get_llm_feedback_assessment( $_POST['feedback_text'] );
+    } elseif ( isset( $_POST['action'] ) && $_POST['action'] === 'set_not_necessary' ) {
+        $result = set_feedback_not_necessary( $_POST );
+        $message = $result['message'];
+    } elseif ( isset( $_POST['action'] ) && $_POST['action'] === 'remove_not_necessary' ) {
+        $result = remove_feedback_not_necessary( $_POST );
+        $message = $result['message'];
     }
 }
 
@@ -399,14 +423,14 @@ if ( $selected_person && $selected_month ) {
         <?php endif; ?>
 
         <?php if ( $message ) : ?>
-            <div class="message <?php echo strpos( $message, 'success' ) !== false ? 'success' : 'error'; ?>">
+            <div class="message <?php echo strpos( strtolower( $message ), 'success' ) !== false || strpos( $message, '✅' ) !== false ? 'success' : 'error'; ?>" style="margin-bottom: 20px;">
                 <?php echo htmlspecialchars( $message ); ?>
             </div>
         <?php endif; ?>
 
 
-        <form method="post" class="hr-form">
-            <input type="hidden" name="action" value="save_feedback">
+        <form method="post" class="hr-form" id="hr-form">
+            <input type="hidden" name="action" value="save_feedback" id="form-action">
             
             <div class="form-row-with-checklist">
                 <div class="form-column">
@@ -451,11 +475,27 @@ if ( $selected_person && $selected_month ) {
 
                     <div class="form-group">
                         <label for="performance">Performance Evaluation:</label>
-                        <select name="performance" id="performance" class="performance-select" required>
+                        <select name="performance" id="performance" class="performance-select" required onchange="toggleFeedbackFields()">
                             <option value="">Select performance level...</option>
                             <option value="high" <?php echo ( $existing_feedback['performance'] ?? '' ) === 'high' ? 'selected' : ''; ?>>High</option>
                             <option value="good" <?php echo ( $existing_feedback['performance'] ?? '' ) === 'good' ? 'selected' : ''; ?>>Good</option>
                             <option value="low" <?php echo ( $existing_feedback['performance'] ?? '' ) === 'low' ? 'selected' : ''; ?>>Low</option>
+                            <optgroup label="Not Necessary">
+                                <?php
+                                // Check if current selection is "not necessary"
+                                $person_feedback = $selected_person ? get_person_feedback_history( $selected_person ) : array();
+                                $not_necessary_key = $selected_month . '_not_necessary';
+                                $current_not_necessary = isset( $person_feedback[ $not_necessary_key ] ) ? $person_feedback[ $not_necessary_key ] : false;
+                                ?>
+                                <option value="not_necessary_sabbatical" <?php echo $current_not_necessary === 'sabbatical' ? 'selected' : ''; ?>>Not necessary - Sabbatical</option>
+                                <option value="not_necessary_extended_leave" <?php echo $current_not_necessary === 'extended_leave' ? 'selected' : ''; ?>>Not necessary - Extended leave</option>
+                                <option value="not_necessary_medical_leave" <?php echo $current_not_necessary === 'medical_leave' ? 'selected' : ''; ?>>Not necessary - Medical leave</option>
+                                <option value="not_necessary_started_mid_month" <?php echo $current_not_necessary === 'started_mid_month' ? 'selected' : ''; ?>>Not necessary - Started mid-month</option>
+                                <option value="not_necessary_between_roles" <?php echo $current_not_necessary === 'between_roles' ? 'selected' : ''; ?>>Not necessary - Between roles</option>
+                                <option value="not_necessary_parental_leave" <?php echo $current_not_necessary === 'parental_leave' ? 'selected' : ''; ?>>Not necessary - Parental leave</option>
+                                <option value="not_necessary_not_on_team" <?php echo $current_not_necessary === 'not_on_team' ? 'selected' : ''; ?>>Not necessary - Not on the team</option>
+                                <option value="not_necessary_other" <?php echo $current_not_necessary === 'other' ? 'selected' : ''; ?>>Not necessary - Other</option>
+                            </optgroup>
                         </select>
                     </div>
                 </div>
@@ -751,6 +791,44 @@ if ( $selected_person && $selected_month ) {
                 toggle.innerHTML = '▼ Expand';
             }
         }
+    </script>
+    <script>
+        function toggleFeedbackFields() {
+            const performance = document.getElementById('performance').value;
+            const isNotNecessary = performance.startsWith('not_necessary_');
+            
+            // Get specific feedback-related elements
+            const feedbackToPersonGroup = document.getElementById('feedback_to_person')?.closest('.form-group');
+            const feedbackToHrGroup = document.getElementById('feedback_to_hr')?.closest('.form-group');
+            const progressChecklist = document.querySelector('.progress-checklist');
+            const autoSaveIndicator = document.querySelector('.auto-save-indicator');
+            const aiChatSection = document.getElementById('ai-chat-sidebar');
+            
+            // Hide/show feedback fields (but keep autoSaveIndicator visible for messages)
+            const elementsToToggle = [feedbackToPersonGroup, feedbackToHrGroup, progressChecklist];
+            elementsToToggle.forEach(element => {
+                if (element) {
+                    element.style.display = isNotNecessary ? 'none' : '';
+                }
+            });
+            
+            // Update form requirements
+            const feedbackToPersonDiv = document.getElementById('feedback_to_person');
+            const feedbackToHrDiv = document.getElementById('feedback_to_hr');
+            
+            if (isNotNecessary) {
+                if (feedbackToPersonDiv) feedbackToPersonDiv.removeAttribute('required');
+                if (feedbackToHrDiv) feedbackToHrDiv.removeAttribute('required');
+            } else {
+                if (feedbackToPersonDiv) feedbackToPersonDiv.setAttribute('required', '');
+                if (feedbackToHrDiv) feedbackToHrDiv.setAttribute('required', '');
+            }
+        }
+        
+        // Run on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleFeedbackFields();
+        });
     </script>
     <script src="assets/hr-reports.js"></script>
     <script>

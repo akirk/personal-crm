@@ -514,7 +514,6 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->notes = $member_data['notes'] ?? '';
 		$person->location = $member_data['location'] ?? $member_data['town'] ?? ''; // Support both 'location' and legacy 'town'
 		$person->timezone = $member_data['timezone'] ?? '';
-		$person->needs_hr_monthly = $member_data['needs_hr_monthly'] ?? false;
 		$person->github = $member_data['github'] ?? '';
 		$person->github_repos = $member_data['github_repos'] ?? array();
 		$person->wordpress = $member_data['wordpress'] ?? '';
@@ -563,7 +562,6 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->notes = $leader_data['notes'] ?? '';
 		$person->location = $leader_data['location'] ?? $leader_data['town'] ?? ''; // Support both 'location' and legacy 'town'
 		$person->timezone = $leader_data['timezone'] ?? '';
-		$person->needs_hr_monthly = $leader_data['needs_hr_monthly'] ?? false;
 		$person->github = $leader_data['github'] ?? '';
 		$person->github_repos = $leader_data['github_repos'] ?? array();
 		$person->wordpress = $leader_data['wordpress'] ?? '';
@@ -615,7 +613,6 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->notes = $alumni_data['notes'] ?? '';
 		$person->location = $alumni_data['location'] ?? $alumni_data['town'] ?? '';
 		$person->timezone = $alumni_data['timezone'] ?? '';
-		$person->needs_hr_monthly = $alumni_data['needs_hr_monthly'] ?? false;
 		$person->github = $alumni_data['github'] ?? '';
 		$person->github_repos = $alumni_data['github_repos'] ?? array();
 		$person->wordpress = $alumni_data['wordpress'] ?? '';
@@ -845,4 +842,75 @@ function sanitize_html( $html ) {
     $clean_html = preg_replace('/javascript:/i', '', $clean_html);
 
     return $clean_html;
+}
+
+/**
+ * Set a person as "not necessary" for HR feedback for a specific month
+ */
+function set_feedback_not_necessary( $data ) {
+    $username = preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $data['username'] ?? '' ) );
+    $month = preg_replace( '/[^0-9\-]/', '', $data['month'] ?? '' );
+    $reason = trim( strip_tags( $data['reason'] ?? '' ) );
+
+    if ( empty( $username ) || empty( $month ) || empty( $reason ) ) {
+        return array( 'success' => false, 'message' => 'Missing required fields.' );
+    }
+
+    $feedback_file = __DIR__ . '/../hr-feedback.json';
+    
+    // Load existing data
+    $content = file_get_contents( $feedback_file );
+    $feedback_data = json_decode( $content, true ) ?: array( 'feedback' => array() );
+    
+    if ( ! isset( $feedback_data['feedback'][ $username ] ) ) {
+        $feedback_data['feedback'][ $username ] = array();
+    }
+    
+    // Set the "not necessary" status
+    $feedback_data['feedback'][ $username ][ $month . '_not_necessary' ] = $reason;
+    
+    // Remove any existing regular feedback for this month
+    if ( isset( $feedback_data['feedback'][ $username ][ $month ] ) ) {
+        unset( $feedback_data['feedback'][ $username ][ $month ] );
+    }
+    
+    // Save the data
+    $json_content = json_encode( $feedback_data, JSON_PRETTY_PRINT );
+    if ( file_put_contents( $feedback_file, $json_content ) !== false ) {
+        return array( 'success' => true, 'message' => 'Successfully marked as not necessary.' );
+    } else {
+        return array( 'success' => false, 'message' => 'Failed to save data.' );
+    }
+}
+
+/**
+ * Remove "not necessary" status for a person for a specific month
+ */
+function remove_feedback_not_necessary( $data ) {
+    $username = preg_replace( '/[^a-z0-9_\-]/', '', strtolower( $data['username'] ?? '' ) );
+    $month = preg_replace( '/[^0-9\-]/', '', $data['month'] ?? '' );
+
+    if ( empty( $username ) || empty( $month ) ) {
+        return array( 'success' => false, 'message' => 'Missing required fields.' );
+    }
+
+    $feedback_file = __DIR__ . '/../hr-feedback.json';
+    
+    // Load existing data
+    $content = file_get_contents( $feedback_file );
+    $feedback_data = json_decode( $content, true ) ?: array( 'feedback' => array() );
+    
+    if ( isset( $feedback_data['feedback'][ $username ][ $month . '_not_necessary' ] ) ) {
+        unset( $feedback_data['feedback'][ $username ][ $month . '_not_necessary' ] );
+        
+        // Save the data
+        $json_content = json_encode( $feedback_data, JSON_PRETTY_PRINT );
+        if ( file_put_contents( $feedback_file, $json_content ) !== false ) {
+            return array( 'success' => true, 'message' => 'Successfully removed not necessary status.' );
+        } else {
+            return array( 'success' => false, 'message' => 'Failed to save data.' );
+        }
+    }
+    
+    return array( 'success' => true, 'message' => 'Status was not set.' );
 }

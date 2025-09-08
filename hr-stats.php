@@ -13,10 +13,8 @@ $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 $performance_filter = $_GET['performance'] ?? null;
 $team_data = load_team_config_with_objects( $current_team, $privacy_mode );
 
-// Get all team members who need HR feedback
-$team_members = array_filter( $team_data['team_members'], function( $person ) {
-    return $person->needs_hr_monthly;
-} );
+// Get all team members (they all need HR feedback by default, unless marked as "not necessary")
+$team_members = $team_data['team_members'];
 
 // Get available teams for switcher
 $available_teams = get_available_teams();
@@ -68,19 +66,28 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
     if ( $month === $current_month ) continue; // Skip current month as it might not be complete
     
     $completed_this_month = 0;
+    $not_necessary_this_month = 0;
+    
     foreach ( $team_members as $username => $person ) {
         $feedback_history = get_person_feedback_history( $username );
-        if ( isset( $feedback_history[ $month ] ) && is_array( $feedback_history[ $month ] ) ) {
+        
+        // Check if person has "not necessary" status for this month
+        if ( isset( $feedback_history[ $month . '_not_necessary' ] ) ) {
+            $not_necessary_this_month++;
+        } elseif ( isset( $feedback_history[ $month ] ) && is_array( $feedback_history[ $month ] ) ) {
             $completed_this_month++;
         }
     }
     
-    $completion_rate = $feedback_stats['total_people'] > 0 ? 
-        round( ( $completed_this_month / $feedback_stats['total_people'] ) * 100 ) : 0;
+    // Calculate total people who actually needed to submit feedback
+    $people_needing_feedback = $feedback_stats['total_people'] - $not_necessary_this_month;
+    $completion_rate = $people_needing_feedback > 0 ? 
+        round( ( $completed_this_month / $people_needing_feedback ) * 100 ) : 0;
     
     $feedback_stats['completion_rates'][ $month ] = array(
         'completed' => $completed_this_month,
-        'total' => $feedback_stats['total_people'],
+        'total' => $people_needing_feedback,
+        'not_necessary' => $not_necessary_this_month,
         'percentage' => $completion_rate
     );
 }
@@ -228,9 +235,14 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
                             <div style="flex: 1; background: #f8f9fa; border-radius: 10px; height: 20px; position: relative; overflow: hidden;">
                                 <div style="background: <?php echo $data['percentage'] >= 80 ? '#28a745' : ($data['percentage'] >= 50 ? '#ffc107' : '#dc3545'); ?>; height: 100%; width: <?php echo $data['percentage']; ?>%; transition: width 0.3s ease;"></div>
                             </div>
-                            <div style="min-width: 80px; text-align: right;">
+                            <div style="min-width: 120px; text-align: right;">
                                 <strong><?php echo $data['completed']; ?>/<?php echo $data['total']; ?></strong>
                                 <span style="color: #666;">(<?php echo $data['percentage']; ?>%)</span>
+                                <?php if ( isset( $data['not_necessary'] ) && $data['not_necessary'] > 0 ) : ?>
+                                    <div style="font-size: 0.8em; color: #666;">
+                                        <?php echo $data['not_necessary']; ?> not needed
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -245,31 +257,64 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
                     Individual Progress
                     <?php if ( $performance_filter ) : ?>
                         <span style="font-size: 0.8em; color: #666; font-weight: normal;">
-                            (filtered by: <strong><?php echo ucfirst( $performance_filter ); ?></strong> performance)
+                            (filtered by: <strong><?php echo ucfirst( $performance_filter ); ?></strong> performance, sorted by date)
                         </span>
                     <?php endif; ?>
                 </h3>
                 <div style="display: grid; gap: 15px;">
-                    <?php foreach ( $team_members as $username => $person ) : ?>
-                        <?php
+                    <?php 
+                    // Pre-process team members for filtering and sorting
+                    $processed_members = array();
+                    
+                    foreach ( $team_members as $username => $person ) :
                         $feedback_history = get_person_feedback_history( $username );
                         $feedback_count = 0;
                         $recent_performance = 'N/A';
+                        $recent_10_performances = array();
+                        $matching_month = null;
+                        $display_performance = 'N/A';
                         
                         if ( ! empty( $feedback_history ) ) {
                             foreach ( $feedback_history as $month => $feedback ) {
                                 if ( $month !== 'hr_monthly_link' && is_array( $feedback ) ) {
                                     $feedback_count++;
+                                    $performance = $feedback['performance'] ?? 'good';
+                                    
+                                    // Store the most recent 10 performance ratings
+                                    if ( count( $recent_10_performances ) < 10 ) {
+                                        $recent_10_performances[] = $performance;
+                                    }
+                                    
+                                    // If filtering, find the most recent month with matching performance
+                                    if ( $performance_filter && $performance === $performance_filter && ! $matching_month ) {
+                                        $matching_month = $month;
+                                        $display_performance = ucfirst( $performance );
+                                    }
+                                    
+                                    // Keep track of the most recent for display when not filtering
                                     if ( $recent_performance === 'N/A' ) {
-                                        $recent_performance = ucfirst( $feedback['performance'] ?? 'good' );
+                                        $recent_performance = ucfirst( $performance );
                                     }
                                 }
                             }
                         }
                         
                         // Skip this person if they don't match the performance filter
-                        if ( $performance_filter && strtolower( $recent_performance ) !== $performance_filter ) {
-                            continue;
+                        // Check if any of their recent 10 performances match the filter
+                        if ( $performance_filter ) {
+                            $has_matching_performance = in_array( $performance_filter, $recent_10_performances );
+                            if ( ! $has_matching_performance ) {
+                                continue;
+                            }
+                        }
+                        
+                        // Determine what to show in the performance badge
+                        if ( $performance_filter && $matching_month ) {
+                            $badge_text = $display_performance;
+                            $badge_subtext = date( 'M Y', strtotime( $matching_month . '-01' ) );
+                        } else {
+                            $badge_text = $recent_performance;
+                            $badge_subtext = 'recent rating';
                         }
                         
                         $performance_colors = array(
@@ -277,7 +322,38 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
                             'Good' => '#007cba',
                             'Low' => '#dc3545'
                         );
-                        $performance_color = $performance_colors[ $recent_performance ] ?? '#6c757d';
+                        $performance_color = $performance_colors[ $badge_text ] ?? '#6c757d';
+                        
+                        // Store the processed member data
+                        $processed_members[] = array(
+                            'username' => $username,
+                            'person' => $person,
+                            'feedback_count' => $feedback_count,
+                            'badge_text' => $badge_text,
+                            'badge_subtext' => $badge_subtext,
+                            'performance_color' => $performance_color,
+                            'matching_month' => $matching_month,
+                            'sort_date' => $matching_month ? strtotime( $matching_month . '-01' ) : 0
+                        );
+                    endforeach;
+                    
+                    // Sort the processed members
+                    if ( $performance_filter ) {
+                        // When filtering, sort by matching month (newest first)
+                        usort( $processed_members, function( $a, $b ) {
+                            return $b['sort_date'] - $a['sort_date'];
+                        });
+                    }
+                    // When not filtering, members are already in the original order (by name)
+                    
+                    // Now display the sorted members
+                    foreach ( $processed_members as $member_data ) :
+                        $username = $member_data['username'];
+                        $person = $member_data['person'];
+                        $feedback_count = $member_data['feedback_count'];
+                        $badge_text = $member_data['badge_text'];
+                        $badge_subtext = $member_data['badge_subtext'];
+                        $performance_color = $member_data['performance_color'];
                         ?>
                         <div style="display: flex; align-items: center; padding: 15px; border: 1px solid #dee2e6; border-radius: 8px; gap: 15px;">
                             <div style="flex: 1;">
@@ -296,9 +372,9 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
                             </div>
                             <div style="text-align: center; min-width: 120px;">
                                 <span style="padding: 4px 8px; border-radius: 12px; font-size: 0.8em; font-weight: 500; color: white; background: <?php echo $performance_color; ?>;">
-                                    <?php echo $recent_performance; ?>
+                                    <?php echo $badge_text; ?>
                                 </span>
-                                <div style="font-size: 0.8em; color: #666; margin-top: 2px;">recent rating</div>
+                                <div style="font-size: 0.8em; color: #666; margin-top: 2px;"><?php echo $badge_subtext; ?></div>
                             </div>
                             <div>
                                 <a href="<?php echo build_team_url( 'hr-reports.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" 
