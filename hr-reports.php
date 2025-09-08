@@ -401,7 +401,14 @@ if ( $selected_person && $selected_month ) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars( $_GET['person'] ?? $team_data['team_name'] ); ?> - HR Monthly Report</title>
+    <title><?php 
+        if ( $selected_person ) {
+            $person = $team_data['team_members'][$selected_person] ?? $team_data['leadership'][$selected_person] ?? null;
+            echo htmlspecialchars( $person ? $person->name : $selected_person );
+        } else {
+            echo htmlspecialchars( $team_data['team_name'] );
+        }
+    ?> - HR Monthly Report</title>
     <link rel="stylesheet" href="assets/style.css">
     <link rel="stylesheet" href="assets/hr-reports.css">
 </head>
@@ -672,9 +679,10 @@ if ( $selected_person && $selected_month ) {
                 <label for="feedback_to_person">Feedback to Person:</label>
                 <div class="editor-toolbar">
                     <button type="button" class="editor-btn" onclick="addLink('feedback_to_person')" title="Add Link">🔗 Link</button>
+                    <button type="button" class="editor-btn" onclick="copyContent('feedback_to_person')" title="Copy Content">📋 Copy</button>
                     <small style="color: #666; margin-left: 10px;">Select text and click Link, or paste URL directly</small>
                 </div>
-                <div class="rich-editor" contenteditable="true" id="feedback_to_person" data-placeholder="Write the feedback that will be shared with the team member..." required><?php echo $existing_feedback['feedback_to_person'] ?? ''; ?></div>
+                <div class="rich-editor" contenteditable="true" spellcheck="true" id="feedback_to_person" data-placeholder="Write the feedback that will be shared with the team member..." required><?php echo $existing_feedback['feedback_to_person'] ?? ''; ?></div>
                 <textarea name="feedback_to_person_html" id="feedback_to_person_html" style="display: none;"></textarea>
                 
                 <!-- AI Chat Trigger -->
@@ -707,9 +715,10 @@ if ( $selected_person && $selected_month ) {
                 <label for="feedback_to_hr">Internal Notes for HR:</label>
                 <div class="editor-toolbar">
                     <button type="button" class="editor-btn" onclick="addLink('feedback_to_hr')" title="Add Link">🔗 Link</button>
+                    <button type="button" class="editor-btn" onclick="copyContent('feedback_to_hr')" title="Copy Content">📋 Copy</button>
                     <small style="color: #666; margin-left: 10px;">Select text and click Link, or paste URL directly</small>
                 </div>
-                <div class="rich-editor" contenteditable="true" id="feedback_to_hr" data-placeholder="Write internal notes that will only be seen by HR..."></div>
+                <div class="rich-editor" contenteditable="true" spellcheck="true" id="feedback_to_hr" data-placeholder="Write internal notes that will only be seen by HR..."><?php echo $existing_feedback['feedback_to_hr'] ?? ''; ?></div>
                 <textarea name="feedback_to_hr_html" id="feedback_to_hr_html" style="display: none;"></textarea>
             </div>
         </form>

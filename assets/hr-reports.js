@@ -75,6 +75,88 @@ function addLink(editorId) {
     }
 }
 
+function copyContent(editorId) {
+    const editor = document.getElementById(editorId);
+    if (!editor) return;
+    
+    // Get the content - use original content if in privacy mode
+    let content = '';
+    if (privacyMode && originalContent[editorId]) {
+        content = originalContent[editorId];
+    } else {
+        content = editor.innerHTML;
+    }
+    
+    // Create a temporary element to extract text with preserved formatting
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+    
+    try {
+        // Try to copy both HTML and plain text to clipboard
+        if (navigator.clipboard && window.ClipboardItem) {
+            const html = new Blob([content], { type: 'text/html' });
+            const text = new Blob([tempDiv.textContent || tempDiv.innerText], { type: 'text/plain' });
+            const clipboardItem = new ClipboardItem({
+                'text/html': html,
+                'text/plain': text
+            });
+            
+            navigator.clipboard.write([clipboardItem]).then(() => {
+                showCopyFeedback(editorId, true);
+            }).catch(() => {
+                // Fallback to plain text only
+                fallbackCopy(tempDiv.textContent || tempDiv.innerText, editorId);
+            });
+        } else {
+            // Fallback for older browsers
+            fallbackCopy(tempDiv.textContent || tempDiv.innerText, editorId);
+        }
+    } catch (error) {
+        console.error('Copy failed:', error);
+        showCopyFeedback(editorId, false);
+    }
+}
+
+function fallbackCopy(text, editorId) {
+    try {
+        // Create temporary textarea
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showCopyFeedback(editorId, success);
+    } catch (error) {
+        showCopyFeedback(editorId, false);
+    }
+}
+
+function showCopyFeedback(editorId, success) {
+    const button = document.querySelector(`button[onclick="copyContent('${editorId}')"]`);
+    if (!button) return;
+    
+    const originalText = button.innerHTML;
+    if (success) {
+        button.innerHTML = '✅ Copied!';
+        button.style.background = '#d4edda';
+        button.style.borderColor = '#c3e6cb';
+        button.style.color = '#155724';
+    } else {
+        button.innerHTML = '❌ Failed';
+        button.style.background = '#f8d7da';
+        button.style.borderColor = '#f5c6cb';
+        button.style.color = '#721c24';
+    }
+    
+    setTimeout(() => {
+        button.innerHTML = originalText;
+        button.style.background = '';
+        button.style.borderColor = '';
+        button.style.color = '';
+    }, 2000);
+}
+
 // Undo/Redo functionality
 let editorHistory = {};
 
@@ -287,8 +369,9 @@ async function sendChatMessageToAI(message, showUserMessage = true) {
         addChatMessage('user', message);
     }
 
-    // Add loading message
-    const loadingId = addLoadingMessage();
+    // Create AI message container with loading content immediately
+    const aiMessageId = addChatMessage('ai', '🤔 Thinking<div class="typing-dots"><span></span><span></span><span></span></div>', true);
+    let hasReceivedContent = false;
 
     try {
         chatHistory.push({ role: 'user', content: message });
@@ -312,10 +395,6 @@ async function sendChatMessageToAI(message, showUserMessage = true) {
             throw new Error('HTTP ' + response.status);
         }
 
-        // Remove loading message and add AI response container
-        removeLoadingMessage(loadingId);
-        const aiMessageId = addChatMessage('ai', '', true);
-
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let result = '';
@@ -333,6 +412,11 @@ async function sendChatMessageToAI(message, showUserMessage = true) {
                 try {
                     const data = JSON.parse(line);
                     if (data.message?.content) {
+                        // Clear loading content on first response
+                        if (!hasReceivedContent) {
+                            result = ''; // Clear any existing content
+                            hasReceivedContent = true;
+                        }
                         result += data.message.content;
                         updateChatMessage(aiMessageId, result);
                     }
@@ -345,8 +429,8 @@ async function sendChatMessageToAI(message, showUserMessage = true) {
         chatHistory.push({ role: 'assistant', content: result });
 
     } catch (error) {
-        removeLoadingMessage(loadingId);
-        addChatMessage('ai', `Sorry, I couldn't connect to the AI service. Error: ${error.message}`);
+        // Update the existing AI message with error content
+        updateChatMessage(aiMessageId, `Sorry, I couldn't connect to the AI service. Error: ${error.message}`);
     }
 }
 
@@ -843,6 +927,29 @@ document.addEventListener('DOMContentLoaded', function () {
                     link.removeAttribute('style');
                     link.removeAttribute('class');
                     link.setAttribute('target', '_blank');
+                    
+                    // Fix HTTP to HTTPS
+                    const href = link.getAttribute('href');
+                    if (href && href.startsWith('http://')) {
+                        link.setAttribute('href', href.replace('http://', 'https://'));
+                    }
+                    
+                    // Move whitespace from inside link to outside
+                    const originalText = link.textContent;
+                    const trimmedText = originalText.trim();
+                    const leadingSpace = originalText.match(/^\s*/)[0];
+                    const trailingSpace = originalText.match(/\s*$/)[0];
+                    
+                    // Set clean link text
+                    link.textContent = trimmedText;
+                    
+                    // Add whitespace outside the link
+                    if (leadingSpace) {
+                        link.parentNode.insertBefore(document.createTextNode(leadingSpace), link);
+                    }
+                    if (trailingSpace) {
+                        link.parentNode.insertBefore(document.createTextNode(trailingSpace), link.nextSibling);
+                    }
                 });
 
                 // Remove all other styling attributes
@@ -857,8 +964,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Get the cleaned text content but preserve links
                 let cleanedContent = tempDiv.innerHTML;
 
-                // Remove most HTML tags except links
-                cleanedContent = cleanedContent.replace(/<(?!a\s|\/a)[^>]+>/gi, ' ');
+                // Remove most HTML tags except links, but preserve link content
+                cleanedContent = cleanedContent.replace(/<(?!a\s|\/a)[^>]+>/gi, '');
+                // Clean up whitespace but preserve single spaces around link text
                 cleanedContent = cleanedContent.replace(/\s+/g, ' ').trim();
 
                 // Insert the cleaned content
@@ -907,6 +1015,8 @@ document.addEventListener('DOMContentLoaded', function () {
             updateHiddenField(editor.id);
             // Auto-uncheck "google doc updated" when content is pasted
             uncheckGoogleDocUpdated();
+            // Trigger autosave
+            scheduleAutoSave();
         });
 
         // Add keyboard shortcuts for undo/redo
