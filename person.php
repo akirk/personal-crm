@@ -263,41 +263,6 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					$has_any_accounts = $has_github || $has_wordpress || $has_linkedin || $has_linear;
 					?>
 
-					<?php if ( $has_any_accounts ) : ?>
-						<div class="section">
-							<h2>External Accounts</h2>
-							<div class="external-account-links">
-								<?php if ( $has_github ) : ?>
-									<a href="https://github.com/<?php echo htmlspecialchars( $person_data->github ); ?>" target="_blank" class="external-link github">
-										<?php echo get_link_icon('GitHub', 'https://github.com/' . $person_data->github, 16); ?>
-										GitHub
-									</a>
-								<?php endif; ?>
-
-								<?php if ( $has_linkedin ) : ?>
-									<a href="https://linkedin.com/in/<?php echo htmlspecialchars( $person_data->linkedin ); ?>" target="_blank" class="external-link linkedin">
-										<?php echo get_link_icon('LinkedIn', 'https://linkedin.com/in/' . $person_data->linkedin, 16); ?>
-										LinkedIn
-									</a>
-								<?php endif; ?>
-
-								<?php if ( $has_wordpress ) : ?>
-									<a href="https://profiles.wordpress.org/<?php echo htmlspecialchars( $person_data->wordpress ); ?>" target="_blank" class="external-link wordpress">
-										<?php echo get_link_icon('WordPress.org', 'https://profiles.wordpress.org/' . $person_data->wordpress, 16); ?>
-										WordPress.org
-									</a>
-								<?php endif; ?>
-
-								<?php if ( $has_linear ) : ?>
-									<a href="<?php echo htmlspecialchars( $person_data->links['Linear'] ); ?>" target="_blank" class="external-link linear">
-										<?php echo get_link_icon('Linear', $person_data->links['Linear'], 16); ?>
-										Linear
-									</a>
-								<?php endif; ?>
-							</div>
-						</div>
-					<?php endif; ?>
-
 					<?php if ( $has_repos ) : ?>
 						<div class="section">
 							<h2>GitHub Repositories</h2>
@@ -376,6 +341,42 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 							<p class="notes-content"><?php echo nl2br( htmlspecialchars( $person_data->notes ) ); ?></p>
 						</div>
 					<?php endif; ?>
+
+					<?php if ( $has_any_accounts ) : ?>
+						<div class="section">
+							<h2>External Accounts</h2>
+							<div class="external-account-links">
+								<?php if ( $has_github ) : ?>
+									<a href="https://github.com/<?php echo htmlspecialchars( $person_data->github ); ?>" target="_blank" class="external-link github">
+										<?php echo get_link_icon('GitHub', 'https://github.com/' . $person_data->github, 16); ?>
+										GitHub
+									</a>
+								<?php endif; ?>
+
+								<?php if ( $has_linkedin ) : ?>
+									<a href="https://linkedin.com/in/<?php echo htmlspecialchars( $person_data->linkedin ); ?>" target="_blank" class="external-link linkedin">
+										<?php echo get_link_icon('LinkedIn', 'https://linkedin.com/in/' . $person_data->linkedin, 16); ?>
+										LinkedIn
+									</a>
+								<?php endif; ?>
+
+								<?php if ( $has_wordpress ) : ?>
+									<a href="https://profiles.wordpress.org/<?php echo htmlspecialchars( $person_data->wordpress ); ?>" target="_blank" class="external-link wordpress">
+										<?php echo get_link_icon('WordPress.org', 'https://profiles.wordpress.org/' . $person_data->wordpress, 16); ?>
+										WordPress.org
+									</a>
+								<?php endif; ?>
+
+								<?php if ( $has_linear ) : ?>
+									<a href="<?php echo htmlspecialchars( $person_data->links['Linear'] ); ?>" target="_blank" class="external-link linear">
+										<?php echo get_link_icon('Linear', $person_data->links['Linear'], 16); ?>
+										Linear
+									</a>
+								<?php endif; ?>
+							</div>
+						</div>
+					<?php endif; ?>
+
 					<?php endif; ?>
 			</div>
 

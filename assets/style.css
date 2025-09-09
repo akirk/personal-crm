@@ -1383,6 +1383,7 @@ details summary span:last-child {
     color: light-dark(#666, #b0b0b0);
     font-size: 16px;
     font-weight: normal;
+    margin-left: 10px;
 }
 
 .back-nav {

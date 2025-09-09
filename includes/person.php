@@ -156,6 +156,7 @@ class Person {
 		// Birthday
 		if ( ! empty( $this->birthday ) ) {
 			$birthday_date = null;
+			$birth_date = null;
 
 			// Check if it's full YYYY-MM-DD format
 			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->birthday ) ) {
@@ -170,16 +171,24 @@ class Person {
 
 			if ( isset( $birthday_this_year ) && $birthday_this_year ) {
 				if ( $birthday_this_year >= $current_date && $birthday_this_year <= $cutoff_date ) {
-					// Calculate the person's age on this birthday
-					$age = $current_year - (int) $birth_date->format( 'Y' );
-					$events[] = Event::from_person_event( 'birthday', $birthday_this_year, $this, array( 'age' => $age ) );
+					// Calculate the person's age on this birthday (only if we have birth year)
+					$event_data = array();
+					if ( $birth_date ) {
+						$age = $current_year - (int) $birth_date->format( 'Y' );
+						$event_data['age'] = $age;
+					}
+					$events[] = Event::from_person_event( 'birthday', $birthday_this_year, $this, $event_data );
 				} elseif ( $birthday_this_year < $current_date ) {
 					// Check next year's birthday
 					$birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birthday_this_year->format( 'm-d' ) );
 					if ( $birthday_next_year && $birthday_next_year <= $cutoff_date ) {
-						// Calculate the person's age on next year's birthday
-						$age = ( $current_year + 1 ) - (int) $birth_date->format( 'Y' );
-						$events[] = Event::from_person_event( 'birthday', $birthday_next_year, $this, array( 'age' => $age ) );
+						// Calculate the person's age on next year's birthday (only if we have birth year)
+						$event_data = array();
+						if ( $birth_date ) {
+							$age = ( $current_year + 1 ) - (int) $birth_date->format( 'Y' );
+							$event_data['age'] = $age;
+						}
+						$events[] = Event::from_person_event( 'birthday', $birthday_next_year, $this, $event_data );
 					}
 				}
 			}
