@@ -98,48 +98,86 @@ function createSimpleTimeUpdater(timezone, personId) {
     setInterval(updateTime, 60000);
 }
 
-// Dark mode functionality
+// Dark mode functionality with 3-click cycle
 function initializeDarkMode() {
     const toggle = document.getElementById('dark-mode-toggle');
     const sunIcon = toggle.querySelector('.sun-icon');
     const moonIcon = toggle.querySelector('.moon-icon');
+    const autoIcon = toggle.querySelector('.auto-icon');
     
-    // Get saved theme or default to system preference
-    let currentTheme = localStorage.getItem('theme');
-    if (!currentTheme) {
-        currentTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (!toggle || !sunIcon || !moonIcon || !autoIcon) {
+        return; // Exit if elements don't exist
     }
     
-    function updateTheme(theme) {
-        if (theme === 'dark') {
-            document.documentElement.style.colorScheme = 'dark';
-            sunIcon.style.display = 'block';
-            moonIcon.style.display = 'none';
-        } else {
-            document.documentElement.style.colorScheme = 'light';
-            sunIcon.style.display = 'none';
-            moonIcon.style.display = 'block';
+    // Get system preference
+    const getSystemTheme = () => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    
+    function getCurrentTheme() {
+        const storedTheme = localStorage.getItem('theme-override');
+        if (storedTheme) {
+            return storedTheme;
         }
-        localStorage.setItem('theme', theme);
+        return getSystemTheme();
     }
     
-    // Set initial theme
-    updateTheme(currentTheme);
+    function updateDisplay(showSystemIcon = false) {
+        const currentTheme = getCurrentTheme();
+        const hasOverride = !!localStorage.getItem('theme-override');
+        
+        // Hide all icons first
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = 'none';
+        autoIcon.style.display = 'none';
+        
+        if (showSystemIcon && !hasOverride) {
+            // Only show computer icon when explicitly requested AND in system mode
+            autoIcon.style.display = 'block';
+        } else {
+            // Always show current theme icon (sun/moon) based on what theme is actually applied
+            if (currentTheme === 'dark') {
+                moonIcon.style.display = 'block';
+            } else {
+                sunIcon.style.display = 'block';
+            }
+        }
+        
+        // Apply the theme
+        document.documentElement.style.colorScheme = currentTheme;
+    }
     
-    // Toggle theme on click
+    // Set initial display
+    updateDisplay();
+    
+    // 3-click cycle with inverted forcing sequence
     toggle.addEventListener('click', () => {
-        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-        currentTheme = newTheme;
-        updateTheme(newTheme);
+        const systemTheme = getSystemTheme();
+        const hasOverride = !!localStorage.getItem('theme-override');
+        
+        if (!hasOverride) {
+            // First click: force opposite of system
+            const oppositeOfSystem = systemTheme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('theme-override', oppositeOfSystem);
+            updateDisplay();
+        } else {
+            const storedOverride = localStorage.getItem('theme-override');
+            // Check if we're currently forcing the opposite of system
+            const oppositeOfSystem = systemTheme === 'dark' ? 'light' : 'dark';
+            
+            if (storedOverride === oppositeOfSystem) {
+                // Second click: force same as system
+                localStorage.setItem('theme-override', systemTheme);
+                updateDisplay();
+            } else {
+                // Third click: back to system (show computer icon briefly)
+                localStorage.removeItem('theme-override');
+                updateDisplay(true); // Show computer icon
+            }
+        }
     });
     
     // Listen for system theme changes
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-        if (!localStorage.getItem('theme')) {
-            const systemTheme = e.matches ? 'dark' : 'light';
-            currentTheme = systemTheme;
-            updateTheme(systemTheme);
-        }
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+        updateDisplay();
     });
 }
 
