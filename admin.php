@@ -14,12 +14,12 @@ error_reporting( E_ALL );
 
 // Get current team from URL parameter or POST (for form submissions)
 $current_team = $_POST['team'] ?? $_GET['team'] ?? null;
-if ( ! $current_team ) {
+if ( ! $current_team && ! ( isset( $_GET['create_team'] ) && $_GET['create_team'] === 'new' ) ) {
 	header( 'Location: team-selection.php' );
 	exit;
 }
 
-$config_file = __DIR__ . '/' . $current_team . '.json';
+$config_file = $current_team ? __DIR__ . '/' . $current_team . '.json' : null;
 $action = $_POST['action'] ?? $_GET['action'] ?? 'dashboard';
 
 // Determine active tab and privacy mode
@@ -28,7 +28,7 @@ $is_adding_new = isset( $_GET['add'] ) && $_GET['add'] === 'new';
 $is_creating_team = isset( $_GET['create_team'] ) && $_GET['create_team'] === 'new';
 
 // Check if JSON file exists and redirect to team creation if not (unless already creating a team)
-if ( ! file_exists( $config_file ) && ! $is_creating_team ) {
+if ( $config_file && ! file_exists( $config_file ) && ! $is_creating_team ) {
 	$create_team_url = build_team_url( 'admin.php', array( 'create_team' => 'new' ) );
 	header( 'Location: ' . $create_team_url );
 	exit;
@@ -1368,8 +1368,10 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
     <meta name="color-scheme" content="light dark">
     <title>Team Management Admin</title>
     <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/cmd-k.css">
 </head>
 <body>
+    <?php render_cmd_k_panel(); ?>
     <!-- Dark Mode Toggle -->
     <?php render_dark_mode_toggle(); ?>
 
@@ -1418,7 +1420,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <h2>Create New Team</h2>
             <form method="post">
                 <input type="hidden" name="action" value="create_team">
-                <?php if ( $current_team !== 'team' ) : ?>
+                <?php if ( $current_team && $current_team !== 'team' ) : ?>
                     <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
                 <?php endif; ?>
                 <div class="form-group">
@@ -1427,7 +1429,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 </div>
                 <div class="form-group">
                     <label for="new_team_slug">Team Slug *</label>
-                    <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing-team" pattern="[a-z0-9_-]+" value="<?php echo $current_team !== 'team' ? htmlspecialchars( $current_team ) : ''; ?>">
+                    <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing-team" pattern="[a-z0-9_-]+" value="<?php echo ( $current_team && $current_team !== 'team' ) ? htmlspecialchars( $current_team ) : ''; ?>">
                     <small class="text-small-muted">Only lowercase letters, numbers, hyphens, and underscores allowed. This will be used as the filename.</small>
                 </div>
                 <div style="margin-top: 20px;">
@@ -2603,5 +2605,6 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
     
     <script src="assets/cmd-k.js"></script>
     <script src="assets/script.js"></script>
+    <?php init_cmd_k_js( $privacy_mode ); ?>
 </body>
 </html>

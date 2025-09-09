@@ -102,9 +102,10 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
     <title>HR Feedback Statistics - <?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team</title>
     <link rel="stylesheet" href="assets/style.css">
     <link rel="stylesheet" href="assets/hr-reports.css">
+    <link rel="stylesheet" href="assets/cmd-k.css">
 </head>
 <body>
-    <!-- Dark Mode Toggle -->
+    <?php render_cmd_k_panel(); ?>
     <?php render_dark_mode_toggle(); ?>
 
     <div class="container">
@@ -116,7 +117,6 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
                 </div>
             </div>
             <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
-                <!-- Team Switcher -->
                 <select id="team-selector" onchange="switchTeam()">
                     <?php
                     foreach ( $available_teams as $team_slug ) {
@@ -129,7 +129,6 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
             </div>
         </div>
 
-        <!-- Overview Stats -->
         <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
             <div class="stat-card">
                 <h3 style="margin: 0 0 10px 0; color: #333;">Team Members</h3>
@@ -164,7 +163,6 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
             </div>
         </div>
 
-        <!-- Performance Distribution -->
         <div class="stat-card" style="margin-bottom: 30px;">
             <h3 style="margin: 0 0 10px 0;">Performance Distribution</h3>
             <p style="font-size: 0.9em; color: #666; margin: 0 0 20px 0;">Click on a performance level to filter individual progress below</p>
@@ -424,5 +422,8 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
         }
 
     </script>
+    <script src="assets/cmd-k.js"></script>
+    <script src="assets/script.js"></script>
+    <?php init_cmd_k_js( $privacy_mode ); ?>
 </body>
 </html>

@@ -1,6 +1,4 @@
 // Team Management JavaScript functionality
-
-// Team switching functionality
 function switchTeam() {
     const selector = document.getElementById('team-selector');
     const selectedTeam = selector.value;
@@ -11,7 +9,6 @@ function switchTeam() {
     window.location = currentUrl.toString();
 }
 
-// Time zone display functionality
 function createTimeUpdater(timezone, personId) {
     function updateTime() {
         const timeElement = document.getElementById(`time-${personId}`);
@@ -54,7 +51,6 @@ function createTimeUpdater(timezone, personId) {
     setInterval(updateTime, 60000);
 }
 
-// Simple time zone display functionality for overview pages (no "your time" comparison)
 function createSimpleTimeUpdater(timezone, personId) {
     function updateTime() {
         const timeElement = document.getElementById(`time-${personId}`);
@@ -98,7 +94,6 @@ function createSimpleTimeUpdater(timezone, personId) {
     setInterval(updateTime, 60000);
 }
 
-// Dark mode functionality with 3-click cycle
 function initializeDarkMode() {
     const toggle = document.getElementById('dark-mode-toggle');
     const sunIcon = toggle.querySelector('.sun-icon');
@@ -109,7 +104,6 @@ function initializeDarkMode() {
         return; // Exit if elements don't exist
     }
     
-    // Get system preference
     const getSystemTheme = () => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     
     function getCurrentTheme() {
@@ -145,48 +139,39 @@ function initializeDarkMode() {
         document.documentElement.style.colorScheme = currentTheme;
     }
     
-    // Set initial display
     updateDisplay();
     
-    // 3-click cycle with inverted forcing sequence
     toggle.addEventListener('click', () => {
         const systemTheme = getSystemTheme();
         const hasOverride = !!localStorage.getItem('theme-override');
         
         if (!hasOverride) {
-            // First click: force opposite of system
             const oppositeOfSystem = systemTheme === 'dark' ? 'light' : 'dark';
             localStorage.setItem('theme-override', oppositeOfSystem);
             updateDisplay();
         } else {
             const storedOverride = localStorage.getItem('theme-override');
-            // Check if we're currently forcing the opposite of system
             const oppositeOfSystem = systemTheme === 'dark' ? 'light' : 'dark';
             
             if (storedOverride === oppositeOfSystem) {
-                // Second click: force same as system
                 localStorage.setItem('theme-override', systemTheme);
                 updateDisplay();
             } else {
-                // Third click: back to system (show computer icon briefly)
                 localStorage.removeItem('theme-override');
                 updateDisplay(true); // Show computer icon
             }
         }
     });
     
-    // Listen for system theme changes
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
         updateDisplay();
     });
 }
 
-// Initialize Command-K functionality
 function initializeCommandK(peopleData, teamsData) {
     if (typeof CmdK !== 'undefined') {
         CmdK.init(peopleData, teamsData);
     }
 }
 
-// Initialize dark mode when DOM is ready
 document.addEventListener('DOMContentLoaded', initializeDarkMode);

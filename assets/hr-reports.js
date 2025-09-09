@@ -1,13 +1,11 @@
 // HR Reports JavaScript functionality
 console.log('test');
-// Global variables
 let chatHistory = [];
 let systemPrompt = '';
 let ollamaModel = 'gpt-oss';
 let autoSaveTimeout;
 let isAutoSaving = false;
 
-// Privacy mode variables
 let privacyMode = false;
 let originalContent = {
     feedback_to_person: '',
@@ -19,7 +17,6 @@ const privacyPlaceholders = {
     feedback_to_hr: 'These HR notes are hidden in privacy mode. This protects confidential information when someone else might see your screen. The actual content is preserved and will be restored when privacy mode is disabled.'
 };
 
-// Form functions
 function resetForm(currentMonth) {
     if (confirm('Are you sure you want to clear the form? Any unsaved changes will be lost.')) {
         document.getElementById('username').value = '';
@@ -537,7 +534,6 @@ function markdownToHtml(markdown) {
     return html;
 }
 
-// Configuration loading
 async function loadConfig() {
     try {
         const response = await fetch('?get_config=1');
@@ -658,7 +654,6 @@ function editCurrentDraft() {
     // Form should already be populated via PHP
 }
 
-// Auto-save functionality
 function initAutoSave() {
     const form = document.querySelector('.hr-form');
     if (!form) {

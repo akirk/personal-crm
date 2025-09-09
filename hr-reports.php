@@ -30,7 +30,6 @@ if ( isset( $_GET['get_previous_feedback'] ) && isset( $_GET['username'] ) && is
     exit;
 }
 
-// Handle form submissions
 $message = '';
 $chat_response = '';
 
@@ -73,9 +72,6 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
     }
 }
 
-/**
- * Create backup of existing file (max one per minute)
- */
 function create_backup( $file_path ) {
     if ( ! file_exists( $file_path ) ) {
         return true; // No file to backup
@@ -101,9 +97,6 @@ function create_backup( $file_path ) {
     return copy( $file_path, $backup_path );
 }
 
-/**
- * Save HR Google Doc link for a person
- */
 function save_hr_google_doc_link( $data ) {
     $username = $data['username'] ?? '';
     $hr_monthly_link = $data['hr_monthly_link'] ?? '';
@@ -131,7 +124,6 @@ function save_hr_google_doc_link( $data ) {
     // Update the hr_monthly_link for this user
     $feedback_data['feedback'][$username]['hr_monthly_link'] = $hr_monthly_link;
     
-    // Create backup before saving
     create_backup( $feedback_file );
     
     $success = file_put_contents( $feedback_file, json_encode( $feedback_data, JSON_PRETTY_PRINT ) );
@@ -147,9 +139,6 @@ function save_hr_google_doc_link( $data ) {
     }
 }
 
-/**
- * Save feedback to JSON file
- */
 function save_feedback( $data ) {
     $username = $data['username'] ?? '';
     $month = $data['month'] ?? '';
@@ -195,7 +184,6 @@ function save_feedback( $data ) {
         'submitted_to_hr' => isset( $data['submitted_to_hr'] ) && $data['submitted_to_hr'] === '1'
     );
     
-    // Create backup before saving
     create_backup( $feedback_file );
     
     $success = file_put_contents( $feedback_file, json_encode( $feedback_data, JSON_PRETTY_PRINT ) );
@@ -207,9 +195,6 @@ function save_feedback( $data ) {
     }
 }
 
-/**
- * Load existing feedback for a person and month
- */
 function load_feedback( $username, $month ) {
     $feedback_file = __DIR__ . '/hr-feedback.json';
     
@@ -230,9 +215,6 @@ function load_feedback( $username, $month ) {
     return $feedback;
 }
 
-/**
- * Get previous month's feedback for comparison
- */
 function get_previous_month_feedback( $username, $current_month ) {
     $feedback_file = __DIR__ . '/hr-feedback.json';
 
@@ -275,9 +257,6 @@ function get_previous_month_feedback( $username, $current_month ) {
 
 
 
-/**
- * Get system prompt from JSON file
- */
 function get_system_prompt() {
     $feedback_file = __DIR__ . '/hr-feedback.json';
     
@@ -291,9 +270,6 @@ function get_system_prompt() {
     return $data['system_prompt'] ?? "You are an HR feedback assessment assistant. Your role is to help managers improve their feedback quality.";
 }
 
-/**
- * Get Ollama model from JSON file
- */
 function get_ollama_model() {
     $feedback_file = __DIR__ . '/hr-feedback.json';
     
@@ -307,9 +283,6 @@ function get_ollama_model() {
     return $data['ollama_model'] ?? "llama3.2";
 }
 
-/**
- * Call Ollama LLM for feedback assessment
- */
 function get_llm_feedback_assessment( $feedback_text ) {
     if ( empty( $feedback_text ) ) {
         return 'Please provide feedback text to analyze.';
@@ -347,11 +320,9 @@ function get_llm_feedback_assessment( $feedback_text ) {
 }
 
 
-// Get current person and month from URL params
 $selected_person = $_GET['person'] ?? '';
 $selected_month = $_GET['month'] ?? get_hr_feedback_month();
 
-// Load existing feedback if available
 $existing_feedback = array();
 if ( $selected_person && $selected_month ) {
     $existing_feedback = load_feedback( $selected_person, $selected_month );
@@ -374,9 +345,10 @@ if ( $selected_person && $selected_month ) {
     ?> - HR Monthly Report</title>
     <link rel="stylesheet" href="assets/style.css">
     <link rel="stylesheet" href="assets/hr-reports.css">
+    <link rel="stylesheet" href="assets/cmd-k.css">
 </head>
 <body>
-    <!-- Dark Mode Toggle -->
+    <?php render_cmd_k_panel(); ?>
     <?php render_dark_mode_toggle(); ?>
 
     <div class="container">
@@ -407,7 +379,6 @@ if ( $selected_person && $selected_month ) {
                     </div>
                 </div>
 
-                <!-- Tab Navigation -->
                 <div class="person-tabs">
                     <a href="<?php echo build_team_url( 'index.php', array( 'person' => $selected_person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
                        class="tab-link">👤 Member Overview</a>
@@ -504,7 +475,6 @@ if ( $selected_person && $selected_month ) {
                     </div>
                 </div>
                 
-                <!-- Progress Checklist (Right Side) -->
                 <div class="progress-checklist">
                     <h4>📋 Progress</h4>
                     <div class="checklist-compact">
@@ -542,7 +512,6 @@ if ( $selected_person && $selected_month ) {
                 <div class="rich-editor" contenteditable="true" spellcheck="true" id="feedback_to_person" data-placeholder="Write the feedback that will be shared with the team member..." required><?php echo $existing_feedback['feedback_to_person'] ?? ''; ?></div>
                 <textarea name="feedback_to_person_html" id="feedback_to_person_html" class="hidden"></textarea>
                 
-                <!-- AI Chat Trigger -->
                 <div class="ai-chat-trigger-container">
                     <button type="button" class="btn btn-secondary" onclick="toggleAIChat()" id="ai-chat-toggle">
                         💬 Open AI Chat Assistant
@@ -552,7 +521,6 @@ if ( $selected_person && $selected_month ) {
 
 
             <?php if ( ! $privacy_mode ) : ?>
-            <!-- Auto-save indicator -->
             <div class="auto-save-indicator" id="save-status" style="text-align: center; margin: 20px 0; font-size: 14px; color: #666;">
                 <div>
                     <span id="save-message">Changes are saved automatically</span>
@@ -575,7 +543,6 @@ if ( $selected_person && $selected_month ) {
         </form>
 
 
-        <!-- AI Chat Sidebar -->
         <div id="ai-chat-sidebar" class="ai-chat-sidebar" style="display: none;">
             <div class="ai-chat-header">
                 <h3>💬 Ollama</h3>
@@ -596,7 +563,6 @@ if ( $selected_person && $selected_month ) {
             </div>
         </div>
 
-        <!-- Current Draft / Feedback History -->
         <?php if ( $selected_person ) : ?>
             <?php
             $history = get_person_feedback_history( $selected_person );
@@ -610,7 +576,6 @@ if ( $selected_person && $selected_month ) {
             ?>
             
             <?php if ( $current_draft && ! ( $current_draft['submitted'] ?? false ) ) : ?>
-                <!-- Current Month Draft in Edit Mode -->
                 <div class="current-draft-section">
                     <h3>📝 Current Month Draft - <?php echo date( 'F Y', strtotime( $current_month . '-01' ) ); ?></h3>
                     <div class="feedback-item current-draft">
@@ -647,7 +612,6 @@ if ( $selected_person && $selected_month ) {
                     </div>
                 </div>
                 
-                <!-- AI Assessment Section -->
                 <div class="ai-assessment-section">
                     <h4>🤖 AI Assessment</h4>
                     <div id="ai-assessment" class="ai-assessment-card">
@@ -687,14 +651,12 @@ if ( $selected_person && $selected_month ) {
                                 <span class="expand-toggle" id="toggle-<?php echo $month; ?>">▼ Expand</span>
                             </div>
 
-                            <!-- Teaser -->
                             <div class="feedback-teaser" id="teaser-<?php echo $month; ?>">
                                 <div class="feedback-comment">
                                     <?php echo htmlspecialchars( $teaser ); ?>
                                 </div>
                             </div>
 
-                            <!-- Full content (initially hidden) -->
                             <div class="feedback-full-content hidden" id="content-<?php echo $month; ?>">
                                 <div class="feedback-content-section">
                                     <strong>To Person:</strong><br>
@@ -728,7 +690,6 @@ if ( $selected_person && $selected_month ) {
             <?php endif; ?>
         <?php endif; ?>
 
-        <!-- Historical Feedback Helper (bottom of page) -->
         <div class="ai-info-card">
             <div class="ai-info-text">
                 💡 <strong>Add historical feedback:</strong> Select any previous month to add older feedback entries
@@ -777,7 +738,6 @@ if ( $selected_person && $selected_month ) {
         </div>
     </div>
 
-    <!-- Footer with privacy mode toggle -->
     <footer class="privacy-footer">
         <?php if ( $privacy_mode ) : ?>
             <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" class="footer-link">🔒 Privacy Mode ON</a>
@@ -869,6 +829,8 @@ if ( $selected_person && $selected_month ) {
         }
 
     </script>
-
+    <script src="assets/cmd-k.js"></script>
+    <script src="assets/script.js"></script>
+    <?php init_cmd_k_js( $privacy_mode ); ?>
 </body>
 </html>

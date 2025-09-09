@@ -5,11 +5,8 @@
  * Displays detailed information for a specific team member, leader, or alumni
  */
 
-// Include common functions and Person class
 require_once __DIR__ . '/includes/common.php';
 require_once __DIR__ . '/includes/person.php';
-
-// Team redirection logic - handle cases where no team parameter is provided
 if ( isset( $_GET['team'] ) ) {
 	$current_team = $_GET['team'];
 	if ( $current_team === get_default_team() && ! isset( $_GET['person'] ) ) {
@@ -26,7 +23,6 @@ if ( isset( $_GET['team'] ) ) {
 	}
 }
 
-// Get privacy mode early for Person object creation
 $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
 // Load team configuration with Person objects
@@ -71,22 +67,8 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 	<link rel="stylesheet" href="assets/cmd-k.css">
 </head>
 <body>
-	<!-- Command-K Panel -->
-	<div id="cmd-k-overlay" class="cmd-k-overlay">
-		<div class="cmd-k-panel">
-			<div class="cmd-k-search-container">
-				<input type="text" id="cmd-k-search" class="cmd-k-search" placeholder="Search teams and people..." autocomplete="off" spellcheck="false">
-			</div>
-			<div id="cmd-k-results" class="cmd-k-results">
-				<!-- Results will be populated here -->
-			</div>
-			<div class="cmd-k-instructions">
-				<span class="cmd-k-kbd">↑↓</span> to navigate • <span class="cmd-k-kbd">Enter</span> to open • <span class="cmd-k-kbd">→</span> to select link • <span class="cmd-k-kbd">Esc</span> to close
-			</div>
-		</div>
-	</div>
+	<?php render_cmd_k_panel(); ?>
 
-	<!-- Dark Mode Toggle -->
 	<?php render_dark_mode_toggle(); ?>
 
 	<div class="container">
@@ -109,7 +91,6 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 				</div>
 			</div>
 
-			<!-- Tab Navigation -->
 			<div class="person-tabs">
 				<a href="<?php echo build_team_url( 'person.php', array( 'person' => $person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
 				   class="tab-link active">👤 Member Overview</a>
@@ -398,7 +379,6 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					<?php endif; ?>
 			</div>
 
-			<!-- Sidebar with HR Feedbacks and Events -->
 			<div class="events-sidebar">
 				<a href="<?php echo build_team_url( 'events.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="sidebar-section-link">
 					<h3 class="sidebar-section-heading">🗓️ Upcoming Events</h3>
@@ -498,7 +478,6 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 			</div>
 		</div>
 
-		<!-- Footer with admin/privacy links -->
 		<footer class="privacy-footer">
 			<?php if ( $privacy_mode ) : ?>
 				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>">🔒 Privacy Mode ON</a>
@@ -512,19 +491,12 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 
 	<script src="assets/cmd-k.js"></script>
 	<script src="assets/script.js"></script>
+	<?php init_cmd_k_js( $privacy_mode ); ?>
 	<script>
-		// Initialize functionality when DOM is ready
 		document.addEventListener('DOMContentLoaded', () => {
-			// Initialize Command-K with data
-			const peopleData = <?php echo json_encode( get_all_people_from_all_teams( $privacy_mode ) ); ?>;
-			const teamsData = <?php echo json_encode( get_all_teams_stats() ); ?>;
-			initializeCommandK(peopleData, teamsData);
-
-			// Initialize timezone display for person pages
 			<?php if ( ! empty( $person_data ) && ( ! empty( $person_data->location ) || ! empty( $person_data->timezone ) ) ) : ?>
 			createTimeUpdater('<?php echo addslashes( $person_data->timezone ); ?>', '<?php echo addslashes( $person ); ?>');
 			<?php endif; ?>
-
 		});
 	</script>
 </body>

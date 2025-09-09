@@ -28,9 +28,10 @@ if ( empty( $available_teams ) ) {
     <meta name="color-scheme" content="light dark">
     <title>Team Selection - Orbit Team Management</title>
     <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/cmd-k.css">
 </head>
 <body>
-    <!-- Dark Mode Toggle -->
+    <?php render_cmd_k_panel(); ?>
     <?php render_dark_mode_toggle(); ?>
 
     <div class="team-selection-container">
@@ -56,5 +57,6 @@ if ( empty( $available_teams ) ) {
     
     <script src="assets/cmd-k.js"></script>
     <script src="assets/script.js"></script>
+    <?php init_cmd_k_js(); ?>
 </body>
 </html>

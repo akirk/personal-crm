@@ -91,6 +91,7 @@ $current_config = load_hr_config();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HR Configuration - <?php echo htmlspecialchars( $team_data['team_name'] ); ?></title>
     <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="assets/cmd-k.css">
     <style>
         .config-form { max-width: 800px; margin: 0 auto; }
         .form-group { margin-bottom: 20px; }
@@ -183,6 +184,7 @@ $current_config = load_hr_config();
     </style>
 </head>
 <body>
+    <?php render_cmd_k_panel(); ?>
     <div class="container">
         <div class="back-link">
             <a href="<?php echo build_team_url( 'hr-reports.php' ); ?>">← Back to HR Reports</a>
@@ -385,5 +387,8 @@ $current_config = load_hr_config();
             }
         }
     </script>
+    <script src="assets/cmd-k.js"></script>
+    <script src="assets/script.js"></script>
+    <?php init_cmd_k_js( $privacy_mode ); ?>
 </body>
 </html>

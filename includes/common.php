@@ -2,6 +2,27 @@
 /**
  * Common functions shared between admin.php and index.php
  */
+
+// Security: Only allow access from localhost
+function only_allow_access_from_localhost() {
+	$remote_addr = $_SERVER['REMOTE_ADDR'] ?? '';
+	$allowed_ips = array( '127.0.0.1', '::1' );
+
+	// Check for localhost access
+	if ( ! in_array( $remote_addr, $allowed_ips, true ) ) {
+		// Also check HTTP_HOST for local development environments
+		$http_host = $_SERVER['HTTP_HOST'] ?? '';
+		if ( ! preg_match( '/^(localhost|127\.0\.0\.1)(:[0-9]+)?$/', $http_host ) ) {
+			http_response_code( 403 );
+			header( 'Content-Type: text/plain' );
+			exit;
+		}
+	}
+}
+
+// Apply localhost protection
+only_allow_access_from_localhost();
+
 require_once __DIR__ . '/event.php';
 
 /**
@@ -47,6 +68,46 @@ function render_person_links( $links, $icon_size = 12 ) {
 			echo '</a>';
 		}
 	}
+}
+
+/**
+ * Render Command-K panel HTML
+ */
+function render_cmd_k_panel() {
+	?>
+	<div id="cmd-k-overlay" class="cmd-k-overlay">
+		<div class="cmd-k-panel">
+			<div class="cmd-k-search-container">
+				<input type="text" id="cmd-k-search" class="cmd-k-search" placeholder="Search teams and people..." autocomplete="off" spellcheck="false">
+			</div>
+			<div id="cmd-k-results" class="cmd-k-results">
+			</div>
+			<div class="cmd-k-instructions">
+				<span class="cmd-k-kbd">↑↓</span> to navigate • <span class="cmd-k-kbd">Enter</span> to open • <span class="cmd-k-kbd">→</span> to select link • <span class="cmd-k-kbd">Esc</span> to close
+			</div>
+		</div>
+	</div>
+	<?php
+}
+
+/**
+ * Initialize Command-K functionality with JavaScript
+ */
+function init_cmd_k_js( $privacy_mode = false ) {
+	$people_data = get_all_people_from_all_teams( $privacy_mode );
+	$teams_data = get_all_teams_stats();
+	?>
+	<script>
+		// Initialize Command-K with data
+		document.addEventListener('DOMContentLoaded', () => {
+			if (typeof CmdK !== 'undefined') {
+				const peopleData = <?php echo json_encode( $people_data ); ?>;
+				const teamsData = <?php echo json_encode( $teams_data ); ?>;
+				CmdK.init(peopleData, teamsData);
+			}
+		});
+	</script>
+	<?php
 }
 
 /**

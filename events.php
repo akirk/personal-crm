@@ -184,23 +184,9 @@ $available_teams = get_available_teams();
     <link rel="stylesheet" href="assets/cmd-k.css">
 </head>
 <body>
-    <!-- Dark Mode Toggle -->
     <?php render_dark_mode_toggle(); ?>
 
-    <!-- Command-K Panel -->
-    <div id="cmd-k-overlay" class="cmd-k-overlay">
-        <div class="cmd-k-panel">
-            <div class="cmd-k-search-container">
-                <input type="text" id="cmd-k-search" class="cmd-k-search" placeholder="Search teams and people..." autocomplete="off" spellcheck="false">
-            </div>
-            <div id="cmd-k-results" class="cmd-k-results">
-                <!-- Results will be populated here -->
-            </div>
-            <div class="cmd-k-instructions">
-                <span class="cmd-k-kbd">↑↓</span> to navigate • <span class="cmd-k-kbd">Enter</span> to open • <span class="cmd-k-kbd">→</span> to select link • <span class="cmd-k-kbd">Esc</span> to close
-            </div>
-        </div>
-    </div>
+    <?php render_cmd_k_panel(); ?>
 
     <div class="container">
         <div class="header">
@@ -566,14 +552,8 @@ $available_teams = get_available_teams();
     
     <script src="assets/cmd-k.js"></script>
     <script src="assets/script.js"></script>
+    <?php init_cmd_k_js( $privacy_mode ); ?>
     <script>
-        // Initialize functionality when DOM is ready
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize Command-K with data
-            const peopleData = <?php echo json_encode( get_all_people_from_all_teams( $privacy_mode ) ); ?>;
-            const teamsData = <?php echo json_encode( get_all_teams_stats() ); ?>;
-            initializeCommandK(peopleData, teamsData);
-        });
         
         // Team switching functionality
         function switchTeam() {

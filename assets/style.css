@@ -64,7 +64,6 @@ body {
     opacity: 0.8;
 }
 
-/* Person tabs navigation */
 .person-tabs {
     display: flex;
     gap: 8px;
@@ -395,7 +394,6 @@ body {
     stroke: light-dark(currentColor, white);
 }
 
-/* Dark mode toggle icons */
 #dark-mode-toggle svg {
     fill: none;
     stroke: currentColor;
@@ -590,7 +588,6 @@ details summary span:last-child {
     display: inline-block;
 }
 
-/* Dark mode toggle */
 #dark-mode-toggle {
     position: absolute;
     top: 0;

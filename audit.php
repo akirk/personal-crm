@@ -162,6 +162,7 @@ $available_teams = get_available_teams();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Audit</title>
+    <link rel="stylesheet" href="assets/cmd-k.css">
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -306,6 +307,7 @@ $available_teams = get_available_teams();
     </style>
 </head>
 <body>
+    <?php render_cmd_k_panel(); ?>
     <div class="container">
         <div class="header">
             <div style="flex-grow: 1;">
@@ -470,5 +472,8 @@ $available_teams = get_available_teams();
             }
         }
     </script>
+    <script src="assets/cmd-k.js"></script>
+    <script src="assets/script.js"></script>
+    <?php init_cmd_k_js( $privacy_mode ); ?>
 </body>
 </html>
