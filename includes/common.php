@@ -799,12 +799,12 @@ function render_upcoming_events_sidebar( $upcoming_events_or_person = null, $pri
 			?></div>
 			<span class="event-type <?php echo htmlspecialchars( $event->type ); ?>"><?php echo ucfirst( $event->type ); ?></span>
 			<?php if ( ! empty( $event->location ) ) : ?>
-				<div style="font-size: 12px; color: #666; margin-top: 4px;">📍 <a href="https://maps.google.com/maps?q=<?php echo urlencode( $event->location ); ?>" target="_blank" style="color: #666; text-decoration: none;"><?php echo htmlspecialchars( $event->location ); ?></a></div>
+				<div class="event-location-small">📍 <a href="https://maps.google.com/maps?q=<?php echo urlencode( $event->location ); ?>" target="_blank" class="location-link"><?php echo htmlspecialchars( $event->location ); ?></a></div>
 			<?php endif; ?>
 			<?php if ( ! empty( $event->links ) ) : ?>
-				<div style="font-size: 12px; margin-top: 4px;">
+				<div class="event-links-small">
 					<?php foreach ( $event->links as $link_text => $link_url ) : ?>
-						<a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank" style="color: #007cba; text-decoration: none; margin-right: 8px;">
+						<a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank" class="event-link-small">
 							<?php echo htmlspecialchars( $link_text ); ?> →
 						</a>
 					<?php endforeach; ?>

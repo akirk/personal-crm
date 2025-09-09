@@ -180,7 +180,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 													<div class="person-username">
 														@<?php echo htmlspecialchars( $member->get_username() ); ?>
 														<?php if ( ! empty( $member->timezone ) || ! empty( $member->location ) ) : ?>
-															<span id="time-<?php echo htmlspecialchars( $username ); ?>" style="margin-left: 8px; color: #666; font-size: 12px;"></span>
+															<span id="time-<?php echo htmlspecialchars( $username ); ?>" class="timezone-display"></span>
 														<?php endif; ?>
 													</div>
 												</div>
@@ -211,7 +211,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 												);
 												?>
 												<?php if ( $is_not_necessary ) : ?>
-													<span class="feedback-status-link not-necessary" title="<?php echo htmlspecialchars( $reason_display ); ?>">➖ Not needed</span>
+													<span class="feedback-status-link not-necessary" title="<?php echo htmlspecialchars( $reason_display ); ?>">– Not needed</span>
 												<?php elseif ( $feedback_status['status'] === 'submitted' ) : ?>
 													<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link submitted">✅ Submitted</a>
 												<?php elseif ( $feedback_status['status'] === 'ready-for-review' ) : ?>
@@ -229,7 +229,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 								<?php endforeach; ?>
 							</ul>
 						<?php else : ?>
-							<p style="color: #666; font-style: italic;">No team members yet. <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'members', 'add' => 'new' ) ); ?>" style="color: #007cba; text-decoration: none;">Add your first team member →</a></p>
+							<p class="empty-state-message">No team members yet. <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'members', 'add' => 'new' ) ); ?>" class="action-link">Add your first team member →</a></p>
 						<?php endif; ?>
 					</div>
 
@@ -246,7 +246,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 													<div class="person-username">
 														@<?php echo htmlspecialchars( $leader->get_username() ); ?>
 														<?php if ( ! empty( $leader->timezone ) || ! empty( $leader->location ) ) : ?>
-															<span id="time-<?php echo htmlspecialchars( $username ); ?>" style="margin-left: 8px; color: #666; font-size: 12px;"></span>
+															<span id="time-<?php echo htmlspecialchars( $username ); ?>" class="timezone-display"></span>
 														<?php endif; ?>
 													</div>
 												</div>
@@ -260,7 +260,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 								<?php endforeach; ?>
 							</ul>
 						<?php else : ?>
-							<p style="color: #666; font-style: italic;">No leadership yet. <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'leadership', 'add' => 'new' ) ); ?>" style="color: #007cba; text-decoration: none;">Add your first leader →</a></p>
+							<p class="empty-state-message">No leadership yet. <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'leadership', 'add' => 'new' ) ); ?>" class="action-link">Add your first leader →</a></p>
 						<?php endif; ?>
 					</div>
 
@@ -277,7 +277,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 													<div class="person-username">
 														@<?php echo htmlspecialchars( $alumnus->get_username() ); ?>
 														<?php if ( ! empty( $alumnus->timezone ) || ! empty( $alumnus->location ) ) : ?>
-															<span id="time-<?php echo htmlspecialchars( $username ); ?>" style="margin-left: 8px; color: #666; font-size: 12px;"></span>
+															<span id="time-<?php echo htmlspecialchars( $username ); ?>" class="timezone-display"></span>
 														<?php endif; ?>
 													</div>
 												</div>
@@ -290,7 +290,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 								<?php endforeach; ?>
 							</ul>
 						<?php else : ?>
-							<p style="color: #666; font-style: italic;">No alumni yet. Alumni are created by moving existing team members or leaders.</p>
+							<p class="empty-state-message">No alumni yet. Alumni are created by moving existing team members or leaders.</p>
 						<?php endif; ?>
 					</div>
 				</div>
@@ -316,13 +316,13 @@ if ( ! empty( $team_members_needing_hr ) ) {
 											<strong><?php echo date( 'M Y', strtotime( $month . '-01' ) ); ?>:</strong>
 											<?php echo $stats['completed']; ?> of <?php echo $stats['total']; ?> submitted
 											<?php if ( isset( $stats['not_necessary'] ) && $stats['not_necessary'] > 0 ) : ?>
-												<span style="color: #666; font-size: 0.85em;">(<?php echo $stats['not_necessary']; ?> not needed)</span>
+												<span class="hr-stats-note">(<?php echo $stats['not_necessary']; ?> not needed)</span>
 											<?php endif; ?>
 										</div>
 									<?php endforeach; ?>
 								</div>
 							<?php else : ?>
-								<p style="color: #666; font-style: italic; font-size: 0.9em;">No HR feedback data available yet.</p>
+								<p class="hr-stats-empty">No HR feedback data available yet.</p>
 							<?php endif; ?>
 						</div>
 					<?php endif; ?>

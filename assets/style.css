@@ -1303,10 +1303,6 @@ details summary span:last-child {
     font-size: 14px;
 }
 
-.location-link {
-    color: light-dark(#007cba, #4a90e2);
-    text-decoration: none;
-}
 
 .location-time {
     margin-left: 10px;
@@ -1453,12 +1449,9 @@ details summary span:last-child {
 
 .hr-feedback-header {
     color: light-dark(#333, #e0e0e0);
-    border-bottom: 2px solid light-dark(#007cba, #4a90e2);
-    padding-bottom: 8px;
     margin-top: 0;
     text-decoration: none;
     display: block;
-    margin-bottom: 15px;
 }
 
 .hr-feedback-header:hover {
@@ -1697,4 +1690,53 @@ details summary span:last-child {
     color: light-dark(#666, #b0b0b0);
     text-decoration: none;
     font-size: 11px;
+}
+
+.timezone-display {
+    margin-left: 8px;
+    color: light-dark(#666, #b0b0b0);
+    font-size: 12px;
+}
+
+.empty-state-message {
+    color: light-dark(#666, #b0b0b0);
+    font-style: italic;
+}
+
+.action-link {
+    color: light-dark(#007cba, #4a90e2);
+    text-decoration: none;
+}
+
+.hr-stats-note {
+    color: light-dark(#666, #b0b0b0);
+    font-size: 0.85em;
+}
+
+.hr-stats-empty {
+    color: light-dark(#666, #b0b0b0);
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+.event-location-small {
+    font-size: 12px;
+    color: light-dark(#666, #b0b0b0);
+    margin-top: 4px;
+}
+
+.event-location-small .location-link {
+    color: light-dark(#666, #b0b0b0);
+    text-decoration: none;
+}
+
+.event-links-small {
+    font-size: 12px;
+    margin-top: 4px;
+}
+
+.event-link-small {
+    color: light-dark(#007cba, #4a90e2);
+    text-decoration: none;
+    margin-right: 8px;
 }
