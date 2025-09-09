@@ -65,6 +65,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="color-scheme" content="light dark">
 	<title><?php echo htmlspecialchars( $person_data->get_display_name_with_nickname() ) . ' - ' . htmlspecialchars( $team_data['team_name'] ) . ' Team'; ?></title>
 	<link rel="stylesheet" href="assets/style.css">
 	<link rel="stylesheet" href="assets/cmd-k.css">
@@ -85,12 +86,18 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 		</div>
 	</div>
 
+	<!-- Dark Mode Toggle -->
+	<button id="dark-mode-toggle">
+		<svg id="dark-mode-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
+		<svg id="light-mode-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+	</button>
+
 	<div class="container">
-		<div class="header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+		<div class="person-header">
 			<div>
-				<h1 style="margin: 0; font-size: 24px;">
+				<h1 class="person-title">
 					<?php echo htmlspecialchars( $person_data->get_display_name_with_nickname() ); ?>
-					<span style="color: #666; font-size: 16px; font-weight: normal;">
+					<span class="person-subtitle">
 						@<?php echo htmlspecialchars( $person_data->get_username() ); ?>
 						<?php if ( ! empty( $person_data->role ) ) : ?>
 							• <?php echo htmlspecialchars( $person_data->role ); ?>
@@ -100,8 +107,8 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						<?php endif; ?>
 					</span>
 				</h1>
-				<div style="margin-top: 5px;">
-					<a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Overview</a>
+				<div class="back-nav">
+					<a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to Team Overview</a>
 				</div>
 			</div>
 
@@ -226,7 +233,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 											$tooltip = 'No birth data available';
 										}
 										?>
-										<span style="background: #f0f0f0; color: #333; padding: 3px 8px; border-radius: 12px; font-size: 13px; margin-left: 6px; cursor: help;" title="<?php echo htmlspecialchars( $tooltip ); ?>">
+										<span class="child-badge" title="<?php echo htmlspecialchars( $tooltip ); ?>">
 											<?php echo htmlspecialchars( $kid['name'] ); ?>
 											<?php if ( isset( $kid['age'] ) ) : ?>
 												(<?php echo $kid['age']; ?>y)
@@ -253,31 +260,31 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					<?php if ( $has_any_accounts ) : ?>
 						<div class="section">
 							<h2>External Accounts</h2>
-							<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
+							<div class="external-account-links">
 								<?php if ( $has_github ) : ?>
-									<a href="https://github.com/<?php echo htmlspecialchars( $person_data->github ); ?>" target="_blank" style="display: inline-flex; align-items: center; padding: 6px 12px; background: #24292e; color: white; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500;">
-										<?php echo str_replace('#222326', 'currentColor', get_link_icon('GitHub', 'https://github.com/' . $person_data->github, 16)); ?>
+									<a href="https://github.com/<?php echo htmlspecialchars( $person_data->github ); ?>" target="_blank" class="external-link github">
+										<?php echo get_link_icon('GitHub', 'https://github.com/' . $person_data->github, 16); ?>
 										GitHub
 									</a>
 								<?php endif; ?>
 
 								<?php if ( $has_linkedin ) : ?>
-									<a href="https://linkedin.com/in/<?php echo htmlspecialchars( $person_data->linkedin ); ?>" target="_blank" style="display: inline-flex; align-items: center; padding: 6px 12px; background: #0077b5; color: white; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500;">
-										<?php echo str_replace('#222326', 'currentColor', get_link_icon('LinkedIn', 'https://linkedin.com/in/' . $person_data->linkedin, 16)); ?>
+									<a href="https://linkedin.com/in/<?php echo htmlspecialchars( $person_data->linkedin ); ?>" target="_blank" class="external-link linkedin">
+										<?php echo get_link_icon('LinkedIn', 'https://linkedin.com/in/' . $person_data->linkedin, 16); ?>
 										LinkedIn
 									</a>
 								<?php endif; ?>
 
 								<?php if ( $has_wordpress ) : ?>
-									<a href="https://profiles.wordpress.org/<?php echo htmlspecialchars( $person_data->wordpress ); ?>" target="_blank" style="display: inline-flex; align-items: center; padding: 6px 12px; background: #21759b; color: white; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500;">
-										<?php echo str_replace('#222326', 'currentColor', get_link_icon('WordPress.org', 'https://profiles.wordpress.org/' . $person_data->wordpress, 16)); ?>
+									<a href="https://profiles.wordpress.org/<?php echo htmlspecialchars( $person_data->wordpress ); ?>" target="_blank" class="external-link wordpress">
+										<?php echo get_link_icon('WordPress.org', 'https://profiles.wordpress.org/' . $person_data->wordpress, 16); ?>
 										WordPress.org
 									</a>
 								<?php endif; ?>
 
 								<?php if ( $has_linear ) : ?>
-									<a href="<?php echo htmlspecialchars( $person_data->links['Linear'] ); ?>" target="_blank" style="display: inline-flex; align-items: center; padding: 6px 12px; background: #5e6ad2; color: white; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500;">
-										<?php echo str_replace('#222326', 'currentColor', get_link_icon('Linear', $person_data->links['Linear'], 16)); ?>
+									<a href="<?php echo htmlspecialchars( $person_data->links['Linear'] ); ?>" target="_blank" class="external-link linear">
+										<?php echo get_link_icon('Linear', $person_data->links['Linear'], 16); ?>
 										Linear
 									</a>
 								<?php endif; ?>
@@ -292,14 +299,14 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 							$repos = is_array( $person_data->github_repos ) ? $person_data->github_repos : array_filter( array_map( 'trim', explode( ',', $person_data->github_repos ) ) );
 							if ( ! empty( $repos ) ) :
 							?>
-								<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+								<div class="github-repo-grid">
 									<?php foreach ( $repos as $repo ) : ?>
-										<div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px;">
-											<a href="https://github.com/<?php echo htmlspecialchars( $repo ); ?>" target="_blank" style="color: #333; text-decoration: none; font-weight: 500;">
+										<div class="github-repo-card">
+											<a href="https://github.com/<?php echo htmlspecialchars( $repo ); ?>" target="_blank" class="github-repo-link">
 												📦 <?php echo htmlspecialchars( $repo ); ?>
 											</a>
 											<?php if ( $has_github ) : ?>
-												<a href="https://github.com/<?php echo htmlspecialchars( $repo ); ?>/pulls/<?php echo htmlspecialchars( $person_data->github ); ?>" target="_blank" style="color: #007cba; text-decoration: none; font-size: 12px; padding: 2px 6px; background: #e3f2fd; border-radius: 3px;">PRs</a>
+												<a href="https://github.com/<?php echo htmlspecialchars( $repo ); ?>/pulls/<?php echo htmlspecialchars( $person_data->github ); ?>" target="_blank" class="github-pr-link">PRs</a>
 											<?php endif; ?>
 										</div>
 									<?php endforeach; ?>
@@ -326,12 +333,12 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						<div class="section">
 							<h2>Quick Links</h2>
 
-						<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
+						<div class="quick-links-container">
 							<?php if ( $has_other_links ) : ?>
 									<?php foreach ( $filtered_links as $link_text => $link_url ) : ?>
 										<?php if ( ! empty( $link_url ) ) : ?>
-											<a href="<?php echo htmlspecialchars( str_replace( '$username', $person, $link_url ) ); ?>" target="_blank" style="display: inline-flex; align-items: center; padding: 8px 16px; background: #007cba; color: white; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;">
-												<?php echo str_replace('#222326', 'currentColor', get_link_icon( $link_text, $link_url, 18)); ?>
+											<a href="<?php echo htmlspecialchars( str_replace( '$username', $person, $link_url ) ); ?>" target="_blank" class="quick-link">
+												<?php echo get_link_icon( $link_text, $link_url, 18); ?>
 												<?php echo htmlspecialchars( $link_text ); ?>
 											</a>
 										<?php endif; ?>
@@ -346,10 +353,10 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 								$activity_url_month = $team_data['activity_url_prefix'] . '&member=' . urlencode( $person_data->username ) . "&start={$start_date}&end={$end_date}";
 								$activity_url_week = $team_data['activity_url_prefix'] . '&member=' . urlencode( $person_data->username );
 								?>
-									<a href="<?php echo htmlspecialchars( $activity_url_month ); ?>" target="_blank" style="display: inline-flex; align-items: center; padding: 8px 16px; background: #28a745; color: white; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;">
+									<a href="<?php echo htmlspecialchars( $activity_url_month ); ?>" target="_blank" class="activity-link-month">
 										📊 Activity (Month)
 									</a>
-									<a href="<?php echo htmlspecialchars( $activity_url_week ); ?>" target="_blank" style="display: inline-flex; align-items: center; padding: 8px 16px; background: #17a2b8; color: white; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1); transition: all 0.2s;">
+									<a href="<?php echo htmlspecialchars( $activity_url_week ); ?>" target="_blank" class="activity-link-week">
 										📊 Activity (Week)
 									</a>
 							<?php endif; ?>
@@ -358,9 +365,9 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					<?php endif; ?>
 
 					<?php if ( ! empty( $person_data->notes ) ) : ?>
-						<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 15px;">
+						<div class="notes-section">
 							<strong>📝 Notes:</strong>
-							<p style="margin: 10px 0 0 0;"><?php echo nl2br( htmlspecialchars( $person_data->notes ) ); ?></p>
+							<p class="notes-content"><?php echo nl2br( htmlspecialchars( $person_data->notes ) ); ?></p>
 						</div>
 					<?php endif; ?>
 					<?php endif; ?>
@@ -390,9 +397,8 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					$show_hr_section = ! empty( $past_feedback ) || $is_team_member;
 					?>
 					<?php if ( $show_hr_section ) : ?>
-						<a href="<?php echo build_team_url( 'hr-reports.php', array( 'person' => $person, 'month' => get_hr_feedback_month(), 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
-						   style="color: inherit; text-decoration: none; display: block; margin-bottom: 15px;">
-							<h3 style="margin-top: 0; color: #333; border-bottom: 2px solid #007cba; padding-bottom: 8px;">📝 HR Feedbacks</h3>
+						<a href="<?php echo build_team_url( 'hr-reports.php', array( 'person' => $person, 'month' => get_hr_feedback_month(), 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="hr-feedback-header">
+							<h3>📝 HR Feedbacks</h3>
 						</a>
 					<?php
 
@@ -408,20 +414,20 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 							$performance_rating = $feedback['performance'] ?? 'good';
 							$performance_text = ucfirst( $performance_rating );
 							?>
-							<details style="margin-bottom: 15px;">
-								<summary style="cursor: pointer; padding: 8px 0; border-bottom: 1px solid #eee; list-style: none; position: relative;">
-									<span style="font-weight: 500; color: #333;"><?php echo date( 'M Y', strtotime( $month . '-01' ) ); ?></span>
-									<span class="performance-badge performance-<?php echo $performance_rating; ?>" style="margin-left: 10px;">
+							<details class="hr-feedback-details">
+								<summary class="hr-feedback-summary">
+									<span class="hr-feedback-month"><?php echo date( 'M Y', strtotime( $month . '-01' ) ); ?></span>
+									<span class="performance-badge performance-<?php echo $performance_rating; ?>">
 										<?php echo $performance_text; ?>
 									</span>
-									<span style="position: absolute; right: 0; color: #999; font-size: 14px;">▶</span>
+									<span class="hr-feedback-arrow">▶</span>
 								</summary>
 								<?php if ( ! $privacy_mode ) : ?>
-									<div style="padding: 12px 0 0 0; font-size: 13px; color: #666; line-height: 1.4;">
+									<div class="hr-feedback-content">
 										<?php echo $feedback_text; ?>
 									</div>
 								<?php else : ?>
-									<div style="padding: 12px 0 0 0; font-size: 13px; color: #666; font-style: italic;">
+									<div class="hr-feedback-privacy">
 										[Feedback content hidden in privacy mode]
 									</div>
 								<?php endif; ?>
@@ -432,9 +438,8 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 
 						if ( count( $past_feedback ) > 10 ) {
 							?>
-							<div style="text-align: center; margin-top: 10px;">
-								<a href="<?php echo build_team_url( 'hr-reports.php', array( 'person' => $person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
-								   style="color: #007cba; text-decoration: none; font-size: 12px;">
+							<div class="hr-feedback-all-link">
+								<a href="<?php echo build_team_url( 'hr-reports.php', array( 'person' => $person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">
 									View all <?php echo count( $past_feedback ); ?> feedback entries →
 								</a>
 							</div>
@@ -442,8 +447,8 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						}
 					} else {
 						?>
-						<div style="background: #f8f9fa; padding: 12px; border-radius: 6px; text-align: center;">
-							<p style="margin: 0; color: #666; font-size: 13px; font-style: italic;">
+						<div class="hr-no-feedback">
+							<p>
 								No feedback history yet
 							</p>
 						</div>
@@ -453,21 +458,21 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					<?php endif; ?>
 
 					<!-- Upcoming Events -->
-					<h3 style="<?php echo $show_hr_section ? 'margin-top: 30px;' : 'margin-top: 0;'; ?> color: #333; border-bottom: 2px solid #007cba; padding-bottom: 8px;">🗓️ Upcoming Events</h3>
+					<h3 class="events-heading" style="<?php echo $show_hr_section ? 'margin-top: 30px;' : 'margin-top: 0;'; ?>">🗓️ Upcoming Events</h3>
 					<?php render_upcoming_events_sidebar( $person ); ?>
 				</div>
 			</div>
 		</div>
 
 		<!-- Footer with admin/privacy links -->
-		<footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 14px;">
+		<footer class="privacy-footer">
 			<?php if ( $privacy_mode ) : ?>
-				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔒 Privacy Mode ON</a>
+				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>">🔒 Privacy Mode ON</a>
 			<?php else : ?>
-				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>
+				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>">🔓 Privacy Mode OFF</a>
 			<?php endif; ?>
-			<a href="<?php echo build_team_url( 'admin.php' ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">⚙️ Admin Panel</a>
-			<a href="<?php echo $person_data->get_edit_url(); ?>" style="color: #666; text-decoration: none;">✏️ Edit Person</a>
+			<a href="<?php echo build_team_url( 'admin.php' ); ?>">⚙️ Admin Panel</a>
+			<a href="<?php echo $person_data->get_edit_url(); ?>">✏️ Edit Person</a>
 		</footer>
 	</div>
 
@@ -485,6 +490,35 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 			<?php if ( ! empty( $person_data ) && ( ! empty( $person_data->location ) || ! empty( $person_data->timezone ) ) ) : ?>
 			createTimeUpdater('<?php echo addslashes( $person_data->timezone ); ?>', '<?php echo addslashes( $person ); ?>');
 			<?php endif; ?>
+
+			// Dark mode functionality
+			const metaColorScheme = document.querySelector('meta[name="color-scheme"]');
+			const darkModeToggle = document.getElementById('dark-mode-toggle');
+			const darkModeIcon = document.getElementById('dark-mode-icon');
+			const lightModeIcon = document.getElementById('light-mode-icon');
+			const systemSettingDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+			// Set initial icon state
+			if ( systemSettingDark ) {
+				darkModeIcon.style.display = 'none';
+				lightModeIcon.style.display = 'inline';
+			} else {
+				darkModeIcon.style.display = 'inline';
+				lightModeIcon.style.display = 'none';
+			}
+
+			// Dark mode toggle event listener
+			darkModeToggle.addEventListener('click', function() {
+				if ( ( metaColorScheme.content === 'light dark' && systemSettingDark ) || metaColorScheme.content === 'dark' ) {
+					metaColorScheme.content = systemSettingDark ? 'light' : 'light dark';
+					darkModeIcon.style.display = 'inline';
+					lightModeIcon.style.display = 'none';
+				} else {
+					metaColorScheme.content = systemSettingDark ? 'light dark' : 'dark';
+					darkModeIcon.style.display = 'none';
+					lightModeIcon.style.display = 'inline';
+				}
+			});
 		});
 	</script>
 </body>

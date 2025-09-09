@@ -314,7 +314,7 @@ $available_teams = get_available_teams();
             </div>
             <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
                 <!-- Team Switcher -->
-                <select id="team-selector" onchange="switchTeam()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                <select id="team-selector" onchange="switchTeam()">
                     <?php
                     foreach ( $available_teams as $team_slug ) {
                         $team_display_name = get_team_name_from_file( $team_slug );

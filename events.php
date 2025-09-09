@@ -80,11 +80,30 @@ $available_teams = get_available_teams();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</title>
     <link rel="stylesheet" href="assets/style.css">
     <link rel="stylesheet" href="assets/cmd-k.css">
 </head>
 <body>
+    <!-- Dark Mode Toggle -->
+    <button id="dark-mode-toggle" type="button" aria-label="Toggle dark mode">
+        <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+    </button>
+
     <!-- Command-K Panel -->
     <div id="cmd-k-overlay" class="cmd-k-overlay">
         <div class="cmd-k-panel">
@@ -102,13 +121,15 @@ $available_teams = get_available_teams();
 
     <div class="container">
         <div class="header">
-            <div style="flex-grow: 1;">
-                <h1><a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a></h1>
-                <a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Overview</a>
+            <div class="header-container">
+                <h1><a href="<?php echo build_team_url( 'index.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a></h1>
+                <div class="back-nav">
+                    <a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to Team Overview</a>
+                </div>
             </div>
-            <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
+            <div class="nav-container">
                 <!-- Team Switcher -->
-                <select id="team-selector" onchange="switchTeam()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                <select id="team-selector" onchange="switchTeam()">
                     <?php
                     foreach ( $available_teams as $team_slug ) {
                         $team_display_name = get_team_name_from_file( $team_slug );
@@ -118,46 +139,46 @@ $available_teams = get_available_teams();
                     ?>
                 </select>
                 
-                <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events', 'add' => 'new' ) ); ?>" class="nav-link" style="background: #28a745;">+ Add Event</a>
+                <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events', 'add' => 'new' ) ); ?>" class="nav-link green">+ Add Event</a>
             </div>
         </div>
 
         <!-- Upcoming Events Section -->
         <div class="section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2 style="margin: 0;">📅 Upcoming Events</h2>
+            <div class="section-header">
+                <h2 class="section-title">📅 Upcoming Events</h2>
                 <?php if ( ! empty( $all_upcoming_events ) ) : ?>
-                    <span style="color: #666; font-size: 14px;"><?php echo count( $all_upcoming_events ); ?> event<?php echo count( $all_upcoming_events ) !== 1 ? 's' : ''; ?></span>
+                    <span class="count-text"><?php echo count( $all_upcoming_events ); ?> event<?php echo count( $all_upcoming_events ) !== 1 ? 's' : ''; ?></span>
                 <?php endif; ?>
             </div>
 
             <?php if ( ! empty( $upcoming_by_month ) ) : ?>
-                <div style="display: grid; gap: 20px;">
+                <div class="content-grid">
                     <?php foreach ( $upcoming_by_month as $month_data ) : ?>
-                        <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
-                            <h3 style="margin: 0 0 15px 0; color: #333; border-bottom: 2px solid #007cba; padding-bottom: 8px;"><?php echo htmlspecialchars( $month_data['label'] ); ?></h3>
-                            <div style="display: grid; gap: 12px;">
+                        <div class="month-card">
+                            <h3 class="month-heading"><?php echo htmlspecialchars( $month_data['label'] ); ?></h3>
+                            <div class="events-month-grid">
                                 <?php foreach ( $month_data['events'] as $event ) : ?>
-                                    <div class="event-row" style="display: flex; align-items: flex-start; gap: 15px; padding: 12px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid <?php echo $event->get_color(); ?>;">
-                                        <div style="flex: 0 0 80px; font-size: 14px; color: #666; font-weight: 500;">
+                                    <div class="event-row" style="border-left: 4px solid <?php echo $event->get_color(); ?>;">
+                                        <div class="event-date-col">
                                             <?php echo $event->date->format( 'M j' ); ?>
                                         </div>
-                                        <div style="flex: 1;">
-                                            <div style="font-weight: 600; color: #333; margin-bottom: 4px;">
+                                        <div class="event-content-col">
+                                            <div class="event-title">
                                                 <?php 
                                                 // For events with a person, link to the person
                                                 if ( $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary' ) ) ) {
-                                                	echo '<a href="' . build_team_url( 'index.php', array( 'person' => $event->person->username ) ) . '" style="color: #007cba; text-decoration: none;">' . htmlspecialchars( $event->get_title() ) . '</a>';
+                                                	echo '<a href="' . build_team_url( 'index.php', array( 'person' => $event->person->username ) ) . '" class="event-person-link">' . htmlspecialchars( $event->get_title() ) . '</a>';
                                                 } else {
                                             		echo htmlspecialchars( $event->get_title() );
                                                 }
                                                 ?>
-                                                <span style="background: <?php echo $event->get_color(); ?>; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 8px;">
+                                                <span class="event-type <?php echo $event->type; ?>">
                                                     <?php echo ucfirst( $event->type ); ?>
                                                 </span>
                                             </div>
                                             <?php if ( ! empty( $event->location ) ) : ?>
-                                                <div style="font-size: 13px; color: #666; margin-bottom: 4px;">📍 <?php echo htmlspecialchars( $event->location ); ?></div>
+                                                <div class="event-location">📍 <?php echo htmlspecialchars( $event->location ); ?></div>
                                             <?php endif; ?>
                                             <?php if ( ! empty( $event->links ) ) : ?>
                                                 <div style="font-size: 13px; margin-bottom: 4px;">
@@ -182,9 +203,9 @@ $available_teams = get_available_teams();
                                                     }
                                                 }
                                                 if ( $event_index !== null ) : ?>
-                                                    <div style="font-size: 12px; margin-top: 4px;">
+                                                    <div class="event-edit-container">
                                                         <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events', 'edit_event' => $event_index ) ); ?>" 
-                                                           style="color: #666; text-decoration: none; font-size: 11px;">
+                                                           class="event-edit-link">
                                                             ✏️ Edit
                                                         </a>
                                                     </div>
@@ -199,10 +220,10 @@ $available_teams = get_available_teams();
                     <?php endforeach; ?>
                 </div>
             <?php else : ?>
-                <div style="text-align: center; padding: 40px; background: #f8f9fa; border-radius: 8px; color: #666;">
-                    <h3 style="margin-bottom: 10px;">No upcoming events</h3>
+                <div class="no-content-card">
+                    <h3>No upcoming events</h3>
                     <p>There are no scheduled events for this team.</p>
-                    <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-link" style="margin-top: 15px; display: inline-block;">
+                    <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-link inline">
                         Add an Event →
                     </a>
                 </div>
@@ -212,30 +233,30 @@ $available_teams = get_available_teams();
         <!-- Past Events Section (Team Events Only, Last 3 Years) -->
         <?php if ( ! empty( $past_by_month ) ) : ?>
             <div class="section" style="margin-top: 40px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h2 style="margin: 0;">📋 Past Team Events</h2>
-                    <span style="color: #666; font-size: 14px;"><?php echo count( $past_team_events ); ?> event<?php echo count( $past_team_events ) !== 1 ? 's' : ''; ?> (last 3 years)</span>
+                <div class="section-header">
+                    <h2 class="section-title">📋 Past Team Events</h2>
+                    <span class="count-text"><?php echo count( $past_team_events ); ?> event<?php echo count( $past_team_events ) !== 1 ? 's' : ''; ?> (last 3 years)</span>
                 </div>
 
-                <div style="display: grid; gap: 20px;">
+                <div class="content-grid">
                     <?php foreach ( $past_by_month as $month_data ) : ?>
-                        <div style="background: white; border: 1px solid #ddd; border-radius: 8px; padding: 20px; opacity: 0.85;">
-                            <h3 style="margin: 0 0 15px 0; color: #666; border-bottom: 2px solid #999; padding-bottom: 8px;"><?php echo htmlspecialchars( $month_data['label'] ); ?></h3>
-                            <div style="display: grid; gap: 12px;">
+                        <div class="past-month-card">
+                            <h3 class="past-month-heading"><?php echo htmlspecialchars( $month_data['label'] ); ?></h3>
+                            <div class="events-month-grid">
                                 <?php foreach ( $month_data['events'] as $event ) : ?>
-                                    <div class="event-row" style="display: flex; align-items: flex-start; gap: 15px; padding: 12px; background: #f1f1f1; border-radius: 6px; border-left: 4px solid <?php echo $event->get_color(); ?>;">
-                                        <div style="flex: 0 0 80px; font-size: 14px; color: #666; font-weight: 500;">
+                                    <div class="past-event-row" style="border-left: 4px solid <?php echo $event->get_color(); ?>;">
+                                        <div class="event-date-col">
                                             <?php echo $event->date->format( 'M j' ); ?>
                                         </div>
-                                        <div style="flex: 1;">
-                                            <div style="font-weight: 600; color: #555; margin-bottom: 4px;">
+                                        <div class="event-content-col">
+                                            <div class="event-title past">
                                                 <?php echo htmlspecialchars( $event->description ); ?>
-                                                <span style="background: <?php echo $event->get_color(); ?>; color: white; padding: 2px 6px; border-radius: 3px; font-size: 11px; margin-left: 8px;">
+                                                <span class="event-type <?php echo $event->type; ?>">
                                                     <?php echo ucfirst( $event->type ); ?>
                                                 </span>
                                             </div>
                                             <?php if ( ! empty( $event->location ) ) : ?>
-                                                <div style="font-size: 13px; color: #666; margin-bottom: 4px;">📍 <?php echo htmlspecialchars( $event->location ); ?></div>
+                                                <div class="event-location">📍 <?php echo htmlspecialchars( $event->location ); ?></div>
                                             <?php endif; ?>
                                             <?php if ( ! empty( $event->links ) ) : ?>
                                                 <div style="font-size: 13px; margin-bottom: 4px;">
@@ -276,13 +297,13 @@ $available_teams = get_available_teams();
         <?php endif; ?>
         
         <!-- Footer with admin/privacy links -->
-        <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 14px;">
+        <footer class="privacy-footer">
             <?php if ( $privacy_mode ) : ?>
-                <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔒 Privacy Mode ON</a>
+                <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>">🔒 Privacy Mode ON</a>
             <?php else : ?>
-                <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>
+                <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>">🔓 Privacy Mode OFF</a>
             <?php endif; ?>
-            <a href="<?php echo build_team_url( 'admin.php' ); ?>" style="color: #666; text-decoration: none;">⚙️ Admin Panel</a>
+            <a href="<?php echo build_team_url( 'admin.php' ); ?>">⚙️ Admin Panel</a>
         </footer>
     </div>
     
@@ -295,7 +316,54 @@ $available_teams = get_available_teams();
             const peopleData = <?php echo json_encode( get_all_people_from_all_teams( $privacy_mode ) ); ?>;
             const teamsData = <?php echo json_encode( get_all_teams_stats() ); ?>;
             initializeCommandK(peopleData, teamsData);
+            
+            // Initialize dark mode
+            initializeDarkMode();
         });
+        
+        function initializeDarkMode() {
+            const toggle = document.getElementById('dark-mode-toggle');
+            const sunIcon = toggle.querySelector('.sun-icon');
+            const moonIcon = toggle.querySelector('.moon-icon');
+            
+            // Get saved theme or default to system preference
+            let currentTheme = localStorage.getItem('theme');
+            if (!currentTheme) {
+                currentTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            
+            function updateTheme(theme) {
+                if (theme === 'dark') {
+                    document.documentElement.style.colorScheme = 'dark';
+                    sunIcon.style.display = 'block';
+                    moonIcon.style.display = 'none';
+                } else {
+                    document.documentElement.style.colorScheme = 'light';
+                    sunIcon.style.display = 'none';
+                    moonIcon.style.display = 'block';
+                }
+                localStorage.setItem('theme', theme);
+            }
+            
+            // Set initial theme
+            updateTheme(currentTheme);
+            
+            // Toggle theme on click
+            toggle.addEventListener('click', () => {
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                currentTheme = newTheme;
+                updateTheme(newTheme);
+            });
+            
+            // Listen for system theme changes
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                if (!localStorage.getItem('theme')) {
+                    const systemTheme = e.matches ? 'dark' : 'light';
+                    currentTheme = systemTheme;
+                    updateTheme(systemTheme);
+                }
+            });
+        }
         
         // Team switching functionality
         function switchTeam() {

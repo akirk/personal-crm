@@ -108,6 +108,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="color-scheme" content="light dark">
 	<title><?php echo htmlspecialchars( $team_data['team_name'] ) . ' Team Management'; ?></title>
 	<link rel="stylesheet" href="assets/style.css">
 	<link rel="stylesheet" href="assets/cmd-k.css">
@@ -128,6 +129,12 @@ if ( ! empty( $team_members_needing_hr ) ) {
 		</div>
 	</div>
 
+	<!-- Dark Mode Toggle -->
+	<button id="dark-mode-toggle">
+		<svg id="dark-mode-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
+		<svg id="light-mode-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+	</button>
+
 	<div class="container">
 		<?php if ( $action === 'overview' ) : ?>
 			<div class="header">
@@ -146,7 +153,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 				<?php endif; ?>
 				<div class="navigation" style="display: flex; align-items: center; gap: 10px;">
 					<!-- Team Switcher -->
-					<select id="team-selector" onchange="switchTeam()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+					<select id="team-selector" onchange="switchTeam()">
 						<?php
 						foreach ( $available_teams as $team_slug ) {
 							$team_display_name = get_team_name_from_file( $team_slug );
@@ -235,7 +242,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 										<div class="person-row-container">
 											<a href="<?php echo $leader->get_profile_url(); ?>" class="person-row">
 												<div class="person-info">
-													<div class="person-name"><?php echo htmlspecialchars( $leader->get_display_name_with_nickname() ); ?> <span style="color: #666; font-weight: normal;">(<?php echo htmlspecialchars( $leader->role ); ?>)</span></div>
+													<div class="person-name"><?php echo htmlspecialchars( $leader->get_display_name_with_nickname() ); ?> <span class="person-role">(<?php echo htmlspecialchars( $leader->role ); ?>)</span></div>
 													<div class="person-username">
 														@<?php echo htmlspecialchars( $leader->get_username() ); ?>
 														<?php if ( ! empty( $leader->timezone ) || ! empty( $leader->location ) ) : ?>
@@ -331,13 +338,13 @@ if ( ! empty( $team_members_needing_hr ) ) {
 		<?php endif; ?>
 
 		<!-- Footer with admin/privacy links -->
-		<footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 14px;">
+		<footer class="privacy-footer">
 			<?php if ( $privacy_mode ) : ?>
-				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔒 Privacy Mode ON</a>
+				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" class="footer-link">🔒 Privacy Mode ON</a>
 			<?php else : ?>
-				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>
+				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="footer-link">🔓 Privacy Mode OFF</a>
 			<?php endif; ?>
-			<a href="<?php echo build_team_url( 'admin.php' ); ?>" style="color: #666; text-decoration: none;">⚙️ Admin Panel</a>
+			<a href="<?php echo build_team_url( 'admin.php' ); ?>" class="footer-link">⚙️ Admin Panel</a>
 		</footer>
 	</div>
 
@@ -362,6 +369,35 @@ if ( ! empty( $team_members_needing_hr ) ) {
 				endif;
 			endforeach; 
 			?>
+
+			// Dark mode functionality
+			const metaColorScheme = document.querySelector('meta[name="color-scheme"]');
+			const darkModeToggle = document.getElementById('dark-mode-toggle');
+			const darkModeIcon = document.getElementById('dark-mode-icon');
+			const lightModeIcon = document.getElementById('light-mode-icon');
+			const systemSettingDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+			// Set initial icon state
+			if ( systemSettingDark ) {
+				darkModeIcon.style.display = 'none';
+				lightModeIcon.style.display = 'inline';
+			} else {
+				darkModeIcon.style.display = 'inline';
+				lightModeIcon.style.display = 'none';
+			}
+
+			// Dark mode toggle event listener
+			darkModeToggle.addEventListener('click', function() {
+				if ( ( metaColorScheme.content === 'light dark' && systemSettingDark ) || metaColorScheme.content === 'dark' ) {
+					metaColorScheme.content = systemSettingDark ? 'light' : 'light dark';
+					darkModeIcon.style.display = 'inline';
+					lightModeIcon.style.display = 'none';
+				} else {
+					metaColorScheme.content = systemSettingDark ? 'light dark' : 'dark';
+					darkModeIcon.style.display = 'none';
+					lightModeIcon.style.display = 'inline';
+				}
+			});
 		});
 	</script>
 </body>

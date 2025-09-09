@@ -915,7 +915,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<button type="submit" class="btn" style="float: right; margin-top: -3em"><?php echo $submit_text; ?></button>
 
 	<!-- Personal Information -->
-	<h4 style="margin: 20px 0 10px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Personal Information</h4>
+	<h4 class="section-heading">Personal Information</h4>
 	<div class="form-grid">
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>name">Full Name<?php echo $privacy_mode ? ' (Privacy Mode - Last name will be masked)' : ''; ?></label>
@@ -923,7 +923,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>nickname">Nickname <small style="color: #666; font-weight: normal;">(optional)</small></label>
+			<label for="<?php echo $prefix; ?>nickname">Nickname <small class="optional-label">(optional)</small></label>
 			<input type="text" id="<?php echo $prefix; ?>nickname" name="nickname" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['nickname'] ?? '' ) : ''; ?>" placeholder="e.g., Mike, Lizzy, DJ">
 		</div>
 
@@ -976,7 +976,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 				}
 				?>
 				<div style="display: flex; gap: 10px; align-items: center;">
-					<select name="birthday_day" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+					<select name="birthday_day" class="form-select">
 						<option value="">Day</option>
 						<?php for ( $d = 1; $d <= 31; $d++ ) : ?>
 							<option value="<?php echo sprintf( '%02d', $d ); ?>" <?php echo (string) $day === sprintf( '%02d', $d ) ? 'selected' : ''; ?>>
@@ -985,7 +985,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 						<?php endfor; ?>
 					</select>
 					
-					<select name="birthday_month" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+					<select name="birthday_month" class="form-select">
 						<option value="">Month</option>
 						<?php 
 						$months = array(
@@ -1000,7 +1000,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 						<?php endforeach; ?>
 					</select>
 					
-					<select name="birthday_year" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+					<select name="birthday_year" class="form-select">
 						<option value="">Year (optional)</option>
 						<?php for ( $y = date( 'Y' ) - 80; $y <= date( 'Y' ) - 16; $y++ ) : ?>
 							<option value="<?php echo $y; ?>" <?php echo $year === (string) $y ? 'selected' : ''; ?>>
@@ -1009,21 +1009,21 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 						<?php endfor; ?>
 					</select>
 				</div>
-				<small style="color: #666; font-size: 12px; display: block; margin-top: 4px;">
+				<small class="form-helper-text">
 					Year is optional - leave empty if unknown
 				</small>
 			<?php else : ?>
 				<input type="hidden" name="birthday_day" value="">
 				<input type="hidden" name="birthday_month" value="">
 				<input type="hidden" name="birthday_year" value="">
-				<p style="color: #666; font-style: italic;">Hidden in privacy mode</p>
+				<p class="text-muted italic-text">Hidden in privacy mode</p>
 			<?php endif; ?>
 		</div>
 	</div>
 
 	<!-- Family Information -->
 	<details style="margin: 20px 0;">
-		<summary style="cursor: pointer; font-weight: 600; color: #666; padding: 8px 0; margin-bottom: 10px;">Family Information</summary>
+		<summary class="summary-toggle">Family Information</summary>
 
 		<div class="form-grid">
 			<div class="form-group">
@@ -1039,7 +1039,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	</details>
 
 	<!-- Company Information -->
-	<h4 style="margin: 20px 0 10px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Company Information</h4>
+	<h4 class="section-heading">Company Information</h4>
 	<div class="form-grid">
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>username">Username *</label>
@@ -1083,16 +1083,16 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 					<div class="link-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
 						<input type="text" name="link_text[]" placeholder="Link text (e.g., '1:1 doc')" value="<?php echo htmlspecialchars( $link_text ); ?>" style="flex: 1;">
 						<input type="url" name="link_url[]" placeholder="URL" value="<?php echo htmlspecialchars( $link_url ); ?>" style="flex: 2;">
-						<button type="button" onclick="removeLink(this)" style="padding: 6px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Remove</button>
+						<button type="button" onclick="removeLink(this)" class="btn-remove">Remove</button>
 					</div>
 				<?php endforeach; ?>
 			</div>
-			<button type="button" onclick="addLink('<?php echo $prefix; ?>')" style="margin-top: 10px; padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">+ Add Link</button>
+			<button type="button" onclick="addLink('<?php echo $prefix; ?>')" class="btn-add">+ Add Link</button>
 		</div>
 	</div>
 
 	<!-- Usernames -->
-	<h4 style="margin: 20px 0 10px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">External Accounts</h4>
+	<h4 class="section-heading">External Accounts</h4>
 	<div class="form-grid">
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>github">GitHub Username</label>
@@ -1119,7 +1119,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<div class="form-group">
 		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
 			<label>GitHub Repositories</label>
-			<button type="button" onclick="addRepoField('<?php echo $prefix; ?>')" style="padding: 4px 8px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">+ Add Repository</button>
+			<button type="button" onclick="addRepoField('<?php echo $prefix; ?>')" class="btn-add-small">+ Add Repository</button>
 		</div>
 		
 		<div id="<?php echo $prefix; ?>repo_fields">
@@ -1135,7 +1135,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 				?>
 				<div class="repo-field" style="display: flex; gap: 8px; margin-bottom: 8px;">
 					<input type="text" name="github_repos[]" placeholder="org/repo-name" style="width: 300px;">
-					<button type="button" onclick="removeRepoField(this)" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+					<button type="button" onclick="removeRepoField(this)" class="btn-remove-small">×</button>
 				</div>
 				<?php
 			} else {
@@ -1143,7 +1143,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 				?>
 					<div class="repo-field" style="display: flex; gap: 8px; margin-bottom: 8px;">
 						<input type="text" name="github_repos[]" value="<?php echo htmlspecialchars( $repo ); ?>" placeholder="org/repo-name" style="width: 300px;">
-						<button type="button" onclick="removeRepoField(this)" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+						<button type="button" onclick="removeRepoField(this)" class="btn-remove-small">×</button>
 					</div>
 				<?php
 				endforeach;
@@ -1176,11 +1176,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		if ( ! empty( $available_repos ) ) :
 		?>
 			<div style="margin-top: 12px;">
-				<small style="color: #666; font-size: 12px;">Potential repositories (click to add):</small>
+				<small class="text-small-muted">Potential repositories (click to add):</small>
 				<div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
 					<?php foreach ( $available_repos as $repo ) : ?>
 						<button type="button" onclick="addRepoToField('<?php echo $prefix; ?>', '<?php echo htmlspecialchars( $repo, ENT_QUOTES ); ?>')" 
-								style="padding: 2px 6px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 12px; cursor: pointer; font-size: 11px; color: #555;">
+								class="event-type-tag">
 							<?php echo htmlspecialchars( $repo ); ?>
 						</button>
 					<?php endforeach; ?>
@@ -1199,7 +1199,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			div.style.marginBottom = '8px';
 			
 			div.innerHTML = '<input type="text" name="github_repos[]" placeholder="org/repo-name" style="width: 300px;">' +
-							'<button type="button" onclick="removeRepoField(this)" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>';
+							'<button type="button" onclick="removeRepoField(this)" class="btn-remove-small">×</button>';
 			
 			container.appendChild(div);
 		}
@@ -1242,7 +1242,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	</script>
 
 	<!-- Personal Events -->
-	<h4 style="margin: 30px 0 10px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Personal Events</h4>
+	<h4 class="section-heading" style="margin-top: 30px;">Personal Events</h4>
 	<div class="form-group">
 		<div id="personal-events-container">
 			<?php 
@@ -1250,18 +1250,18 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			if ( ! empty( $personal_events ) ) :
 				foreach ( $personal_events as $index => $event ) :
 			?>
-				<div class="personal-event-row" style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; background: #f9f9f9; border-radius: 4px;">
+				<div class="personal-event-row">
 					<input type="date" name="personal_events[<?php echo $index; ?>][date]" value="<?php echo htmlspecialchars( $event['date'] ?? '' ); ?>" style="flex: 0 0 150px;">
 					<input type="hidden" name="personal_events[<?php echo $index; ?>][type]" value="other">
 					<input type="text" name="personal_events[<?php echo $index; ?>][description]" value="<?php echo htmlspecialchars( $event['description'] ?? '' ); ?>" placeholder="Event description" style="flex: 1;">
-					<button type="button" onclick="removePersonalEvent(this)" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">×</button>
+					<button type="button" onclick="removePersonalEvent(this)" class="btn-remove-personal">×</button>
 				</div>
 			<?php 
 				endforeach;
 			endif;
 			?>
 		</div>
-		<button type="button" onclick="addPersonalEvent()" style="margin-top: 10px; padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">+ Add Personal Event</button>
+		<button type="button" onclick="addPersonalEvent()" class="btn-add-personal">+ Add Personal Event</button>
 	</div>
 
 	<script>
@@ -1271,13 +1271,12 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			const container = document.getElementById('personal-events-container');
 			const eventRow = document.createElement('div');
 			eventRow.className = 'personal-event-row';
-			eventRow.style.cssText = 'display: flex; gap: 10px; align-items: center; margin-bottom: 10px; padding: 10px; background: #f9f9f9; border-radius: 4px;';
 			
 			eventRow.innerHTML = `
 				<input type="date" name="personal_events[${personalEventIndex}][date]" style="flex: 0 0 150px;">
 				<input type="hidden" name="personal_events[${personalEventIndex}][type]" value="other">
 				<input type="text" name="personal_events[${personalEventIndex}][description]" placeholder="Event description" style="flex: 1;">
-				<button type="button" onclick="removePersonalEvent(this)" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">×</button>
+				<button type="button" onclick="removePersonalEvent(this)" class="btn-remove-personal">×</button>
 			`;
 			
 			container.appendChild(eventRow);
@@ -1298,8 +1297,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 </form>
 
 <?php if ( $is_editing && $show_alumni_actions ) : ?>
-	<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
-		<h4 style="color: #666; margin-bottom: 10px;">Alumni Actions</h4>
+	<div class="divider-section">
+		<h4 class="text-muted" style="margin-bottom: 10px;">Alumni Actions</h4>
 		<form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to move this person to alumni? They will be removed from active team lists.')">
 			<input type="hidden" name="action" value="move_to_alumni">
 			<input type="hidden" name="username" value="<?php echo htmlspecialchars( $edit_data['username'] ?? '' ); ?>">
@@ -1307,11 +1306,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			<?php if ( $current_team !== 'team' ) : ?>
 				<input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
 			<?php endif; ?>
-			<button type="submit" class="btn" style="background: #f0ad4e; border-color: #eea236;">
+			<button type="submit" class="btn btn-warning">
 				📚 Move to Alumni
 			</button>
 		</form>
-		<p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">
+		<p class="text-small-muted" style="margin: 5px 0 0 0;">
 			This will move the person to alumni status while preserving all their data.
 		</p>
 	</div>
@@ -1325,197 +1324,29 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>Team Management Admin</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f1f1f1;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.13);
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 10px;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 24px;
-        }
-        .header p {
-            margin: 0;
-            color: #666;
-            font-size: 14px;
-        }
-        .header-content {
-            flex-grow: 1;
-        }
-        .navigation {
-            margin: 0;
-        }
-        .nav-link {
-            display: inline-block;
-            margin-left: 10px;
-            padding: 8px 16px;
-            background: #0073aa;
-            color: white;
-            text-decoration: none;
-            border-radius: 4px;
-            transition: background 0.3s;
-            font-size: 14px;
-        }
-        .nav-link:hover {
-            background: #005a87;
-        }
-        .nav-tabs {
-            display: flex;
-            border-bottom: 1px solid #ddd;
-            margin-bottom: 30px;
-        }
-        .nav-tab {
-            padding: 10px 20px;
-            background: #f9f9f9;
-            border: 1px solid #ddd;
-            border-bottom: none;
-            cursor: pointer;
-            text-decoration: none;
-            color: #333;
-        }
-        .nav-tab:hover, .nav-tab.active {
-            background: white;
-        }
-        .tab-content {
-            display: none;
-        }
-        .tab-content.active {
-            display: block;
-        }
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-        }
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        .form-group textarea {
-            height: 80px;
-            resize: vertical;
-        }
-        .btn {
-            background: #0073aa;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 14px;
-            font-family: inherit;
-        }
-        .btn:hover {
-            background: #005a87;
-            text-decoration: none;
-            color: white;
-        }
-        .btn-danger {
-            background: #dc3545;
-        }
-        .btn-danger:hover {
-            background: #c82333;
-        }
-        .message {
-            padding: 10px 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .message.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .person-list {
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .person-item {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .person-item:last-child {
-            border-bottom: none;
-        }
-        .person-info h4 {
-            margin: 0 0 5px 0;
-        }
-        .person-info small {
-            color: #666;
-        }
-        .timezone-input {
-            position: relative;
-        }
-        .timezone-suggestions {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #ddd;
-            border-top: none;
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 1000;
-            display: none;
-        }
-        .timezone-suggestion {
-            padding: 8px 12px;
-            cursor: pointer;
-            border-bottom: 1px solid #eee;
-        }
-        .timezone-suggestion:hover,
-        .timezone-suggestion.selected {
-            background: #f0f8ff;
-        }
-        .timezone-suggestion:last-child {
-            border-bottom: none;
-        }
-    </style>
+    <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
+    <!-- Dark Mode Toggle -->
+    <button id="dark-mode-toggle" type="button" aria-label="Toggle dark mode">
+        <svg class="sun-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+        <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+    </button>
+
     <div class="container">
         <div class="header">
             <div class="header-content">
@@ -1528,7 +1359,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     $available_teams = get_available_teams();
                     if ( $available_teams ) :
                     	?>
-                    <select id="team-selector" onchange="switchTeam()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                    <select id="team-selector" onchange="switchTeam()">
                         <?php
                         foreach ( $available_teams as $team_slug ) {
                             $team_display_name = get_team_name_from_file( $team_slug );
@@ -1555,7 +1386,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         <?php if ( $is_creating_team ) : ?>
             <!-- Create New Team Page -->
             <div style="margin-bottom: 20px;">
-                <a href="<?php echo build_team_url( 'admin.php' ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Admin Dashboard</a>
+                <a href="<?php echo build_team_url( 'admin.php' ); ?>" class="back-link-admin">← Back to Admin Dashboard</a>
             </div>
             
             <h2>Create New Team</h2>
@@ -1571,11 +1402,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <div class="form-group">
                     <label for="new_team_slug">Team Slug *</label>
                     <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing-team" pattern="[a-z0-9_-]+" value="<?php echo $current_team !== 'team' ? htmlspecialchars( $current_team ) : ''; ?>">
-                    <small style="color: #666; font-size: 12px;">Only lowercase letters, numbers, hyphens, and underscores allowed. This will be used as the filename.</small>
+                    <small class="text-small-muted">Only lowercase letters, numbers, hyphens, and underscores allowed. This will be used as the filename.</small>
                 </div>
                 <div style="margin-top: 20px;">
                     <button type="submit" class="btn">Create Team</button>
-                    <a href="<?php echo build_team_url( 'admin.php' ); ?>" class="btn" style="background: #6c757d; margin-left: 10px;">Cancel</a>
+                    <a href="<?php echo build_team_url( 'admin.php' ); ?>" class="btn btn-secondary" style="margin-left: 10px;">Cancel</a>
                 </div>
             </form>
         <?php else : ?>
@@ -1615,7 +1446,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                         <input type="checkbox" id="is_default" name="is_default" value="1" <?php echo isset( $config['default'] ) && $config['default'] ? 'checked' : ''; ?> style="width: auto;">
                         <span>Set as default team</span>
                     </label>
-                    <small style="color: #666; font-size: 12px; margin-left: 20px;">
+                    <small class="text-small-muted" style="margin-left: 20px;">
                         When users visit the site without specifying a team, they'll be redirected to this team automatically.
                     </small>
                 </div>
@@ -1628,7 +1459,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         <!-- Team Links Tab -->
         <div id="team_links" class="tab-content <?php echo $active_tab === 'team_links' ? 'active' : ''; ?>">
             <h2>Team Links</h2>
-            <p style="color: #666; margin-bottom: 20px;">These links will appear on the front page next to the team headline.</p>
+            <p class="text-muted" style="margin-bottom: 20px;">These links will appear on the front page next to the team headline.</p>
 
             <form method="post">
                 <input type="hidden" name="action" value="save_team_links">
@@ -1646,7 +1477,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                 <div class="team-link-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
                                     <input type="text" name="team_links[<?php echo $link_index; ?>][text]" value="<?php echo htmlspecialchars( $link_text ); ?>" placeholder="Link text (e.g., Linear)" style="flex: 0 0 150px;">
                                     <input type="url" name="team_links[<?php echo $link_index; ?>][url]" value="<?php echo htmlspecialchars( $link_url ); ?>" placeholder="https://..." style="flex: 1;">
-                                    <button type="button" class="remove-team-link" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Remove</button>
+                                    <button type="button" class="remove-team-link btn-remove-personal">Remove</button>
                                 </div>
                             <?php
                             $link_index++;
@@ -1655,11 +1486,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                             <div class="team-link-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
                                 <input type="text" name="team_links[0][text]" value="" placeholder="Link text (e.g., Linear)" style="flex: 0 0 150px;">
                                 <input type="url" name="team_links[0][url]" value="" placeholder="https://..." style="flex: 1;">
-                                <button type="button" class="remove-team-link" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Remove</button>
+                                <button type="button" class="remove-team-link btn-remove-personal">Remove</button>
                             </div>
                         <?php endif; ?>
                     </div>
-                    <button type="button" id="add-team-link" class="btn" style="background: #28a745; margin-top: 10px;">+ Add Link</button>
+                    <button type="button" id="add-team-link" class="btn btn-add-personal">+ Add Link</button>
                 </div>
 
                 <button type="submit" class="btn">Save Team Links</button>
@@ -1726,7 +1557,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     $back_params = array( 'tab' => 'members' );
                     if ( $privacy_mode ) $back_params['privacy'] = '1';
                     ?>
-                    <a href="<?php echo build_team_url( 'admin.php', $back_params ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Members</a>
+                    <a href="<?php echo build_team_url( 'admin.php', $back_params ); ?>" class="back-link-admin">← Back to Team Members</a>
                 </div>
                 <h3>Add New Team Member</h3>
                 <?php render_person_form( 'member', null, false ); ?>
@@ -1792,7 +1623,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     $back_params = array( 'tab' => 'leadership' );
                     if ( $privacy_mode ) $back_params['privacy'] = '1';
                     ?>
-                    <a href="<?php echo build_team_url( 'admin.php', $back_params ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Leadership</a>
+                    <a href="<?php echo build_team_url( 'admin.php', $back_params ); ?>" class="back-link-admin">← Back to Leadership</a>
                 </div>
                 <h3>Add New Leader</h3>
                 <?php render_person_form( 'leader', null, false ); ?>
@@ -1859,7 +1690,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <?php if ( $is_editing_alumni ) : ?>
                 <?php render_person_form( 'alumni', $edit_data, $is_editing_alumni ); ?>
             <?php else : ?>
-                <p style="color: #666; font-style: italic; margin-top: 20px;">
+                <p class="text-muted italic-text" style="margin-top: 20px;">
                     Alumni members can only be created by moving existing team members or leaders to alumni status.
                     Use the "📚 Move to Alumni" button when editing a team member or leader.
                 </p>
@@ -1884,7 +1715,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     <?php if ( ! empty( $event['links'] ) ) : ?>
                                         <div class="person-links" style="margin-top: 8px;">
                                             <?php foreach ( $event['links'] as $link_text => $link_url ) : ?>
-                                                <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank" style="margin-right: 10px; color: #007cba; text-decoration: none; font-size: 12px;">
+                                                <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank" class="link-primary text-small" style="margin-right: 10px;">
                                                     <?php echo htmlspecialchars( $link_text ); ?> →
                                                 </a>
                                             <?php endforeach; ?>
@@ -1936,7 +1767,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     
                     <div class="form-group">
                         <label for="event-type">Event Type</label>
-                        <select id="event-type" name="event_type" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                        <select id="event-type" name="event_type" class="form-select" style="width: 100%;">
                             <option value="team" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'team' ? 'selected' : ''; ?>>Team Meetup</option>
                             <option value="company" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'company' ? 'selected' : ''; ?>>Company Meetup</option>
                             <option value="conference" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'conference' ? 'selected' : ''; ?>>Conference</option>
@@ -1957,9 +1788,9 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 </div>
                 
                 <div class="form-group">
-                    <div class="event-links-section" style="border: 1px solid #ddd; border-radius: 6px; padding: 15px; background: #f9f9f9; margin-top: 15px;">
-                        <label style="font-weight: bold; color: #333; margin-bottom: 10px; display: block;">🔗 Event Links</label>
-                        <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Add links for Zoom calls, agendas, documents, etc. You can paste rich text links and they'll be auto-parsed.</p>
+                    <div class="event-links-section">
+                        <label style="font-weight: bold; margin-bottom: 10px; display: block;" class="text-dark">🔗 Event Links</label>
+                        <p class="text-small-muted" style="margin-bottom: 15px;">Add links for Zoom calls, agendas, documents, etc. You can paste rich text links and they'll be auto-parsed.</p>
                         
                         <div id="event-links-container" style="margin-bottom: 15px;">
                             <?php if ( $is_editing_event && ! empty( $edit_data['links'] ) ) : ?>
@@ -1968,20 +1799,20 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                         <input type="text" name="event_links[<?php echo $link_index; ?>][text]" 
                                                value="<?php echo htmlspecialchars( $link_text ); ?>" 
                                                placeholder="Link text (e.g., Zoom, Agenda)" 
-                                               style="flex: 0 0 200px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                                               class="form-select" style="flex: 0 0 200px;">
                                         <input type="url" name="event_links[<?php echo $link_index; ?>][url]" 
                                                value="<?php echo htmlspecialchars( $link_url ); ?>" 
                                                placeholder="URL" 
-                                               style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                                               class="form-select" style="flex: 1;">
                                         <button type="button" class="remove-link-btn" 
-                                                style="padding: 8px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
+                                                class="btn-large-remove">Remove</button>
                                     </div>
                                 <?php $link_index++; endforeach; ?>
                             <?php endif; ?>
                         </div>
                         
                         <button type="button" id="add-event-link-btn" 
-                                style="padding: 8px 16px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                                class="btn-large-primary">
                             + Add Link
                         </button>
                     </div>
@@ -1994,7 +1825,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         <!-- Audit Tab -->
         <div id="audit" class="tab-content <?php echo $active_tab === 'audit' ? 'active' : ''; ?>">
             <h2>📊 Data Completeness Audit</h2>
-            <p style="color: #666; margin-bottom: 20px;">Identify missing data points and improve team profiles</p>
+            <p class="text-muted" style="margin-bottom: 20px;">Identify missing data points and improve team profiles</p>
 
             <?php
             // Get audit data for all people
@@ -2058,33 +1889,33 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             ?>
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold; color: #0073aa; margin-bottom: 5px;"><?php echo $total_people; ?></div>
-                    <div style="color: #666; font-size: 14px;">Total People</div>
+                <div class="admin-section">
+                    <div class="stat-number"><?php echo $total_people; ?></div>
+                    <div class="stat-label">Total People</div>
                 </div>
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold; color: #0073aa; margin-bottom: 5px;"><?php echo $avg_score; ?>%</div>
-                    <div style="color: #666; font-size: 14px;">Average Completeness</div>
+                <div class="admin-section">
+                    <div class="stat-number"><?php echo $avg_score; ?>%</div>
+                    <div class="stat-label">Average Completeness</div>
                 </div>
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold; color: #0073aa; margin-bottom: 5px;"><?php echo $complete_profiles; ?></div>
-                    <div style="color: #666; font-size: 14px;">Complete Profiles (90%+)</div>
+                <div class="admin-section">
+                    <div class="stat-number"><?php echo $complete_profiles; ?></div>
+                    <div class="stat-label">Complete Profiles (90%+)</div>
                 </div>
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 2em; font-weight: bold; color: #0073aa; margin-bottom: 5px;"><?php echo $needs_attention; ?></div>
-                    <div style="color: #666; font-size: 14px;">Needs Attention (&lt;70%)</div>
+                <div class="admin-section">
+                    <div class="stat-number"><?php echo $needs_attention; ?></div>
+                    <div class="stat-label">Needs Attention (&lt;70%)</div>
                 </div>
             </div>
 
-            <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <div class="events-tab-section">
                 <span style="margin-right: 15px; font-weight: 600;">Filter by:</span>
-                <select style="padding: 6px 12px; border: 1px solid #ced4da; border-radius: 4px; margin-right: 15px;" id="type-filter" onchange="filterAuditTable()">
+                <select class="form-select-small" style="margin-right: 15px;" id="type-filter" onchange="filterAuditTable()">
                     <option value="">All Types</option>
                     <option value="Team Member">Team Members</option>
                     <option value="Leadership">Leadership</option>
                     <option value="Alumni">Alumni</option>
                 </select>
-                <select style="padding: 6px 12px; border: 1px solid #ced4da; border-radius: 4px;" id="score-filter" onchange="filterAuditTable()">
+                <select class="form-select-small" id="score-filter" onchange="filterAuditTable()">
                     <option value="">All Scores</option>
                     <option value="poor">Poor (&lt;50%)</option>
                     <option value="fair">Fair (50-79%)</option>
@@ -2095,48 +1926,48 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
             <table style="width: 100%; border-collapse: collapse; margin-top: 20px;" id="audit-table">
                 <thead>
-                    <tr style="background: #f8f9fa;">
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-weight: 600;">Person</th>
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-weight: 600;">Type</th>
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-weight: 600;">Completeness</th>
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-weight: 600;">Missing Data Points</th>
-                        <th style="padding: 12px; text-align: left; border-bottom: 1px solid #dee2e6; font-weight: 600;">Actions</th>
+                    <tr class="table-header-row">
+                        <th class="table-cell">Person</th>
+                        <th class="table-cell">Type</th>
+                        <th class="table-cell">Completeness</th>
+                        <th class="table-cell">Missing Data Points</th>
+                        <th class="table-cell">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ( $audit_data as $item ) : ?>
-                        <tr style="border-bottom: 1px solid #dee2e6;" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" data-score="<?php echo $item['score']; ?>" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background=''">
-                            <td style="padding: 12px;">
+                        <tr class="table-row" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" data-score="<?php echo $item['score']; ?>">
+                            <td class="table-cell" style="font-weight: normal;">
                                 <div style="font-weight: 600;">
                                     <?php echo htmlspecialchars( mask_name( $item['name'], $privacy_mode ) ); ?>
                                 </div>
-                                <div style="font-size: 12px; color: #666;">
+                                <div class="text-small-muted">
                                     @<?php echo htmlspecialchars( mask_username( $item['username'], $privacy_mode ) ); ?>
                                 </div>
                             </td>
-                            <td style="padding: 12px;"><?php echo htmlspecialchars( $item['type'] ); ?></td>
-                            <td style="padding: 12px;">
-                                <span style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-weight: 600; font-size: 12px; min-width: 40px; text-align: center; <?php
-                                    if ( $item['score'] >= 90 ) echo 'background: #d4edda; color: #155724;';
-                                    elseif ( $item['score'] >= 80 ) echo 'background: #d1ecf1; color: #0c5460;';
-                                    elseif ( $item['score'] >= 50 ) echo 'background: #fff3cd; color: #856404;';
-                                    else echo 'background: #f8d7da; color: #721c24;';
-                                ?>"><?php echo $item['score']; ?>%</span>
+                            <td class="table-cell" style="font-weight: normal;"><?php echo htmlspecialchars( $item['type'] ); ?></td>
+                            <td class="table-cell" style="font-weight: normal;">
+                                <span class="<?php
+                                    if ( $item['score'] >= 90 ) echo 'score-excellent';
+                                    elseif ( $item['score'] >= 80 ) echo 'score-good';
+                                    elseif ( $item['score'] >= 50 ) echo 'score-fair';
+                                    else echo 'score-poor';
+                                ?>" style="display: inline-block; padding: 4px 8px; border-radius: 12px; font-weight: 600; font-size: 12px; min-width: 40px; text-align: center;"><?php echo $item['score']; ?>%</span>
                             </td>
-                            <td style="padding: 12px; font-size: 13px;">
+                            <td class="table-cell" style="font-weight: normal; font-size: 13px;">
                                 <?php if ( empty( $item['missing'] ) ) : ?>
-                                    <span style="color: #28a745; font-weight: 500;">✅ Complete</span>
+                                    <span class="link-success">✅ Complete</span>
                                 <?php else : ?>
                                     <?php foreach ( $item['missing'] as $missing_item ) : ?>
-                                        <span style="<?php echo strpos( $missing_item, 'optional' ) !== false ? 'color: #6c757d;' : 'color: #dc3545; font-weight: 500;'; ?>">
+                                        <span class="<?php echo strpos( $missing_item, 'optional' ) !== false ? 'link-secondary' : 'link-danger'; ?>">
                                             <?php echo htmlspecialchars( $missing_item ); ?>
                                         </span><?php echo $missing_item !== end( $item['missing'] ) ? ', ' : ''; ?>
                                     <?php endforeach; ?>
                                 <?php endif; ?>
                             </td>
-                            <td style="padding: 12px;">
-                                <a href="<?php echo build_team_url( 'admin.php', array( 'edit_member' => $item['username'] ) ); ?>" style="color: #0073aa; text-decoration: none; font-size: 12px; margin-right: 8px;">✏️ Edit</a>
-                                <a href="<?php echo build_team_url( 'index.php', array( 'person' => $item['username'] ) ); ?>" style="color: #0073aa; text-decoration: none; font-size: 12px;" target="_blank">👁️ View</a>
+                            <td class="table-cell" style="font-weight: normal;">
+                                <a href="<?php echo build_team_url( 'admin.php', array( 'edit_member' => $item['username'] ) ); ?>" class="link-primary text-small" style="margin-right: 8px;">✏️ Edit</a>
+                                <a href="<?php echo build_team_url( 'index.php', array( 'person' => $item['username'] ) ); ?>" class="link-primary text-small" target="_blank">👁️ View</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -2147,7 +1978,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         <!-- JSON View Tab -->
         <div id="json" class="tab-content <?php echo $active_tab === 'json' ? 'active' : ''; ?>">
             <p>This is the current contents of your team.json file:</p>
-            <pre style="background: #f8f8f8; padding: 20px; border-radius: 4px; overflow-x: auto;"><?php echo htmlspecialchars( json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ); ?></pre>
+            <pre class="config-preview"><?php echo htmlspecialchars( json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ); ?></pre>
             
             <p style="margin-top: 20px;">
                 <a href="<?php echo build_team_url( 'index.php' ); ?>" class="btn" target="_blank">View Team Dashboard</a>
@@ -2213,7 +2044,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     linkRow.innerHTML = `
                         <input type="text" name="team_links[${currentIndex}][text]" value="" placeholder="Link text (e.g., Linear)" style="flex: 0 0 150px;">
                         <input type="url" name="team_links[${currentIndex}][url]" value="" placeholder="https://..." style="flex: 1;">
-                        <button type="button" class="remove-team-link" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Remove</button>
+                        <button type="button" class="remove-team-link btn-remove-personal">Remove</button>
                     `;
 
                     container.appendChild(linkRow);
@@ -2415,7 +2246,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             newRow.innerHTML = `
                 <input type="text" name="link_text[]" placeholder="Link text (e.g., 'Project docs')" style="flex: 1;">
                 <input type="url" name="link_url[]" placeholder="URL" style="flex: 2;">
-                <button type="button" onclick="removeLink(this)" style="padding: 6px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Remove</button>
+                <button type="button" onclick="removeLink(this)" class="btn-remove">Remove</button>
             `;
             container.appendChild(newRow);
         }
@@ -2443,12 +2274,12 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             newRow.innerHTML = `
                 <input type="text" name="event_links[${eventLinkCounter}][text]" 
                        placeholder="Link text (e.g., Zoom, Agenda)" 
-                       style="flex: 0 0 200px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                       class="form-select" style="flex: 0 0 200px;">
                 <input type="url" name="event_links[${eventLinkCounter}][url]" 
                        placeholder="URL" 
-                       style="flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px;">
+                       class="form-select" style="flex: 1;">
                 <button type="button" onclick="removeEventLink(this)" 
-                        style="padding: 8px 12px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Remove</button>
+                        class="btn-large-remove">Remove</button>
             `;
             container.appendChild(newRow);
             
@@ -2539,7 +2370,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     urlInput.value = linkUrl;
                                     
                                     // Add visual feedback
-                                    urlInput.style.background = '#e8f5e8';
+                                    urlInput.classList.add('success-highlight');
                                     setTimeout(() => {
                                         urlInput.style.background = '';
                                     }, 1500);
@@ -2558,7 +2389,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     urlInput.value = parsed.url;
                                     
                                     // Add visual feedback
-                                    urlInput.style.background = '#e8f5e8';
+                                    urlInput.classList.add('success-highlight');
                                     setTimeout(() => {
                                         urlInput.style.background = '';
                                     }, 1500);
@@ -2589,7 +2420,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     urlInput.value = linkUrl;
                                     
                                     // Add visual feedback
-                                    urlInput.style.background = '#e8f5e8';
+                                    urlInput.classList.add('success-highlight');
                                     setTimeout(() => {
                                         urlInput.style.background = '';
                                     }, 1500);
@@ -2606,7 +2437,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     urlInput.value = parsed.url;
                                     
                                     // Add visual feedback
-                                    urlInput.style.background = '#e8f5e8';
+                                    urlInput.classList.add('success-highlight');
                                     setTimeout(() => {
                                         urlInput.style.background = '';
                                     }, 1500);
@@ -2689,19 +2520,69 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
     </script>
     
     <!-- Footer with admin/privacy links -->
-    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 14px;">
+    <footer class="footer-admin">
         <?php
         $current_params = $_GET;
         if ( $privacy_mode ) {
             $current_params['privacy'] = '0';
-            echo '<a href="?' . http_build_query( $current_params ) . '" style="color: #666; text-decoration: none; margin-right: 15px;">🔒 Privacy Mode ON</a>';
+            echo '<a href="?' . http_build_query( $current_params ) . '" class="text-muted" style="text-decoration: none; margin-right: 15px;">🔒 Privacy Mode ON</a>';
         } else {
             $current_params['privacy'] = '1';
-            echo '<a href="?' . http_build_query( $current_params ) . '" style="color: #666; text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>';
+            echo '<a href="?' . http_build_query( $current_params ) . '" class="text-muted" style="text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>';
         }
         ?>
-        <a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: #666; text-decoration: none;">👥 Team Overview</a>
+        <a href="<?php echo build_team_url( 'index.php' ); ?>" class="text-muted" style="text-decoration: none;">👥 Team Overview</a>
     </footer>
+    
+    <script>
+        // Dark mode functionality
+        function initializeDarkMode() {
+            const toggle = document.getElementById('dark-mode-toggle');
+            const sunIcon = toggle.querySelector('.sun-icon');
+            const moonIcon = toggle.querySelector('.moon-icon');
+            
+            // Get saved theme or default to system preference
+            let currentTheme = localStorage.getItem('theme');
+            if (!currentTheme) {
+                currentTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            
+            function updateTheme(theme) {
+                if (theme === 'dark') {
+                    document.documentElement.style.colorScheme = 'dark';
+                    sunIcon.style.display = 'block';
+                    moonIcon.style.display = 'none';
+                } else {
+                    document.documentElement.style.colorScheme = 'light';
+                    sunIcon.style.display = 'none';
+                    moonIcon.style.display = 'block';
+                }
+                localStorage.setItem('theme', theme);
+            }
+            
+            // Set initial theme
+            updateTheme(currentTheme);
+            
+            // Toggle theme on click
+            toggle.addEventListener('click', () => {
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                currentTheme = newTheme;
+                updateTheme(newTheme);
+            });
+            
+            // Listen for system theme changes
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                if (!localStorage.getItem('theme')) {
+                    const systemTheme = e.matches ? 'dark' : 'light';
+                    currentTheme = systemTheme;
+                    updateTheme(systemTheme);
+                }
+            });
+        }
+        
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', initializeDarkMode);
+    </script>
     
 </body>
 </html>

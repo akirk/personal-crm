@@ -98,11 +98,18 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>HR Feedback Statistics - <?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team</title>
     <link rel="stylesheet" href="assets/style.css">
     <link rel="stylesheet" href="assets/hr-reports.css">
 </head>
 <body>
+    <!-- Dark Mode Toggle -->
+    <button id="dark-mode-toggle">
+        <svg id="dark-mode-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
+        <svg id="light-mode-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    </button>
+
     <div class="container">
         <div class="header">
             <div style="flex-grow: 1;">
@@ -113,7 +120,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
             </div>
             <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
                 <!-- Team Switcher -->
-                <select id="team-selector" onchange="switchTeam()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white;">
+                <select id="team-selector" onchange="switchTeam()">
                     <?php
                     foreach ( $available_teams as $team_slug ) {
                         $team_display_name = get_team_name_from_file( $team_slug );
@@ -127,7 +134,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
 
         <!-- Overview Stats -->
         <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
-            <div class="stat-card" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div class="stat-card">
                 <h3 style="margin: 0 0 10px 0; color: #333;">Team Members</h3>
                 <div style="font-size: 2em; font-weight: bold; color: #007cba;">
                     <?php echo $feedback_stats['total_people']; ?>
@@ -135,7 +142,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
                 <div style="font-size: 0.9em; color: #666;">requiring HR feedback</div>
             </div>
 
-            <div class="stat-card" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div class="stat-card">
                 <h3 style="margin: 0 0 10px 0; color: #333;">Total Feedback</h3>
                 <div style="font-size: 2em; font-weight: bold; color: #28a745;">
                     <?php echo $feedback_stats['total_feedback_entries']; ?>
@@ -143,7 +150,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
                 <div style="font-size: 0.9em; color: #666;">feedback entries recorded</div>
             </div>
 
-            <div class="stat-card" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div class="stat-card">
                 <h3 style="margin: 0 0 10px 0; color: #333;">Participation</h3>
                 <div style="font-size: 2em; font-weight: bold; color: #17a2b8;">
                     <?php echo $feedback_stats['people_with_feedback']; ?>/<?php echo $feedback_stats['total_people']; ?>
@@ -151,7 +158,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
                 <div style="font-size: 0.9em; color: #666;">people with feedback</div>
             </div>
 
-            <div class="stat-card" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div class="stat-card">
                 <h3 style="margin: 0 0 10px 0; color: #333;">Months Tracked</h3>
                 <div style="font-size: 2em; font-weight: bold; color: #6f42c1;">
                     <?php echo count( $feedback_stats['months_with_data'] ); ?>
@@ -161,7 +168,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
         </div>
 
         <!-- Performance Distribution -->
-        <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+        <div class="stat-card" style="margin-bottom: 30px;">
             <h3 style="margin: 0 0 10px 0;">Performance Distribution</h3>
             <p style="font-size: 0.9em; color: #666; margin: 0 0 20px 0;">Click on a performance level to filter individual progress below</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
@@ -224,7 +231,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
 
         <!-- Monthly Completion Rates -->
         <?php if ( ! empty( $feedback_stats['completion_rates'] ) ) : ?>
-            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px;">
+            <div class="stat-card" style="margin-bottom: 30px;">
                 <h3 style="margin: 0 0 20px 0;">Monthly Completion Rates</h3>
                 <div style="display: flex; flex-direction: column; gap: 15px;">
                     <?php foreach ( array_slice( $feedback_stats['completion_rates'], 0, 6 ) as $month => $data ) : ?>
@@ -232,7 +239,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
                             <div style="min-width: 100px; font-weight: 500;">
                                 <?php echo date( 'M Y', strtotime( $month . '-01' ) ); ?>
                             </div>
-                            <div style="flex: 1; background: #f8f9fa; border-radius: 10px; height: 20px; position: relative; overflow: hidden;">
+                            <div class="progress-bar-bg">
                                 <div style="background: <?php echo $data['percentage'] >= 80 ? '#28a745' : ($data['percentage'] >= 50 ? '#ffc107' : '#dc3545'); ?>; height: 100%; width: <?php echo $data['percentage']; ?>%; transition: width 0.3s ease;"></div>
                             </div>
                             <div style="min-width: 120px; text-align: right;">
@@ -252,7 +259,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
 
         <!-- Individual Progress -->
         <?php if ( ! empty( $all_feedback ) && ! $privacy_mode ) : ?>
-            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <div class="stat-card">
                 <h3 style="margin: 0 0 20px 0;">
                     Individual Progress
                     <?php if ( $performance_filter ) : ?>
@@ -387,7 +394,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
                 </div>
             </div>
         <?php elseif ( $privacy_mode ) : ?>
-            <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+            <div class="stat-card" style="text-align: center;">
                 <p style="color: #666; font-style: italic;">Individual progress hidden in privacy mode.</p>
             </div>
         <?php endif; ?>
@@ -418,6 +425,37 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
             const newUrl = window.location.pathname + '?' + urlParams.toString();
             window.location.href = newUrl;
         }
+
+        // Dark mode functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const metaColorScheme = document.querySelector('meta[name="color-scheme"]');
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const darkModeIcon = document.getElementById('dark-mode-icon');
+            const lightModeIcon = document.getElementById('light-mode-icon');
+            const systemSettingDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+            // Set initial icon state
+            if ( systemSettingDark ) {
+                darkModeIcon.style.display = 'none';
+                lightModeIcon.style.display = 'inline';
+            } else {
+                darkModeIcon.style.display = 'inline';
+                lightModeIcon.style.display = 'none';
+            }
+
+            // Dark mode toggle event listener
+            darkModeToggle.addEventListener('click', function() {
+                if ( ( metaColorScheme.content === 'light dark' && systemSettingDark ) || metaColorScheme.content === 'dark' ) {
+                    metaColorScheme.content = systemSettingDark ? 'light' : 'light dark';
+                    darkModeIcon.style.display = 'inline';
+                    lightModeIcon.style.display = 'none';
+                } else {
+                    metaColorScheme.content = systemSettingDark ? 'light dark' : 'dark';
+                    darkModeIcon.style.display = 'none';
+                    lightModeIcon.style.display = 'inline';
+                }
+            });
+        });
     </script>
 </body>
 </html>

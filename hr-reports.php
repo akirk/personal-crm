@@ -363,6 +363,7 @@ if ( $selected_person && $selected_month ) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title><?php 
         if ( $selected_person ) {
             $person = $team_data['team_members'][$selected_person] ?? $team_data['leadership'][$selected_person] ?? null;
@@ -375,17 +376,23 @@ if ( $selected_person && $selected_month ) {
     <link rel="stylesheet" href="assets/hr-reports.css">
 </head>
 <body>
+    <!-- Dark Mode Toggle -->
+    <button id="dark-mode-toggle">
+        <svg id="dark-mode-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path></svg>
+        <svg id="light-mode-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    </button>
+
     <div class="container">
         <?php if ( $selected_person ) : ?>
             <?php
             $person = $team_data['team_members'][$selected_person] ?? $team_data['leadership'][$selected_person] ?? null;
             if ( $person ) :
             ?>
-            <div class="header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+            <div class="person-header">
                 <div>
-                    <h1 style="margin: 0; font-size: 24px;">
+                    <h1 class="person-title">
                         <?php echo htmlspecialchars( $person->get_display_name_with_nickname() ); ?>
-                        <span style="color: #666; font-size: 16px; font-weight: normal;">
+                        <span class="person-subtitle">
                             @<?php echo htmlspecialchars( $person->get_username() ); ?>
                             <?php if ( ! empty( $person->role ) ) : ?>
                                 • <?php echo htmlspecialchars( $person->role ); ?>
@@ -398,8 +405,8 @@ if ( $selected_person && $selected_month ) {
                             <?php endif; ?>
                         </span>
                     </h1>
-                    <div style="margin-top: 5px;">
-                        <a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Overview</a>
+                    <div class="back-nav">
+                        <a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to Team Overview</a>
                     </div>
                 </div>
 
@@ -414,16 +421,16 @@ if ( $selected_person && $selected_month ) {
             <?php endif; ?>
         <?php else : ?>
             <div class="header">
-                <h1 style="margin: 0; font-size: 24px;">HR Monthly Reports</h1>
-                <div style="margin-top: 5px;">
-                    <a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Overview</a>
+                <h1 class="person-title">HR Monthly Reports</h1>
+                <div class="back-nav">
+                    <a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to Team Overview</a>
                 </div>
-                <p style="color: #666; margin: 10px 0 0 0;">Select a team member to manage their feedback</p>
+                <p class="text-muted">Select a team member to manage their feedback</p>
             </div>
         <?php endif; ?>
 
         <?php if ( $message ) : ?>
-            <div class="message <?php echo strpos( strtolower( $message ), 'success' ) !== false || strpos( $message, '✅' ) !== false ? 'success' : 'error'; ?>" style="margin-bottom: 20px;">
+            <div class="message <?php echo strpos( strtolower( $message ), 'success' ) !== false || strpos( $message, '✅' ) !== false ? 'success' : 'error'; ?>">
                 <?php echo htmlspecialchars( $message ); ?>
             </div>
         <?php endif; ?>
@@ -462,7 +469,7 @@ if ( $selected_person && $selected_month ) {
                                 $month_end = date( 'Y-m-t', strtotime( $selected_month . '-01' ) );
                                 $activity_url = $team_data['activity_url_prefix'] . '&member=' . urlencode( $selected_person ) . '&start=' . $month_start . '&end=' . $month_end;
                             ?>
-                                <div style="margin-top: 8px;">
+                                <div class="activity-link-container">
                                     <a href="<?php echo htmlspecialchars( $activity_url ); ?>"
                                        target="_blank"
                                        class="btn btn-secondary btn-small">
@@ -533,13 +540,13 @@ if ( $selected_person && $selected_month ) {
                 <div class="editor-toolbar">
                     <button type="button" class="editor-btn" onclick="addLink('feedback_to_person')" title="Add Link">🔗 Link</button>
                     <button type="button" class="editor-btn" onclick="copyContent('feedback_to_person')" title="Copy Content">📋 Copy</button>
-                    <small style="color: #666; margin-left: 10px;">Select text and click Link, or paste URL directly</small>
+                    <small class="text-small-muted">Select text and click Link, or paste URL directly</small>
                 </div>
                 <div class="rich-editor" contenteditable="true" spellcheck="true" id="feedback_to_person" data-placeholder="Write the feedback that will be shared with the team member..." required><?php echo $existing_feedback['feedback_to_person'] ?? ''; ?></div>
-                <textarea name="feedback_to_person_html" id="feedback_to_person_html" style="display: none;"></textarea>
+                <textarea name="feedback_to_person_html" id="feedback_to_person_html" class="hidden"></textarea>
                 
                 <!-- AI Chat Trigger -->
-                <div style="margin-top: 10px;">
+                <div class="ai-chat-trigger-container">
                     <button type="button" class="btn btn-secondary" onclick="toggleAIChat()" id="ai-chat-toggle">
                         💬 Open AI Chat Assistant
                     </button>
@@ -563,10 +570,10 @@ if ( $selected_person && $selected_month ) {
                 <div class="editor-toolbar">
                     <button type="button" class="editor-btn" onclick="addLink('feedback_to_hr')" title="Add Link">🔗 Link</button>
                     <button type="button" class="editor-btn" onclick="copyContent('feedback_to_hr')" title="Copy Content">📋 Copy</button>
-                    <small style="color: #666; margin-left: 10px;">Select text and click Link, or paste URL directly</small>
+                    <small class="text-small-muted">Select text and click Link, or paste URL directly</small>
                 </div>
                 <div class="rich-editor" contenteditable="true" spellcheck="true" id="feedback_to_hr" data-placeholder="Write internal notes that will only be seen by HR..."><?php echo $existing_feedback['feedback_to_hr'] ?? ''; ?></div>
-                <textarea name="feedback_to_hr_html" id="feedback_to_hr_html" style="display: none;"></textarea>
+                <textarea name="feedback_to_hr_html" id="feedback_to_hr_html" class="hidden"></textarea>
             </div>
         </form>
 
@@ -616,19 +623,19 @@ if ( $selected_person && $selected_month ) {
                         </div>
                         <div>
                             <strong>To Person:</strong><br>
-                            <div style="background: #f9f9f9; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                            <div class="feedback-quote">
                                 <?php echo sanitize_html( $current_draft['feedback_to_person'] ) ?: nl2br( htmlspecialchars( $current_draft['feedback_to_person'] ) ); ?>
                             </div>
                         </div>
                         <?php if ( ! empty( $current_draft['feedback_to_hr'] ) ) : ?>
-                            <div style="margin-top: 15px;">
+                            <div class="hr-notes-section">
                                 <strong>HR Notes:</strong><br>
-                                <div style="background: #f9f9f9; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                                <div class="feedback-quote">
                                     <?php echo sanitize_html( $current_draft['feedback_to_hr'] ) ?: nl2br( htmlspecialchars( $current_draft['feedback_to_hr'] ) ); ?>
                                 </div>
                             </div>
                         <?php endif; ?>
-                        <div class="draft-actions" style="margin-top: 15px; text-align: right;">
+                        <div class="draft-actions">
                             <button type="button" class="btn btn-secondary" onclick="editCurrentDraft()">✏️ Continue Editing</button>
                             <button type="button" class="btn" onclick="submitCurrentDraft()">✅ Submit Final</button>
                         </div>
@@ -638,9 +645,9 @@ if ( $selected_person && $selected_month ) {
                 <!-- AI Assessment Section -->
                 <div class="ai-assessment-section">
                     <h4>🤖 AI Assessment</h4>
-                    <div id="ai-assessment" class="chat-response" style="min-height: 60px; background: #f0f8ff; border-left-color: #4a90e2;">
-                        <div id="assessment-loading" style="color: #666; font-style: italic;">Analyzing feedback...</div>
-                        <div id="assessment-content" style="display: none;"></div>
+                    <div id="ai-assessment" class="ai-assessment-card">
+                        <div id="assessment-loading" class="loading-text">Analyzing feedback...</div>
+                        <div id="assessment-content" class="hidden"></div>
                     </div>
                 </div>
             <?php endif; ?>
@@ -655,7 +662,7 @@ if ( $selected_person && $selected_month ) {
                         $feedback_plain = strip_tags( $feedback_text );
                         $teaser = strlen( $feedback_plain ) > 150 ? substr( $feedback_plain, 0, 150 ) . '...' : $feedback_plain;
                         ?>
-                        <div class="feedback-item <?php echo ( $feedback['submitted_to_hr'] ?? false ) ? 'submitted' : 'draft'; ?>" style="cursor: pointer;" onclick="toggleFeedbackDetails('<?php echo $month; ?>')">
+                        <div class="feedback-item clickable-feedback <?php echo ( $feedback['submitted_to_hr'] ?? false ) ? 'submitted' : 'draft'; ?>" onclick="toggleFeedbackDetails('<?php echo $month; ?>')">
                             <div class="feedback-header">
                                 <span><?php echo date( 'F Y', strtotime( $month . '-01' ) ); ?></span>
                                 <span class="performance-badge performance-<?php echo $feedback['performance']; ?>"><?php echo ucfirst( $feedback['performance'] ); ?></span>
@@ -664,33 +671,33 @@ if ( $selected_person && $selected_month ) {
                                 <?php else : ?>
                                     <span class="status-badge draft">📝 Draft</span>
                                 <?php endif; ?>
-                                <span class="expand-toggle" id="toggle-<?php echo $month; ?>" style="margin-left: auto; color: #666; font-size: 14px;">▼ Expand</span>
+                                <span class="expand-toggle" id="toggle-<?php echo $month; ?>">▼ Expand</span>
                             </div>
 
                             <!-- Teaser -->
                             <div class="feedback-teaser" id="teaser-<?php echo $month; ?>">
-                                <div style="background: #f9f9f9; padding: 10px; border-radius: 4px; margin-top: 8px; font-style: italic; color: #666;">
+                                <div class="feedback-comment">
                                     <?php echo htmlspecialchars( $teaser ); ?>
                                 </div>
                             </div>
 
                             <!-- Full content (initially hidden) -->
-                            <div class="feedback-full-content" id="content-<?php echo $month; ?>" style="display: none;">
-                                <div style="margin-top: 8px;">
+                            <div class="feedback-full-content hidden" id="content-<?php echo $month; ?>">
+                                <div class="feedback-content-section">
                                     <strong>To Person:</strong><br>
-                                    <div style="background: #f9f9f9; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                                    <div class="feedback-quote">
                                         <?php echo $feedback_text; ?>
                                     </div>
                                 </div>
                                 <?php if ( ! empty( $feedback['feedback_to_hr'] ) ) : ?>
-                                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd;">
+                                    <div class="hr-notes-divider">
                                         <strong>HR Notes:</strong><br>
-                                        <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 5px;">
+                                        <div class="draft-warning">
                                             <?php echo sanitize_html( $feedback['feedback_to_hr'] ) ?: nl2br( htmlspecialchars( $feedback['feedback_to_hr'] ) ); ?>
                                         </div>
                                     </div>
                                 <?php endif; ?>
-                                <div style="margin-top: 10px; color: #666; font-size: 12px;">
+                                <div class="feedback-timestamps">
                                     Created: <?php echo $feedback['created_at']; ?>
                                     <?php if ( $feedback['updated_at'] !== $feedback['created_at'] ) : ?>
                                         | Updated: <?php echo $feedback['updated_at']; ?>
@@ -709,11 +716,12 @@ if ( $selected_person && $selected_month ) {
         <?php endif; ?>
 
         <!-- Historical Feedback Helper (bottom of page) -->
-        <div style="margin-top: 30px; padding: 15px; background: #f0f8ff; border-radius: 8px; border-left: 4px solid #007cba;">
-            <div style="font-size: 13px; color: #666;">
+        <div class="ai-info-card">
+            <div class="ai-info-text">
                 💡 <strong>Add historical feedback:</strong> Select any previous month to add older feedback entries
                 <div style="margin-top: 8px;">
                     <strong>Quick select:</strong>
+                    <div class="quick-select-links">
                     <?php
                     // Get existing feedback for selected person to check which months already have feedback
                     $existing_months = array();
@@ -738,7 +746,7 @@ if ( $selected_person && $selected_month ) {
                             $quick_url = '?' . http_build_query( $url_params );
                             ?>
                             <a href="<?php echo htmlspecialchars( $quick_url ); ?>"
-                               style="display: inline-block; margin-right: 8px; padding: 4px 8px; background: #fff; border: 1px solid #007cba; border-radius: 4px; text-decoration: none; color: #007cba; font-size: 12px;">
+                               class="copy-button">
                                 <?php echo $month_display; ?>
                             </a>
                             <?php
@@ -747,25 +755,26 @@ if ( $selected_person && $selected_month ) {
                     }
 
                     if ( $months_shown === 0 ) {
-                        echo '<span style="color: #666; font-size: 12px; font-style: italic;">All recent months have feedback</span>';
+                        echo '<span class="no-months-message">All recent months have feedback</span>';
                     }
                     ?>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Footer with privacy mode toggle -->
-    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 14px;">
+    <footer class="privacy-footer">
         <?php if ( $privacy_mode ) : ?>
-            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔒 Privacy Mode ON</a>
+            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" class="footer-link">🔒 Privacy Mode ON</a>
         <?php else : ?>
-            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>
+            <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="footer-link">🔓 Privacy Mode OFF</a>
         <?php endif; ?>
-        <a href="<?php echo build_team_url( 'admin.php' ); ?>" style="color: #666; text-decoration: none; margin-right: 15px;">⚙️ Admin Panel</a>
-        <a href="<?php echo build_team_url( 'hr-config.php' ); ?>" style="color: #666; text-decoration: none;">🤖 Ollama Settings</a>
+        <a href="<?php echo build_team_url( 'admin.php' ); ?>" class="footer-link">⚙️ Admin Panel</a>
+        <a href="<?php echo build_team_url( 'hr-config.php' ); ?>" class="footer-link">🤖 Ollama Settings</a>
         <?php if ( $selected_person ) : ?>
-            | <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'team', 'edit_person' => $selected_person ) ); ?>" style="color: #666; text-decoration: none;">✏️ Edit Person</a>
+            | <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'team', 'edit_person' => $selected_person ) ); ?>" class="footer-link">✏️ Edit Person</a>
         <?php endif; ?>
     </footer>
 
@@ -845,6 +854,37 @@ if ( $selected_person && $selected_month ) {
                 updatePersonHistory();
             }
         }
+
+        // Dark mode functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const metaColorScheme = document.querySelector('meta[name="color-scheme"]');
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const darkModeIcon = document.getElementById('dark-mode-icon');
+            const lightModeIcon = document.getElementById('light-mode-icon');
+            const systemSettingDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+            // Set initial icon state
+            if ( systemSettingDark ) {
+                darkModeIcon.style.display = 'none';
+                lightModeIcon.style.display = 'inline';
+            } else {
+                darkModeIcon.style.display = 'inline';
+                lightModeIcon.style.display = 'none';
+            }
+
+            // Dark mode toggle event listener
+            darkModeToggle.addEventListener('click', function() {
+                if ( ( metaColorScheme.content === 'light dark' && systemSettingDark ) || metaColorScheme.content === 'dark' ) {
+                    metaColorScheme.content = systemSettingDark ? 'light' : 'light dark';
+                    darkModeIcon.style.display = 'inline';
+                    lightModeIcon.style.display = 'none';
+                } else {
+                    metaColorScheme.content = systemSettingDark ? 'light dark' : 'dark';
+                    darkModeIcon.style.display = 'none';
+                    lightModeIcon.style.display = 'inline';
+                }
+            });
+        });
     </script>
 
 </body>
