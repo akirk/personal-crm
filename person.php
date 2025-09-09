@@ -172,20 +172,20 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 									$current_date = new DateTime();
 									$age = $current_date->diff( $birth_date )->y;
 									if ( $privacy_mode ) {
-										$age_display = 'Age ' . $age;
+										$age_display = '[Hidden]';
 									} else {
-										$age_display = 'Age ' . $age . ' (born ' . $birth_date->format( 'F j, Y' ) . ')';
+										$age_display = $age . ' (born ' . $birth_date->format( 'F j, Y' ) . ')';
 									}
 								}
 							} elseif ( preg_match( '/^\d{2}-\d{2}$/', $person_data->birthday ) ) {
 								// Legacy MM-DD format - can't calculate exact age
-								if ( ! $privacy_mode ) {
+								if ( $privacy_mode ) {
+									$age_display = '[Hidden]';
+								} else {
 									$display_date = DateTime::createFromFormat( 'm-d', $person_data->birthday );
 									if ( $display_date ) {
 										$age_display = 'Birthday ' . $display_date->format( 'F j' );
 									}
-								} else {
-									$age_display = 'Birthday [Hidden]';
 								}
 							}
 							?>
@@ -219,8 +219,16 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						<?php if ( ! empty( $person_data->location ) ) : ?>
 							<p>
 								<strong>🌍 Location:</strong>
-								<a href="https://maps.google.com/maps?q=<?php echo urlencode( $person_data->location ); ?>" target="_blank" class="location-link"><?php echo htmlspecialchars( $person_data->location ); ?></a>
-								<span id="time-<?php echo htmlspecialchars( $person ); ?>" style="margin-left: 10px; color: #666; font-size: 14px;"></span>
+								<?php
+								$display_location = $person_data->location;
+								if ( $privacy_mode ) {
+									// Extract country from location (assume country is last part after comma)
+									$location_parts = array_map( 'trim', explode( ',', $person_data->location ) );
+									$display_location = end( $location_parts ); // Get the last part (country)
+								}
+								?>
+								<a href="https://maps.google.com/maps?q=<?php echo urlencode( $privacy_mode ? $display_location : $person_data->location ); ?>" target="_blank" class="location-link"><?php echo htmlspecialchars( $display_location ); ?></a>
+								<span id="time-<?php echo htmlspecialchars( $person ); ?>" class="timezone-display"></span>
 							</p>
 						<?php endif; ?>
 
@@ -432,7 +440,13 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 
 							// Use existing performance badge classes
 							$performance_rating = $feedback['performance'] ?? 'good';
-							$performance_text = ucfirst( $performance_rating );
+							if ( $privacy_mode ) {
+								// Use generic performance text for privacy
+								$performance_text = 'HIGH/GOOD/LOW';
+								$performance_rating = 'privacy'; // Use neutral styling
+							} else {
+								$performance_text = ucfirst( $performance_rating );
+							}
 							?>
 							<details class="hr-feedback-details">
 								<summary class="hr-feedback-summary">

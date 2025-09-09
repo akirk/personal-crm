@@ -619,7 +619,15 @@ if ( $selected_person && $selected_month ) {
                     <div class="feedback-item current-draft">
                         <div class="feedback-header">
                             <span>Draft - Last updated: <?php echo $current_draft['updated_at']; ?></span>
-                            <span class="performance-badge performance-<?php echo $current_draft['performance']; ?>"><?php echo ucfirst( $current_draft['performance'] ); ?></span>
+                            <?php
+                            $performance_class = $current_draft['performance'];
+                            $performance_text = ucfirst( $current_draft['performance'] );
+                            if ( $privacy_mode ) {
+                                $performance_text = 'HIGH/GOOD/LOW';
+                                $performance_class = 'privacy';
+                            }
+                            ?>
+                            <span class="performance-badge performance-<?php echo $performance_class; ?>"><?php echo $performance_text; ?></span>
                         </div>
                         <div>
                             <strong>To Person:</strong><br>
@@ -665,7 +673,15 @@ if ( $selected_person && $selected_month ) {
                         <div class="feedback-item clickable-feedback <?php echo ( $feedback['submitted_to_hr'] ?? false ) ? 'submitted' : 'draft'; ?>" onclick="toggleFeedbackDetails('<?php echo $month; ?>')">
                             <div class="feedback-header">
                                 <span><?php echo date( 'F Y', strtotime( $month . '-01' ) ); ?></span>
-                                <span class="performance-badge performance-<?php echo $feedback['performance']; ?>"><?php echo ucfirst( $feedback['performance'] ); ?></span>
+                                <?php
+                                $performance_class = $feedback['performance'];
+                                $performance_text = ucfirst( $feedback['performance'] );
+                                if ( $privacy_mode ) {
+                                    $performance_text = 'HIGH/GOOD/LOW';
+                                    $performance_class = 'privacy';
+                                }
+                                ?>
+                                <span class="performance-badge performance-<?php echo $performance_class; ?>"><?php echo $performance_text; ?></span>
                                 <?php if ( $feedback['submitted_to_hr'] ?? false ) : ?>
                                     <span class="status-badge submitted">✅ Submitted</span>
                                 <?php else : ?>

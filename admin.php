@@ -134,6 +134,15 @@ function save_config( $config, $file_path ) {
 		return false;
 	}
 
+	// Sort events by date before saving
+	if ( isset( $config['events'] ) && is_array( $config['events'] ) ) {
+		usort( $config['events'], function( $a, $b ) {
+			$dateA = $a['start_date'] ?? '';
+			$dateB = $b['start_date'] ?? '';
+			return strcmp( $dateA, $dateB );
+		} );
+	}
+
 	$json = json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
 	return file_put_contents( $file_path, $json ) !== false;
 }

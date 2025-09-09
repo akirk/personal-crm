@@ -68,11 +68,11 @@ class Person {
 	 * Mask a username for privacy mode
 	 */
 	private function mask_username( $username ) {
-		if ( strlen( $username ) <= 3 ) {
+		if ( strlen( $username ) <= 1 ) {
 			return $username; // Too short to mask meaningfully
 		}
 
-		return substr( $username, 0, 3 ) . '...';
+		return substr( $username, 0, 1 ) . '...';
 	}
 
 	/**

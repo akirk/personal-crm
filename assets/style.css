@@ -563,6 +563,11 @@ body {
     color: light-dark(#721c24, #f5a6b0);
 }
 
+.performance-privacy { 
+    background: light-dark(#e9ecef, #4a4a4a);
+    color: light-dark(#6c757d, #adb5bd);
+}
+
 /* HR Feedback History Details */
 details[open] summary span:last-child {
     transform: rotate(90deg);
@@ -781,11 +786,16 @@ details summary span:last-child {
 /* Admin panel specific styles */
 .btn-remove {
     padding: 6px 10px;
-    background: light-dark(#dc3545, #e74c3c);
-    color: white;
-    border: none;
+    background: transparent;
+    color: light-dark(#dc3545, #e74c3c);
+    border: 1px solid light-dark(#dc3545, #e74c3c);
     border-radius: 4px;
     cursor: pointer;
+}
+
+.btn-remove:hover {
+    background: light-dark(#dc3545, #e74c3c);
+    color: white;
 }
 
 .btn-add {
@@ -810,20 +820,31 @@ details summary span:last-child {
 
 .btn-remove-small {
     padding: 4px 8px;
-    background: light-dark(#dc3545, #e74c3c);
-    color: white;
-    border: none;
+    background: transparent;
+    color: light-dark(#dc3545, #e74c3c);
+    border: 1px solid light-dark(#dc3545, #e74c3c);
     border-radius: 4px;
     cursor: pointer;
+    font-size: 12px;
+}
+
+.btn-remove-small:hover {
+    background: light-dark(#dc3545, #e74c3c);
+    color: white;
 }
 
 .btn-remove-personal {
-    background: light-dark(#dc3545, #e74c3c);
-    color: white;
-    border: none;
+    background: transparent;
+    color: light-dark(#dc3545, #e74c3c);
+    border: 1px solid light-dark(#dc3545, #e74c3c);
     padding: 5px 10px;
     border-radius: 3px;
     cursor: pointer;
+}
+
+.btn-remove-personal:hover {
+    background: light-dark(#dc3545, #e74c3c);
+    color: white;
 }
 
 .btn-add-personal {
@@ -843,12 +864,17 @@ details summary span:last-child {
 
 .btn-large-remove {
     padding: 8px 12px;
-    background: light-dark(#dc3545, #e74c3c);
-    color: white;
-    border: none;
+    background: transparent;
+    color: light-dark(#dc3545, #e74c3c);
+    border: 1px solid light-dark(#dc3545, #e74c3c);
     border-radius: 4px;
     cursor: pointer;
     font-size: 12px;
+}
+
+.btn-large-remove:hover {
+    background: light-dark(#dc3545, #e74c3c);
+    color: white;
 }
 
 .btn-large-primary {
@@ -988,7 +1014,7 @@ details summary span:last-child {
 }
 
 .btn {
-    background: #007cba;
+    background: light-dark(#007cba, #4a90e2);
     color: white;
     padding: 10px 20px;
     border: none;
@@ -998,20 +1024,26 @@ details summary span:last-child {
     display: inline-block;
     font-size: 14px;
     font-family: inherit;
+    line-height: 1;
+    box-sizing: border-box;
+    vertical-align: middle;
 }
 
 .btn:hover {
-    background: #005a87;
+    background: light-dark(#005a87, #5ba0ff);
     text-decoration: none;
     color: white;
 }
 
 .btn-danger {
-    background: light-dark(#dc3545, #e74c3c);
+    background: transparent;
+    color: light-dark(#dc3545, #e74c3c);
+    border: 1px solid light-dark(#dc3545, #e74c3c);
 }
 
 .btn-danger:hover {
-    background: light-dark(#c82333, #d32f2f);
+    background: light-dark(#dc3545, #e74c3c);
+    color: white;
 }
 
 .message {
