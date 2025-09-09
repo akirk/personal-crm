@@ -759,28 +759,28 @@ function parse_personal_events_data( $events_data ) {
 function get_missing_data_points( $person, $person_type = 'member' ) {
 	$missing = array();
 
-	// Core fields
+	// Core fields (required)
 	if ( empty( $person['name'] ) ) {
-		$missing[] = 'Name';
+		$missing[] = array( 'field' => 'Name', 'priority' => 'required' );
 	}
 	if ( empty( $person['role'] ) ) {
-		$missing[] = 'Role';
+		$missing[] = array( 'field' => 'Role', 'priority' => 'required' );
 	}
 	if ( empty( $person['location'] ) ) {
-		$missing[] = 'Location';
+		$missing[] = array( 'field' => 'Location', 'priority' => 'required' );
 	}
 	if ( empty( $person['timezone'] ) ) {
-		$missing[] = 'Timezone';
+		$missing[] = array( 'field' => 'Timezone', 'priority' => 'required' );
 	}
 
 	// Birthday
 	if ( empty( $person['birthday'] ) ) {
-		$missing[] = 'Birthday';
+		$missing[] = array( 'field' => 'Birthday', 'priority' => 'required' );
 	}
 
 	// Company anniversary
 	if ( empty( $person['company_anniversary'] ) ) {
-		$missing[] = 'Company Anniversary';
+		$missing[] = array( 'field' => 'Company Anniversary', 'priority' => 'required' );
 	}
 
 	// Links - check for key links
@@ -788,19 +788,27 @@ function get_missing_data_points( $person, $person_type = 'member' ) {
 
 	foreach ( $expected_links as $expected_link ) {
 		if ( ! isset( $person['links'][ $expected_link ] ) || empty( $person['links'][ $expected_link ] ) ) {
-			$missing[] = $expected_link . ' link';
+			$missing[] = array( 'field' => $expected_link . ' link', 'priority' => 'required' );
 		}
 	}
 
-	// Optional fields that are nice to have
-	if ( empty( $person['partner'] ) ) {
-		$missing[] = 'Partner (optional)';
+	// Recommended fields - likely to be filled out for most people
+	if ( empty( $person['wordpress'] ) ) {
+		$missing[] = array( 'field' => 'WordPress.org profile', 'priority' => 'recommended' );
 	}
+	if ( empty( $person['linkedin'] ) ) {
+		$missing[] = array( 'field' => 'LinkedIn profile', 'priority' => 'recommended' );
+	}
+	if ( empty( $person['partner'] ) ) {
+		$missing[] = array( 'field' => 'Partner', 'priority' => 'recommended' );
+	}
+	
+	// Optional fields - often rightfully stay empty
 	if ( empty( $person['kids'] ) ) {
-		$missing[] = 'Kids info (optional)';
+		$missing[] = array( 'field' => 'Kids info', 'priority' => 'optional' );
 	}
 	if ( empty( $person['notes'] ) ) {
-		$missing[] = 'Notes (optional)';
+		$missing[] = array( 'field' => 'Notes', 'priority' => 'optional' );
 	}
 
 	return $missing;
@@ -810,26 +818,50 @@ function get_missing_data_points( $person, $person_type = 'member' ) {
  * Get completeness score as percentage
  */
 function get_completeness_score( $missing_data, $person_type = 'member' ) {
-	// Core required fields
-	$total_core_fields = 6; // name, role, location, timezone, birthday, company_anniversary
-	if ( $person_type === 'member' ) {
-		$total_core_fields += 2; // 1:1 doc, HR monthly links
-	} else {
-		$total_core_fields += 1; // 1:1 doc link
-	}
-
-	// Count missing core fields (exclude optional ones)
-	$missing_core = 0;
+	// Count total fields by priority
+	$total_required = 7; // name, role, location, timezone, birthday, company_anniversary, 1:1 doc
+	$total_recommended = 3; // wordpress.org, linkedin, partner
+	$total_optional = 2; // kids, notes
+	
+	// Count missing fields by priority
+	$missing_required = 0;
+	$missing_recommended = 0;
+	$missing_optional = 0;
+	
 	foreach ( $missing_data as $missing_item ) {
-		if ( strpos( $missing_item, 'optional' ) === false ) {
-			$missing_core++;
+		if ( is_array( $missing_item ) ) {
+			switch ( $missing_item['priority'] ) {
+				case 'required':
+					$missing_required++;
+					break;
+				case 'recommended':
+					$missing_recommended++;
+					break;
+				case 'optional':
+					$missing_optional++;
+					break;
+			}
+		} else {
+			// Backwards compatibility - treat string items as required if not marked optional
+			if ( strpos( $missing_item, 'optional' ) === false ) {
+				$missing_required++;
+			} else {
+				$missing_recommended++;
+			}
 		}
 	}
-
-	$completed_core = $total_core_fields - $missing_core;
-	$score = round( ( $completed_core / $total_core_fields ) * 100 );
-
-	return max( 0, $score );
+	
+	// Calculate weighted score
+	// Required fields: 70% weight
+	// Recommended fields: 25% weight  
+	// Optional fields: 5% weight
+	$required_score = ( ( $total_required - $missing_required ) / $total_required ) * 70;
+	$recommended_score = ( ( $total_recommended - $missing_recommended ) / $total_recommended ) * 25;
+	$optional_score = ( ( $total_optional - $missing_optional ) / $total_optional ) * 5;
+	
+	$total_score = $required_score + $recommended_score + $optional_score;
+	
+	return max( 0, round( $total_score ) );
 }
 
 /**
@@ -1954,7 +1986,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     @<?php echo htmlspecialchars( mask_username( $item['username'], $privacy_mode ) ); ?>
                                 </div>
                             </td>
-                            <td class="table-cell" style="font-weight: normal;"><?php echo htmlspecialchars( $item['type'] ); ?></td>
+                            <td class="table-cell" style="font-weight: normal; white-space: nowrap;"><?php echo htmlspecialchars( $item['type'] ); ?></td>
                             <td class="table-cell" style="font-weight: normal;">
                                 <span class="<?php
                                     if ( $item['score'] >= 90 ) echo 'score-excellent';
@@ -1967,14 +1999,55 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                 <?php if ( empty( $item['missing'] ) ) : ?>
                                     <span class="link-success">✅ Complete</span>
                                 <?php else : ?>
-                                    <?php foreach ( $item['missing'] as $missing_item ) : ?>
-                                        <span class="<?php echo strpos( $missing_item, 'optional' ) !== false ? 'link-secondary' : 'link-danger'; ?>">
-                                            <?php echo htmlspecialchars( $missing_item ); ?>
-                                        </span><?php echo $missing_item !== end( $item['missing'] ) ? ', ' : ''; ?>
-                                    <?php endforeach; ?>
+                                    <?php 
+                                    $required_fields = array();
+                                    $recommended_fields = array();
+                                    $optional_fields = array();
+                                    
+                                    foreach ( $item['missing'] as $missing_item ) {
+                                        if ( is_array( $missing_item ) ) {
+                                            switch ( $missing_item['priority'] ) {
+                                                case 'required':
+                                                    $required_fields[] = $missing_item['field'];
+                                                    break;
+                                                case 'recommended':
+                                                    $recommended_fields[] = $missing_item['field'];
+                                                    break;
+                                                case 'optional':
+                                                    $optional_fields[] = $missing_item['field'];
+                                                    break;
+                                            }
+                                        } else {
+                                            // Backwards compatibility
+                                            if ( strpos( $missing_item, 'optional' ) !== false ) {
+                                                $recommended_fields[] = str_replace( ' (optional)', '', $missing_item );
+                                            } else {
+                                                $required_fields[] = $missing_item;
+                                            }
+                                        }
+                                    }
+                                    ?>
+                                    
+                                    <?php if ( ! empty( $required_fields ) ) : ?>
+                                        <?php foreach ( $required_fields as $field ) : ?>
+                                            <span class="link-danger" title="Required field"><?php echo htmlspecialchars( $field ); ?></span><?php echo ( $field !== end( $required_fields ) || ! empty( $recommended_fields ) || ! empty( $optional_fields ) ) ? ', ' : ''; ?>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ( ! empty( $recommended_fields ) ) : ?>
+                                        <?php foreach ( $recommended_fields as $field ) : ?>
+                                            <span class="link-warning" title="Recommended field - likely to be filled out"><?php echo htmlspecialchars( $field ); ?></span><?php echo ( $field !== end( $recommended_fields ) || ! empty( $optional_fields ) ) ? ', ' : ''; ?>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ( ! empty( $optional_fields ) ) : ?>
+                                        <?php foreach ( $optional_fields as $field ) : ?>
+                                            <span class="link-secondary" title="Optional field - may rightfully stay empty"><?php echo htmlspecialchars( $field ); ?></span><?php echo $field !== end( $optional_fields ) ? ', ' : ''; ?>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </td>
-                            <td class="table-cell" style="font-weight: normal;">
+                            <td class="table-cell" style="font-weight: normal; white-space: nowrap;">
                                 <a href="<?php echo build_team_url( 'admin.php', array( 'edit_member' => $item['username'] ) ); ?>" class="link-primary text-small" style="margin-right: 8px;">✏️ Edit</a>
                                 <a href="<?php echo build_team_url( 'index.php', array( 'person' => $item['username'] ) ); ?>" class="link-primary text-small" target="_blank">👁️ View</a>
                             </td>
@@ -2543,55 +2616,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         <a href="<?php echo build_team_url( 'index.php' ); ?>" class="text-muted" style="text-decoration: none;">👥 Team Overview</a>
     </footer>
     
-    <script>
-        // Dark mode functionality
-        function initializeDarkMode() {
-            const toggle = document.getElementById('dark-mode-toggle');
-            const sunIcon = toggle.querySelector('.sun-icon');
-            const moonIcon = toggle.querySelector('.moon-icon');
-            
-            // Get saved theme or default to system preference
-            let currentTheme = localStorage.getItem('theme');
-            if (!currentTheme) {
-                currentTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            }
-            
-            function updateTheme(theme) {
-                if (theme === 'dark') {
-                    document.documentElement.style.colorScheme = 'dark';
-                    sunIcon.style.display = 'block';
-                    moonIcon.style.display = 'none';
-                } else {
-                    document.documentElement.style.colorScheme = 'light';
-                    sunIcon.style.display = 'none';
-                    moonIcon.style.display = 'block';
-                }
-                localStorage.setItem('theme', theme);
-            }
-            
-            // Set initial theme
-            updateTheme(currentTheme);
-            
-            // Toggle theme on click
-            toggle.addEventListener('click', () => {
-                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-                currentTheme = newTheme;
-                updateTheme(newTheme);
-            });
-            
-            // Listen for system theme changes
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                if (!localStorage.getItem('theme')) {
-                    const systemTheme = e.matches ? 'dark' : 'light';
-                    currentTheme = systemTheme;
-                    updateTheme(systemTheme);
-                }
-            });
-        }
-        
-        // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', initializeDarkMode);
-    </script>
-    
+    <script src="assets/cmd-k.js"></script>
+    <script src="assets/script.js"></script>
 </body>
 </html>

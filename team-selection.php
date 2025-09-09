@@ -69,55 +69,7 @@ if ( empty( $available_teams ) ) {
         </div>
     </div>
     
-    <script>
-        // Dark mode functionality
-        function initializeDarkMode() {
-            const toggle = document.getElementById('dark-mode-toggle');
-            const sunIcon = toggle.querySelector('.sun-icon');
-            const moonIcon = toggle.querySelector('.moon-icon');
-            
-            // Get saved theme or default to system preference
-            let currentTheme = localStorage.getItem('theme');
-            if (!currentTheme) {
-                currentTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-            }
-            
-            function updateTheme(theme) {
-                if (theme === 'dark') {
-                    document.documentElement.style.colorScheme = 'dark';
-                    sunIcon.style.display = 'block';
-                    moonIcon.style.display = 'none';
-                } else {
-                    document.documentElement.style.colorScheme = 'light';
-                    sunIcon.style.display = 'none';
-                    moonIcon.style.display = 'block';
-                }
-                localStorage.setItem('theme', theme);
-            }
-            
-            // Set initial theme
-            updateTheme(currentTheme);
-            
-            // Toggle theme on click
-            toggle.addEventListener('click', () => {
-                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-                currentTheme = newTheme;
-                updateTheme(newTheme);
-            });
-            
-            // Listen for system theme changes
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                if (!localStorage.getItem('theme')) {
-                    const systemTheme = e.matches ? 'dark' : 'light';
-                    currentTheme = systemTheme;
-                    updateTheme(systemTheme);
-                }
-            });
-        }
-        
-        // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', initializeDarkMode);
-    </script>
-    
+    <script src="assets/cmd-k.js"></script>
+    <script src="assets/script.js"></script>
 </body>
 </html>
