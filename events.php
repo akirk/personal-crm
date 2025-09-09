@@ -184,7 +184,7 @@ $available_teams = get_available_teams();
                                                 <div style="font-size: 13px; margin-bottom: 4px;">
                                                     <?php foreach ( $event->links as $link_text => $link_url ) : ?>
                                                         <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank" 
-                                                           style="color: #007cba; text-decoration: none; margin-right: 12px;">
+                                                           class="event-link-main">
                                                             <?php echo htmlspecialchars( $link_text ); ?> →
                                                         </a>
                                                     <?php endforeach; ?>
@@ -262,7 +262,7 @@ $available_teams = get_available_teams();
                                                 <div style="font-size: 13px; margin-bottom: 4px;">
                                                     <?php foreach ( $event->links as $link_text => $link_url ) : ?>
                                                         <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank" 
-                                                           style="color: #007cba; text-decoration: none; margin-right: 12px;">
+                                                           class="event-link-main">
                                                             <?php echo htmlspecialchars( $link_text ); ?> →
                                                         </a>
                                                     <?php endforeach; ?>

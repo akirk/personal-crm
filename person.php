@@ -158,12 +158,40 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 
 		<div class="overview-layout">
 			<div class="people-section">
-				<?php if ( ! empty( $person_data->birthday ) || ! empty( $person_data->company_anniversary ) || ! empty( $kids_with_ages ) || ! empty( $person_data->notes ) || ! empty( $person_data->location ) ) : ?>
+				<?php if ( ! empty( $person_data->birthday ) || ! empty( $person_data->company_anniversary ) || ! empty( $kids_with_ages ) || ! empty( $person_data->notes ) || ! empty( $person_data->location ) || ! empty( $person_data->partner ) ) : ?>
 					<div class="section">
 						<h2>Personal Details</h2>
 
 						<?php if ( ! empty( $person_data->birthday ) ) : ?>
-							<p><strong>🎂 Birthday:</strong> <?php echo htmlspecialchars( $person_data->get_birthday_display() ); ?></p>
+							<?php
+							// Calculate age from birthday
+							$age_display = '';
+							if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $person_data->birthday ) ) {
+								$birth_date = DateTime::createFromFormat( 'Y-m-d', $person_data->birthday );
+								if ( $birth_date ) {
+									$current_date = new DateTime();
+									$age = $current_date->diff( $birth_date )->y;
+									if ( $privacy_mode ) {
+										$age_display = 'Age ' . $age;
+									} else {
+										$age_display = 'Age ' . $age . ' (born ' . $birth_date->format( 'F j, Y' ) . ')';
+									}
+								}
+							} elseif ( preg_match( '/^\d{2}-\d{2}$/', $person_data->birthday ) ) {
+								// Legacy MM-DD format - can't calculate exact age
+								if ( ! $privacy_mode ) {
+									$display_date = DateTime::createFromFormat( 'm-d', $person_data->birthday );
+									if ( $display_date ) {
+										$age_display = 'Birthday ' . $display_date->format( 'F j' );
+									}
+								} else {
+									$age_display = 'Birthday [Hidden]';
+								}
+							}
+							?>
+							<?php if ( $age_display ) : ?>
+								<p><strong>🎂 Age:</strong> <?php echo htmlspecialchars( $age_display ); ?></p>
+							<?php endif; ?>
 						<?php endif; ?>
 
 						<?php if ( ! empty( $person_data->company_anniversary ) ) : ?>
@@ -173,23 +201,15 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 								$current_date = new DateTime();
 								$years_at_company = $current_date->diff( $anniversary_date )->y;
 								
-								// Calculate next anniversary
-								$current_year = (int) $current_date->format( 'Y' );
-								$next_anniversary_year = $current_year;
-								if ( $anniversary_date > $current_date || $anniversary_date->format( 'm-d' ) < $current_date->format( 'm-d' ) ) {
-									$next_anniversary_year = $current_year + 1;
-								}
-								$next_anniversary = DateTime::createFromFormat( 'Y-m-d', $next_anniversary_year . '-' . $anniversary_date->format( 'm-d' ) );
-								
 								if ( $privacy_mode ) {
-									echo '<p><strong>🏢 Company:</strong> ' . $years_at_company . ' years (next anniversary hidden)</p>';
+									echo '<p><strong>🏢 Years at Company:</strong> ' . $years_at_company . ' years</p>';
 								} else {
 									if ( $years_at_company == 0 ) {
-										// First year - show when they will complete their first year
-										echo '<p><strong>🏢 Company:</strong> Started ' . htmlspecialchars( $anniversary_date->format( 'F j, Y' ) ) . ' • First anniversary ' . htmlspecialchars( $next_anniversary->format( 'F j, Y' ) ) . '</p>';
+										// First year - show start date
+										echo '<p><strong>🏢 Years at Company:</strong> Started ' . htmlspecialchars( $anniversary_date->format( 'F j, Y' ) ) . ' (less than 1 year)</p>';
 									} else {
-										// Multiple years - show time at company and next anniversary
-										echo '<p><strong>🏢 Company:</strong> ' . $years_at_company . ' years • Next anniversary ' . htmlspecialchars( $next_anniversary->format( 'F j, Y' ) ) . '</p>';
+										// Multiple years - show time at company and start date
+										echo '<p><strong>🏢 Years at Company:</strong> ' . $years_at_company . ' years (started ' . htmlspecialchars( $anniversary_date->format( 'F j, Y' ) ) . ')</p>';
 									}
 								}
 							}
@@ -199,7 +219,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						<?php if ( ! empty( $person_data->location ) ) : ?>
 							<p>
 								<strong>🌍 Location:</strong>
-								<a href="https://maps.google.com/maps?q=<?php echo urlencode( $person_data->location ); ?>" target="_blank" style="color: #007cba; text-decoration: none;"><?php echo htmlspecialchars( $person_data->location ); ?></a>
+								<a href="https://maps.google.com/maps?q=<?php echo urlencode( $person_data->location ); ?>" target="_blank" class="location-link"><?php echo htmlspecialchars( $person_data->location ); ?></a>
 								<span id="time-<?php echo htmlspecialchars( $person ); ?>" style="margin-left: 10px; color: #666; font-size: 14px;"></span>
 							</p>
 						<?php endif; ?>

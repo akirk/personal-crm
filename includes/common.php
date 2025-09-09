@@ -739,7 +739,7 @@ function render_upcoming_events_sidebar( $upcoming_events_or_person = null, $pri
 				$person_data = $team_data['alumni'][ $current_person ];
 			}
 			
-			$upcoming_events = $person_data ? $person_data->get_upcoming_events() : array();
+			$upcoming_events = $person_data ? $person_data->get_upcoming_events_with_personal_dates() : array();
 		} else {
 			// Get team-wide events
 			global $team_data;
@@ -784,18 +784,32 @@ function render_upcoming_events_sidebar( $upcoming_events_or_person = null, $pri
 			</div>
 			<div class="event-description"><?php 
 				// Use title without person name if this event belongs to the current person
-				if ( $current_person && $event->person ) {
+				if ( $current_person && $event->person && $event->person->username === $current_person ) {
 					// Since we're viewing this person's own events, remove their name
 					$description = $event->get_title_without_person_name();
+					echo htmlspecialchars( $description );
 				} else {
 					$description = $event->description;
+					
+					// Remove age information from birthday descriptions when in privacy mode
+					if ( $privacy_mode && $event->type === 'birthday' && strpos( $description, '(turning ' ) !== false ) {
+						$description = preg_replace( '/\s*\(turning \d+\)/', '', $description );
+					}
+					
+					// If this event has a person and we're not on that person's page, make the person name clickable
+					if ( $event->person && ! $privacy_mode ) {
+						$person_name = $event->person->name;
+						$person_username = $event->person->username;
+						$person_link = build_team_url( 'person.php', array( 'person' => $person_username ) );
+						
+						// Replace person name with clickable link in the description
+						$clickable_name = '<a href="' . htmlspecialchars( $person_link ) . '" class="event-person-link">' . htmlspecialchars( $person_name ) . '</a>';
+						$description = str_replace( htmlspecialchars( $person_name ), $clickable_name, htmlspecialchars( $description ) );
+						echo $description;
+					} else {
+						echo htmlspecialchars( $description );
+					}
 				}
-				
-				// Remove age information from birthday descriptions when in privacy mode
-				if ( $privacy_mode && $event->type === 'birthday' && strpos( $description, '(turning ' ) !== false ) {
-					$description = preg_replace( '/\s*\(turning \d+\)/', '', $description );
-				}
-				echo htmlspecialchars( $description ); 
 			?></div>
 			<span class="event-type <?php echo htmlspecialchars( $event->type ); ?>"><?php echo ucfirst( $event->type ); ?></span>
 			<?php if ( ! empty( $event->location ) ) : ?>

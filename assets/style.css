@@ -438,6 +438,68 @@ body {
     font-size: 14px;
 }
 
+.event-person-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.event-person-link:hover {
+    color: light-dark(#007cba, #4a90e2);
+}
+
+.location-link {
+    color: light-dark(#007cba, #4a90e2);
+    text-decoration: none;
+}
+
+.location-link:hover {
+    text-decoration: underline;
+}
+
+.event-link-main {
+    color: light-dark(#007cba, #4a90e2);
+    text-decoration: none;
+    margin-right: 12px;
+}
+
+.event-link-main:hover {
+    text-decoration: underline;
+}
+
+.person-profile-link {
+    color: light-dark(#007cba, #4a90e2);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.person-profile-link:hover {
+    text-decoration: underline;
+}
+
+.stat-number {
+    font-size: 2em;
+    font-weight: bold;
+    color: light-dark(#007cba, #4a90e2);
+}
+
+.sidebar-section-link {
+    color: inherit;
+    text-decoration: none;
+    display: block;
+    margin-bottom: 15px;
+}
+
+.sidebar-section-heading {
+    margin: 0;
+    color: light-dark(#007cba, #4a90e2);
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.sidebar-section-heading:hover {
+    color: light-dark(#005a9b, #5ba0ff);
+}
+
 .event-type {
     display: inline-block;
     padding: 2px 8px;
@@ -487,18 +549,18 @@ body {
 }
 
 .performance-high { 
-    background: #cce5ff; 
-    color: #004085; 
+    background: light-dark(#cce5ff, #1e3a5f);
+    color: light-dark(#004085, #99ccff);
 }
 
 .performance-good { 
-    background: #d4edda; 
-    color: #155724; 
+    background: light-dark(#d4edda, #1e3d2a);
+    color: light-dark(#155724, #90d4a0);
 }
 
 .performance-low { 
-    background: #f8d7da; 
-    color: #721c24; 
+    background: light-dark(#f8d7da, #4a1e23);
+    color: light-dark(#721c24, #f5a6b0);
 }
 
 /* HR Feedback History Details */
@@ -1279,6 +1341,7 @@ details summary span:last-child {
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 20px;
+    border-bottom: 2px solid light-dark(#e9ecef, #444);
 }
 
 .person-title {
@@ -1317,7 +1380,6 @@ details summary span:last-child {
     border-radius: 12px;
     font-size: 13px;
     margin-left: 6px;
-    cursor: help;
 }
 
 .external-account-links {

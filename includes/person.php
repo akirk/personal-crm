@@ -569,4 +569,85 @@ class Person {
 			'css_class' => 'not-started'
 		);
 	}
+
+	/**
+	 * Get upcoming events for this person with guaranteed birthday and anniversary inclusion
+	 * This method ensures that the person's next birthday and anniversary are always included,
+	 * even if they just passed (to always show when they are)
+	 */
+	public function get_upcoming_events_with_personal_dates() {
+		$events = array();
+		$current_date = new DateTime();
+		$current_year = (int) $current_date->format( 'Y' );
+		$cutoff_date = clone $current_date;
+		$cutoff_date->add( new DateInterval( 'P1Y' ) ); // 1 year from now
+
+		// Always include birthday - find the next occurrence (this year or next year)
+		if ( ! empty( $this->birthday ) ) {
+			$birthday_date = null;
+
+			// Check if it's full YYYY-MM-DD format
+			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->birthday ) ) {
+				$birth_date = DateTime::createFromFormat( 'Y-m-d', $this->birthday );
+				if ( $birth_date ) {
+					$birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
+					$birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birth_date->format( 'm-d' ) );
+					
+					// Use this year's birthday if it hasn't passed yet, otherwise use next year's
+					if ( $birthday_this_year >= $current_date ) {
+						$age = $current_year - (int) $birth_date->format( 'Y' );
+						$events[] = Event::from_person_event( 'birthday', $birthday_this_year, $this, array( 'age' => $age ) );
+					} else {
+						$age = ( $current_year + 1 ) - (int) $birth_date->format( 'Y' );
+						$events[] = Event::from_person_event( 'birthday', $birthday_next_year, $this, array( 'age' => $age ) );
+					}
+				}
+			} elseif ( preg_match( '/^\d{2}-\d{2}$/', $this->birthday ) ) {
+				// Legacy MM-DD format
+				$birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->birthday );
+				$birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $this->birthday );
+				
+				if ( $birthday_this_year >= $current_date ) {
+					$events[] = Event::from_person_event( 'birthday', $birthday_this_year, $this );
+				} else {
+					$events[] = Event::from_person_event( 'birthday', $birthday_next_year, $this );
+				}
+			}
+		}
+
+		// Always include company anniversary - find the next occurrence
+		if ( ! empty( $this->company_anniversary ) ) {
+			$anniversary_date = DateTime::createFromFormat( 'Y-m-d', $this->company_anniversary );
+			if ( $anniversary_date ) {
+				$anniversary_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $anniversary_date->format( 'm-d' ) );
+				$anniversary_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $anniversary_date->format( 'm-d' ) );
+				
+				if ( $anniversary_this_year >= $current_date ) {
+					$years = $current_year - (int) $anniversary_date->format( 'Y' );
+					$events[] = Event::from_person_event( 'anniversary', $anniversary_this_year, $this, array( 'years' => $years ) );
+				} else {
+					$years = ( $current_year + 1 ) - (int) $anniversary_date->format( 'Y' );
+					$events[] = Event::from_person_event( 'anniversary', $anniversary_next_year, $this, array( 'years' => $years ) );
+				}
+			}
+		}
+
+		// Get other upcoming events (kids' birthdays, personal events) with normal filtering
+		$other_events = $this->get_upcoming_events();
+		foreach ( $other_events as $event ) {
+			// Only add events that are not the person's own birthday or anniversary
+			// (we already added those above)
+			if ( ! ( $event->type === 'birthday' && $event->person === $this ) && 
+			     ! ( $event->type === 'anniversary' && $event->person === $this ) ) {
+				$events[] = $event;
+			}
+		}
+
+		// Sort all events by date
+		usort( $events, function( $a, $b ) {
+			return $a->date <=> $b->date;
+		} );
+
+		return $events;
+	}
 }

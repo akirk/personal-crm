@@ -136,7 +136,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
         <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
             <div class="stat-card">
                 <h3 style="margin: 0 0 10px 0; color: #333;">Team Members</h3>
-                <div style="font-size: 2em; font-weight: bold; color: #007cba;">
+                <div class="stat-number">
                     <?php echo $feedback_stats['total_people']; ?>
                 </div>
                 <div style="font-size: 0.9em; color: #666;">requiring HR feedback</div>
@@ -364,7 +364,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
                         ?>
                         <div style="display: flex; align-items: center; padding: 15px; border: 1px solid #dee2e6; border-radius: 8px; gap: 15px;">
                             <div style="flex: 1;">
-                                <a href="<?php echo $person->get_profile_url(); ?>" style="color: #007cba; text-decoration: none; font-weight: 500;">
+                                <a href="<?php echo $person->get_profile_url(); ?>" class="person-profile-link">
                                     <?php echo htmlspecialchars( $person->get_display_name_with_nickname() ); ?>
                                 </a>
                                 <div style="font-size: 0.9em; color: #666;">

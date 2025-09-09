@@ -296,8 +296,8 @@ if ( ! empty( $team_members_needing_hr ) ) {
 				</div>
 
 				<div class="events-sidebar">
-					<a href="<?php echo build_team_url( 'events.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" style="color: inherit; text-decoration: none; display: block; margin-bottom: 15px;">
-						<h3 style="margin: 0; color: #007cba; cursor: pointer; transition: color 0.2s;">🗓️ Upcoming Events →</h3>
+					<a href="<?php echo build_team_url( 'events.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="sidebar-section-link">
+						<h3 class="sidebar-section-heading">🗓️ Upcoming Events →</h3>
 					</a>
 					<?php
 					render_upcoming_events_sidebar( null, 6 );
@@ -306,8 +306,8 @@ if ( ! empty( $team_members_needing_hr ) ) {
 					<!-- HR Feedback Overview -->
 					<?php if ( ! empty( $team_members_needing_hr ) ) : ?>
 						<div style="margin-top: 30px;">
-							<a href="<?php echo build_team_url( 'hr-stats.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" style="color: inherit; text-decoration: none; display: block; margin-bottom: 15px;">
-								<h3 style="margin: 0; color: #007cba; cursor: pointer; transition: color 0.2s;">📊 HR Feedback Overview →</h3>
+							<a href="<?php echo build_team_url( 'hr-stats.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="sidebar-section-link">
+								<h3 class="sidebar-section-heading">📊 HR Feedback Overview →</h3>
 							</a>
 							<?php if ( ! empty( $hr_monthly_stats ) ) : ?>
 								<div style="display: flex; flex-direction: column; gap: 8px;">
