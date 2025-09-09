@@ -644,6 +644,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 	return array(
 		'activity_url_prefix' => $config['activity_url_prefix'],
         'team_name' => $config['team_name'],
+		'team_links' => $config['team_links'] ?? array(),
 		'team_members' => $team_members,
 		'leadership' => $leadership,
 		'alumni' => $alumni,

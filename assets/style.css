@@ -183,6 +183,7 @@ body {
     margin-bottom: 20px;
     padding-bottom: 10px;
     border-bottom: 2px solid #e9ecef;
+    gap: 1em;
 }
 
 .header h1 {

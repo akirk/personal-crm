@@ -131,9 +131,19 @@ if ( ! empty( $team_members_needing_hr ) ) {
 	<div class="container">
 		<?php if ( $action === 'overview' ) : ?>
 			<div class="header">
-				<div style="flex-grow: 1;">
+				<div>
 					<h1><a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Overview</a></h1>
 				</div>
+				<?php if ( ! empty( $team_data['team_links'] ) ) : ?>
+					<div class="person-links" style="flex-grow: 1;">
+						<?php foreach ( $team_data['team_links'] as $link_text => $link_url ) : ?>
+							<a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank">
+								<?php echo get_link_icon( $link_text, $link_url, 12 ); ?>
+								<?php echo htmlspecialchars( $link_text ); ?>
+							</a>
+						<?php endforeach; ?>
+					</div>
+				<?php endif; ?>
 				<div class="navigation" style="display: flex; align-items: center; gap: 10px;">
 					<!-- Team Switcher -->
 					<select id="team-selector" onchange="switchTeam()" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; background: white;">

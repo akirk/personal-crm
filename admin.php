@@ -184,6 +184,27 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			}
 			break;
 			
+		case 'save_team_links':
+			// Handle team links
+			$team_links = array();
+			if ( isset( $_POST['team_links'] ) && is_array( $_POST['team_links'] ) ) {
+				foreach ( $_POST['team_links'] as $link_data ) {
+					$link_text = trim( sanitize_text_field( $link_data['text'] ?? '' ) );
+					$link_url = trim( sanitize_url( $link_data['url'] ?? '' ) );
+					if ( ! empty( $link_text ) && ! empty( $link_url ) ) {
+						$team_links[ $link_text ] = $link_url;
+					}
+				}
+			}
+			$config['team_links'] = $team_links;
+
+			if ( save_config( $config, $config_file ) ) {
+				$message = 'Team links saved successfully!';
+			} else {
+				$error = 'Failed to save team links.';
+			}
+			break;
+
 		case 'edit_member':
 		case 'add_member':
 			$member_config = get_person_type_config( 'member' );
@@ -1097,7 +1118,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<!-- GitHub Repositories -->
 	<div class="form-group">
 		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-			<label>GitHub Repositories <small style="color: #666; font-weight: normal;">(optional)</small></label>
+			<label>GitHub Repositories</label>
 			<button type="button" onclick="addRepoField('<?php echo $prefix; ?>')" style="padding: 4px 8px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">+ Add Repository</button>
 		</div>
 		
@@ -1155,7 +1176,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		if ( ! empty( $available_repos ) ) :
 		?>
 			<div style="margin-top: 12px;">
-				<small style="color: #666; font-size: 12px;">Team repositories (click to add):</small>
+				<small style="color: #666; font-size: 12px;">Potential repositories (click to add):</small>
 				<div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
 					<?php foreach ( $available_repos as $repo ) : ?>
 						<button type="button" onclick="addRepoToField('<?php echo $prefix; ?>', '<?php echo htmlspecialchars( $repo, ENT_QUOTES ); ?>')" 
@@ -1223,7 +1244,6 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<!-- Personal Events -->
 	<h4 style="margin: 30px 0 10px 0; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Personal Events</h4>
 	<div class="form-group">
-		<label>Personal Events <small style="color: #666; font-weight: normal;">(e.g., return from vacation, end of sabbatical)</small></label>
 		<div id="personal-events-container">
 			<?php 
 			$personal_events = $is_editing && isset( $edit_data['personal_events'] ) ? $edit_data['personal_events'] : array();
@@ -1562,6 +1582,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
         <div class="nav-tabs">
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'general' ) ); ?>" class="nav-tab <?php echo $active_tab === 'general' ? 'active' : ''; ?>">General Settings</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'team_links' ) ); ?>" class="nav-tab <?php echo $active_tab === 'team_links' ? 'active' : ''; ?>">Team Links (<?php echo count( $config['team_links'] ?? array() ); ?>)</a>
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'members' ) ); ?>" class="nav-tab <?php echo $active_tab === 'members' ? 'active' : ''; ?>">Team Members (<?php echo count( $config['team_members'] ); ?>)</a>
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'leadership' ) ); ?>" class="nav-tab <?php echo $active_tab === 'leadership' ? 'active' : ''; ?>">Leadership (<?php echo count( $config['leadership'] ); ?>)</a>
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'alumni' ) ); ?>" class="nav-tab <?php echo $active_tab === 'alumni' ? 'active' : ''; ?>">Alumni (<?php echo count( $config['alumni'] ?? array() ); ?>)</a>
@@ -1598,8 +1619,50 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                         When users visit the site without specifying a team, they'll be redirected to this team automatically.
                     </small>
                 </div>
+
                 
                 <button type="submit" class="btn">Save General Settings</button>
+            </form>
+        </div>
+
+        <!-- Team Links Tab -->
+        <div id="team_links" class="tab-content <?php echo $active_tab === 'team_links' ? 'active' : ''; ?>">
+            <h2>Team Links</h2>
+            <p style="color: #666; margin-bottom: 20px;">These links will appear on the front page next to the team headline.</p>
+
+            <form method="post">
+                <input type="hidden" name="action" value="save_team_links">
+                <?php if ( $current_team !== 'team' ) : ?>
+                    <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+                <?php endif; ?>
+
+                <div class="form-group">
+                    <div id="team-links-container">
+                        <?php
+                        $team_links = $config['team_links'] ?? array();
+                        $link_index = 0;
+                        if ( ! empty( $team_links ) ) :
+                            foreach ( $team_links as $link_text => $link_url ) : ?>
+                                <div class="team-link-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                                    <input type="text" name="team_links[<?php echo $link_index; ?>][text]" value="<?php echo htmlspecialchars( $link_text ); ?>" placeholder="Link text (e.g., Linear)" style="flex: 0 0 150px;">
+                                    <input type="url" name="team_links[<?php echo $link_index; ?>][url]" value="<?php echo htmlspecialchars( $link_url ); ?>" placeholder="https://..." style="flex: 1;">
+                                    <button type="button" class="remove-team-link" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Remove</button>
+                                </div>
+                            <?php
+                            $link_index++;
+                            endforeach;
+                        else : ?>
+                            <div class="team-link-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                                <input type="text" name="team_links[0][text]" value="" placeholder="Link text (e.g., Linear)" style="flex: 0 0 150px;">
+                                <input type="url" name="team_links[0][url]" value="" placeholder="https://..." style="flex: 1;">
+                                <button type="button" class="remove-team-link" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Remove</button>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <button type="button" id="add-team-link" class="btn" style="background: #28a745; margin-top: 10px;">+ Add Link</button>
+                </div>
+
+                <button type="submit" class="btn">Save Team Links</button>
             </form>
         </div>
 
@@ -2113,6 +2176,62 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             // Add active class to clicked tab
             event.target.classList.add('active');
         }
+
+        // Team links functionality
+        let teamLinkIndex = <?php echo count( $config['team_links'] ?? array() ); ?>;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Function to get next available index
+            function getNextTeamLinkIndex() {
+                const container = document.getElementById('team-links-container');
+                const existingRows = container.querySelectorAll('.team-link-row');
+                let maxIndex = -1;
+                
+                existingRows.forEach(row => {
+                    const textInput = row.querySelector('input[type="text"]');
+                    if (textInput && textInput.name) {
+                        const match = textInput.name.match(/team_links\[(\d+)\]\[text\]/);
+                        if (match) {
+                            maxIndex = Math.max(maxIndex, parseInt(match[1]));
+                        }
+                    }
+                });
+                
+                return maxIndex + 1;
+            }
+            
+            // Add link button
+            const addButton = document.getElementById('add-team-link');
+            if (addButton) {
+                addButton.addEventListener('click', function() {
+                    const container = document.getElementById('team-links-container');
+                    const currentIndex = getNextTeamLinkIndex();
+                    const linkRow = document.createElement('div');
+                    linkRow.className = 'team-link-row';
+                    linkRow.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
+
+                    linkRow.innerHTML = `
+                        <input type="text" name="team_links[${currentIndex}][text]" value="" placeholder="Link text (e.g., Linear)" style="flex: 0 0 150px;">
+                        <input type="url" name="team_links[${currentIndex}][url]" value="" placeholder="https://..." style="flex: 1;">
+                        <button type="button" class="remove-team-link" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Remove</button>
+                    `;
+
+                    container.appendChild(linkRow);
+
+                    // Add event listener to the new remove button
+                    linkRow.querySelector('.remove-team-link').addEventListener('click', function() {
+                        linkRow.remove();
+                    });
+                });
+            }
+
+            // Remove link buttons
+            document.querySelectorAll('.remove-team-link').forEach(button => {
+                button.addEventListener('click', function() {
+                    this.parentElement.remove();
+                });
+            });
+        });
         
         // All editing is now handled server-side via URL parameters
         
