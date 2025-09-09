@@ -222,6 +222,7 @@ class Event {
 			'company' => '#2ecc71',
 			'conference' => '#f39c12',
 			'training' => '#1abc9c',
+			'sabbatical' => '#34495e',
 			'other' => '#95a5a6'
 		);
 

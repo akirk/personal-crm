@@ -775,6 +775,8 @@ function render_upcoming_events_sidebar( $upcoming_events_or_person = null, $pri
 							echo 'today';
 						} elseif ( $days_until == 1 ) {
 							echo 'in 1d';
+						} elseif ( $days_until > 60 ) {
+							echo 'in ' . floor( $days_until / 30 ) . 'mo';
 						} else {
 							echo 'in ' . $days_until . 'd';
 						}

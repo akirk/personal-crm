@@ -301,7 +301,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 
 				<div class="events-sidebar">
 					<a href="<?php echo build_team_url( 'events.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="sidebar-section-link">
-						<h3 class="sidebar-section-heading">🗓️ Upcoming Events →</h3>
+						<h3 class="sidebar-section-heading">🗓️ Upcoming Events</h3>
 					</a>
 					<?php
 					render_upcoming_events_sidebar( null, 6 );

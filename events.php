@@ -281,7 +281,7 @@ $available_teams = get_available_teams();
                                             <div class="event-title">
                                                 <?php 
                                                 // For events with a person, link to the person
-                                                if ( $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary' ) ) ) {
+                                                if ( $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary', 'sabbatical', 'other' ) ) ) {
                                                 	echo '<a href="' . build_team_url( 'index.php', array( 'person' => $event->person->username ) ) . '" class="event-person-link">' . htmlspecialchars( $event->get_title() ) . '</a>';
                                                 } else {
                                             		echo htmlspecialchars( $event->get_title() );
@@ -362,7 +362,7 @@ $available_teams = get_available_teams();
                 <!-- Calendar days -->
                 <?php foreach ( $calendar_grid as $week ) : ?>
                     <?php foreach ( $week as $day ) : ?>
-                        <div class="calendar-day <?php echo ! $day['is_current_month'] ? 'other-month' : ''; ?> <?php echo $day['is_today'] ? 'today' : ''; ?>">
+                        <div class="calendar-day <?php echo ! $day['is_current_month'] ? 'other-month' : ''; ?> <?php echo $day['is_today'] ? 'today' : ''; ?>"<?php if ( ! $day['is_current_month'] ) : ?> onclick="navigateToMonth('<?php echo $day['date']->format( 'Y' ); ?>', '<?php echo $day['date']->format( 'n' ); ?>')" style="cursor: pointer;"<?php endif; ?>>
                             <div class="calendar-day-number"><?php echo $day['day']; ?></div>
 
                             <?php if ( ! empty( $day['events'] ) ) : ?>
@@ -374,18 +374,99 @@ $available_teams = get_available_teams();
                                         if ( $event_count >= $max_visible ) break;
                                         $event_title = $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary' ) ) ?
                                                       $event->get_title() : $event->description;
-                                        $tooltip = $event_title . ( ! empty( $event->location ) ? ' - ' . $event->location : '' );
+
+                                        // Handle multi-day event display
+                                        if ( isset( $event->end_date ) && $event->end_date ) {
+                                            $current_date_str = $day['date']->format( 'Y-m-d' );
+                                            $start_date_str = $event->date->format( 'Y-m-d' );
+                                            $end_date_str = $event->end_date->format( 'Y-m-d' );
+
+                                            // Normalize dates to midnight for proper comparison
+                                            $current_midnight = clone $day['date'];
+                                            $current_midnight->setTime( 0, 0, 0 );
+                                            $start_midnight = clone $event->date;
+                                            $start_midnight->setTime( 0, 0, 0 );
+                                            
+                                            // Calculate days from start (0-based)
+                                            $days_diff = $current_midnight->diff( $start_midnight )->days;
+
+                                            // Only modify the title if it's NOT the first day (days_diff > 0)
+                                            if ( $days_diff > 0 ) {
+                                                $day_number = $days_diff + 1;
+
+                                                if ( $current_date_str === $end_date_str ) {
+                                                    $event_title = "Last day";
+                                                } else {
+                                                    $event_title = "Day " . $day_number;
+                                                }
+
+                                                // Add location if available
+                                                if ( ! empty( $event->location ) ) {
+                                                    // Extract just the town/city from location
+                                                    $location_parts = explode( ',', $event->location );
+                                                    $town = trim( $location_parts[0] );
+                                                    $event_title = $town . ' - ' . $event_title;
+                                                }
+                                            }
+                                            // First day keeps the original event title unchanged
+                                        }
+
+                                        // For continuation days, use original title in tooltip
+                                        $original_title = $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary', 'sabbatical', 'other' ) ) ?
+                                                         $event->get_title() : $event->description;
+                                        $tooltip = $original_title . ( ! empty( $event->location ) ? ' - ' . $event->location : '' );
                                     ?>
-                                        <?php if ( $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary' ) ) ) : ?>
+                                        <?php if ( $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary', 'sabbatical', 'other' ) ) ) : ?>
                                             <a href="<?php echo build_team_url( 'index.php', array( 'person' => $event->person->username ) ); ?>"
                                                class="calendar-event <?php echo $event->type; ?>"
                                                title="<?php echo htmlspecialchars( $tooltip ); ?>"
-                                               style="color: inherit; text-decoration: none; display: block;">
+                                               style="text-decoration: none; display: block;">
                                                 <?php echo htmlspecialchars( $event_title ); ?>
                                             </a>
                                         <?php else : ?>
                                             <div class="calendar-event <?php echo $event->type; ?>" title="<?php echo htmlspecialchars( $tooltip ); ?>">
                                                 <?php echo htmlspecialchars( $event_title ); ?>
+                                                <?php if ( ! empty( $event->links ) ) :
+                                                    // For multi-day events, spread links across days
+                                                    $show_links = array();
+                                                    if ( isset( $event->end_date ) && $event->end_date ) {
+                                                        $current_date_str = $day['date']->format( 'Y-m-d' );
+                                                        $start_date_str = $event->date->format( 'Y-m-d' );
+
+                                                        // Normalize dates to midnight for proper comparison
+                                                        $current_midnight = clone $day['date'];
+                                                        $current_midnight->setTime( 0, 0, 0 );
+                                                        $start_midnight = clone $event->date;
+                                                        $start_midnight->setTime( 0, 0, 0 );
+                                                        $days_diff = $current_midnight->diff( $start_midnight )->days;
+
+                                                        if ( $days_diff > 0 ) {
+                                                            $day_number = $days_diff + 1;
+                                                            $link_index = $day_number - 2; // Day 2 = index 0, Day 3 = index 1, etc.
+
+                                                            $links_array = array_values( $event->links );
+                                                            $link_keys = array_keys( $event->links );
+
+                                                            if ( isset( $links_array[$link_index] ) ) {
+                                                                $show_links[$link_keys[$link_index]] = $links_array[$link_index];
+                                                            }
+                                                        }
+                                                    } else {
+                                                        // Single day event - show all links
+                                                        $show_links = $event->links;
+                                                    }
+
+                                                    if ( ! empty( $show_links ) ) : ?>
+                                                    <div style="font-size: 11px; margin-top: 2px;">
+                                                        <?php foreach ( $show_links as $link_text => $link_url ) : ?>
+                                                            <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank"
+                                                               style="color: white; text-decoration: underline; font-size: 10px; display: block;"
+                                                               title="<?php echo htmlspecialchars( $link_text ); ?>">
+                                                                <?php echo htmlspecialchars( $link_text ); ?> →
+                                                            </a>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                <?php endif; endif; ?>
                                             </div>
                                         <?php endif; ?>
                                     <?php
@@ -406,8 +487,8 @@ $available_teams = get_available_teams();
         </div>
         <?php endif; ?>
 
-        <!-- Past Events Section (Team Events Only, Last 3 Years) -->
-        <?php if ( ! empty( $past_by_month ) ) : ?>
+        <!-- Past Events Section (Team Events Only, Last 3 Years) - Only show in list view -->
+        <?php if ( $view_mode === 'list' && ! empty( $past_by_month ) ) : ?>
             <div class="section" style="margin-top: 40px;">
                 <div class="section-header">
                     <h2 class="section-title">📋 Past Team Events</h2>
@@ -500,6 +581,14 @@ $available_teams = get_available_teams();
             const selectedTeam = selector.value;
             const currentUrl = new URL(window.location);
             currentUrl.searchParams.set('team', selectedTeam);
+            window.location = currentUrl.toString();
+        }
+        
+        // Calendar month navigation functionality
+        function navigateToMonth(year, month) {
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.set('month', month);
+            currentUrl.searchParams.set('year', year);
             window.location = currentUrl.toString();
         }
     </script>

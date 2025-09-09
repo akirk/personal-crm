@@ -1963,6 +1963,11 @@ details summary span:last-child {
     color: light-dark(#999, #666);
 }
 
+.calendar-day.other-month:hover {
+    background: light-dark(#e9ecef, #3a3a3a);
+    color: light-dark(#666, #999);
+}
+
 .calendar-day.today {
     background: light-dark(#e3f2fd, #1a3a5a);
 }

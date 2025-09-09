@@ -400,31 +400,37 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 
 			<!-- Sidebar with HR Feedbacks and Events -->
 			<div class="events-sidebar">
-					<?php
-					// Get HR feedback history for this person first
-					$feedback_history = get_person_feedback_history( $person );
-					$current_month = get_hr_feedback_month();
-					// Include feedback from all months that have data (including current month if submitted)
-					$past_feedback = array_filter( $feedback_history, function( $feedback, $month ) use ( $current_month ) {
-						if ( $month === 'hr_monthly_link' || ! is_array( $feedback ) ) {
-							return false;
-						}
-						// Include current month only if it's submitted to HR
-						if ( $month === $current_month ) {
-							return isset( $feedback['submitted_to_hr'] ) && $feedback['submitted_to_hr'];
-						}
-						// Include all past months
-						return true;
-					}, ARRAY_FILTER_USE_BOTH );
-					krsort( $past_feedback ); // Sort by month descending
-					
-					// Show HR Feedbacks section if there's past feedback OR if they're a team member (all team members need HR feedback)
-					$show_hr_section = ! empty( $past_feedback ) || $is_team_member;
-					?>
-					<?php if ( $show_hr_section ) : ?>
-						<a href="<?php echo build_team_url( 'hr-reports.php', array( 'person' => $person, 'month' => get_hr_feedback_month(), 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="hr-feedback-header">
-							<h3>📝 HR Feedbacks</h3>
-						</a>
+				<a href="<?php echo build_team_url( 'events.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="sidebar-section-link">
+					<h3 class="sidebar-section-heading">🗓️ Upcoming Events</h3>
+				</a>
+				<?php render_upcoming_events_sidebar( $person ); ?>
+
+				<?php
+				// Get HR feedback history for this person first
+				$feedback_history = get_person_feedback_history( $person );
+				$current_month = get_hr_feedback_month();
+				// Include feedback from all months that have data (including current month if submitted)
+				$past_feedback = array_filter( $feedback_history, function( $feedback, $month ) use ( $current_month ) {
+					if ( $month === 'hr_monthly_link' || ! is_array( $feedback ) ) {
+						return false;
+					}
+					// Include current month only if it's submitted to HR
+					if ( $month === $current_month ) {
+						return isset( $feedback['submitted_to_hr'] ) && $feedback['submitted_to_hr'];
+					}
+					// Include all past months
+					return true;
+				}, ARRAY_FILTER_USE_BOTH );
+				krsort( $past_feedback ); // Sort by month descending
+
+				// Show HR Feedbacks section if there's past feedback OR if they're a team member (all team members need HR feedback)
+				$show_hr_section = ! empty( $past_feedback ) || $is_team_member;
+				?>
+				<?php if ( $show_hr_section ) : ?>
+					<div style="margin-top: 30px">
+					<a href="<?php echo build_team_url( 'hr-reports.php', array( 'person' => $person, 'month' => get_hr_feedback_month(), 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="hr-feedback-header">
+						<h3 class="sidebar-section-heading">📝 HR Feedbacks</h3>
+					</a>
 					<?php
 
 					if ( ! empty( $past_feedback ) ) {
@@ -486,11 +492,8 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						<?php
 					}
 					?>
-					<?php endif; ?>
-
-					<!-- Upcoming Events -->
-					<h3 class="events-heading" style="<?php echo $show_hr_section ? 'margin-top: 30px;' : 'margin-top: 0;'; ?>">🗓️ Upcoming Events</h3>
-					<?php render_upcoming_events_sidebar( $person ); ?>
+					</div>
+				<?php endif; ?>
 				</div>
 			</div>
 		</div>
