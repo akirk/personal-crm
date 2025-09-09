@@ -24,6 +24,24 @@ if ( isset( $_GET['team'] ) ) {
 // Get privacy mode
 $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
+// Get calendar view parameters
+$view_mode = isset( $_GET['view'] ) ? $_GET['view'] : 'list';
+$calendar_month = isset( $_GET['month'] ) ? intval( $_GET['month'] ) : date( 'n' );
+$calendar_year = isset( $_GET['year'] ) ? intval( $_GET['year'] ) : date( 'Y' );
+
+// Validate view mode
+if ( ! in_array( $view_mode, array( 'list', 'month-monday', 'month-sunday' ) ) ) {
+    $view_mode = 'list';
+}
+
+// Validate calendar month/year
+if ( $calendar_month < 1 || $calendar_month > 12 ) {
+    $calendar_month = date( 'n' );
+}
+if ( $calendar_year < 2000 || $calendar_year > 2100 ) {
+    $calendar_year = date( 'Y' );
+}
+
 // Load team configuration with Person objects
 $team_data = load_team_config_with_objects( $current_team, $privacy_mode );
 
@@ -41,6 +59,86 @@ usort( $past_team_events, function( $a, $b ) {
 
 // Get all upcoming events (personal + team) using shared function
 $all_upcoming_events = get_upcoming_events_for_display( $team_data );
+
+// Calendar helper functions
+function build_calendar_url( $params = array() ) {
+    global $current_team;
+    $base_params = array( 'team' => $current_team );
+    if ( isset( $_GET['privacy'] ) ) {
+        $base_params['privacy'] = $_GET['privacy'];
+    }
+    return '?' . http_build_query( array_merge( $base_params, $params ) );
+}
+
+function get_events_for_date( $events, $date ) {
+    $target_date = $date->format( 'Y-m-d' );
+    $matching_events = array();
+
+    foreach ( $events as $event ) {
+        $event_date = $event->date->format( 'Y-m-d' );
+
+        // Check if event has end_date for multi-day support
+        if ( isset( $event->end_date ) && $event->end_date ) {
+            $end_date = $event->end_date->format( 'Y-m-d' );
+            if ( $target_date >= $event_date && $target_date <= $end_date ) {
+                $matching_events[] = $event;
+            }
+        } else {
+            // Single day event
+            if ( $event_date === $target_date ) {
+                $matching_events[] = $event;
+            }
+        }
+    }
+
+    return $matching_events;
+}
+
+function generate_calendar_grid( $year, $month, $events, $week_starts_monday = true ) {
+    $first_day = new DateTime( "$year-$month-01" );
+    $last_day = new DateTime( $first_day->format( 'Y-m-t' ) );
+
+    // Calculate first day of calendar grid
+    $first_day_of_week = (int) $first_day->format( 'w' );
+    if ( $week_starts_monday ) {
+        $first_day_of_week = $first_day_of_week === 0 ? 6 : $first_day_of_week - 1;
+    }
+
+    $calendar_start = clone $first_day;
+    $calendar_start->modify( "-$first_day_of_week days" );
+
+    // Generate 6 weeks (42 days) to ensure consistent grid
+    $calendar = array();
+    $current_date = clone $calendar_start;
+
+    for ( $week = 0; $week < 6; $week++ ) {
+        $calendar[$week] = array();
+        for ( $day = 0; $day < 7; $day++ ) {
+            $is_current_month = $current_date->format( 'n' ) == $month;
+            $is_today = $current_date->format( 'Y-m-d' ) === date( 'Y-m-d' );
+            $day_events = get_events_for_date( $events, $current_date );
+
+            $calendar[$week][$day] = array(
+                'date' => clone $current_date,
+                'day' => $current_date->format( 'j' ),
+                'is_current_month' => $is_current_month,
+                'is_today' => $is_today,
+                'events' => $day_events
+            );
+
+            $current_date->modify( '+1 day' );
+        }
+    }
+
+    return $calendar;
+}
+
+// Generate calendar data if in calendar view
+$calendar_grid = null;
+if ( $view_mode !== 'list' ) {
+    $week_starts_monday = $view_mode === 'month-monday';
+    $calendar_grid = generate_calendar_grid( $calendar_year, $calendar_month, $all_upcoming_events, $week_starts_monday );
+}
 
 // Group upcoming events by month
 $upcoming_by_month = array();
@@ -128,15 +226,46 @@ $available_teams = get_available_teams();
             </div>
         </div>
 
-        <!-- Upcoming Events Section -->
-        <div class="section">
-            <div class="section-header">
-                <h2 class="section-title">📅 Upcoming Events</h2>
-                <?php if ( ! empty( $all_upcoming_events ) ) : ?>
-                    <span class="count-text"><?php echo count( $all_upcoming_events ); ?> event<?php echo count( $all_upcoming_events ) !== 1 ? 's' : ''; ?></span>
-                <?php endif; ?>
+        <!-- View Mode Toggle -->
+        <div class="view-controls">
+            <div class="view-toggle">
+                <a href="<?php echo build_calendar_url( array( 'view' => 'list' ) ); ?>"
+                   class="view-btn <?php echo $view_mode === 'list' ? 'active' : ''; ?>">📅 Upcoming Events</a>
+                <a href="<?php echo build_calendar_url( array( 'view' => 'month-monday', 'month' => $calendar_month, 'year' => $calendar_year ) ); ?>"
+                   class="view-btn <?php echo $view_mode === 'month-monday' ? 'active' : ''; ?>">Month (Mon)</a>
+                <a href="<?php echo build_calendar_url( array( 'view' => 'month-sunday', 'month' => $calendar_month, 'year' => $calendar_year ) ); ?>"
+                   class="view-btn <?php echo $view_mode === 'month-sunday' ? 'active' : ''; ?>">Month (Sun)</a>
             </div>
+            <?php if ( ! empty( $all_upcoming_events ) ) : ?>
+                <div class="events-count">
+                    <?php echo count( $all_upcoming_events ); ?> upcoming event<?php echo count( $all_upcoming_events ) !== 1 ? 's' : ''; ?>
+                </div>
+            <?php endif; ?>
+        </div>
 
+        <!-- Calendar Navigation -->
+        <?php if ( $view_mode !== 'list' ) :
+            // Calculate previous/next month
+            $prev_month = $calendar_month === 1 ? 12 : $calendar_month - 1;
+            $prev_year = $calendar_month === 1 ? $calendar_year - 1 : $calendar_year;
+            $next_month = $calendar_month === 12 ? 1 : $calendar_month + 1;
+            $next_year = $calendar_month === 12 ? $calendar_year + 1 : $calendar_year;
+
+            $month_names = array( 1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April', 5 => 'May', 6 => 'June',
+                                 7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December' );
+        ?>
+            <div class="calendar-navigation">
+                <a href="<?php echo build_calendar_url( array( 'view' => $view_mode, 'month' => $prev_month, 'year' => $prev_year ) ); ?>"
+                   class="nav-arrow">← Previous</a>
+                <h3><?php echo $month_names[$calendar_month] . ' ' . $calendar_year; ?></h3>
+                <a href="<?php echo build_calendar_url( array( 'view' => $view_mode, 'month' => $next_month, 'year' => $next_year ) ); ?>"
+                   class="nav-arrow">Next →</a>
+            </div>
+        <?php endif; ?>
+
+        <!-- Upcoming Events Section -->
+        <?php if ( $view_mode === 'list' ) : ?>
+        <div class="section">
             <?php if ( ! empty( $upcoming_by_month ) ) : ?>
                 <div class="content-grid">
                     <?php foreach ( $upcoming_by_month as $month_data ) : ?>
@@ -214,6 +343,68 @@ $available_teams = get_available_teams();
                 </div>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
+
+        <!-- Calendar View -->
+        <?php if ( $view_mode !== 'list' && $calendar_grid ) :
+            $week_starts_monday = $view_mode === 'month-monday';
+            $day_headers = $week_starts_monday ?
+                array( 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun' ) :
+                array( 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' );
+        ?>
+        <div class="section calendar-section">
+            <div class="calendar-grid">
+                <!-- Day headers -->
+                <?php foreach ( $day_headers as $day_header ) : ?>
+                    <div class="calendar-header"><?php echo $day_header; ?></div>
+                <?php endforeach; ?>
+
+                <!-- Calendar days -->
+                <?php foreach ( $calendar_grid as $week ) : ?>
+                    <?php foreach ( $week as $day ) : ?>
+                        <div class="calendar-day <?php echo ! $day['is_current_month'] ? 'other-month' : ''; ?> <?php echo $day['is_today'] ? 'today' : ''; ?>">
+                            <div class="calendar-day-number"><?php echo $day['day']; ?></div>
+
+                            <?php if ( ! empty( $day['events'] ) ) : ?>
+                                <div class="calendar-events">
+                                    <?php
+                                    $max_visible = 3;
+                                    $event_count = 0;
+                                    foreach ( $day['events'] as $event ) :
+                                        if ( $event_count >= $max_visible ) break;
+                                        $event_title = $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary' ) ) ?
+                                                      $event->get_title() : $event->description;
+                                        $tooltip = $event_title . ( ! empty( $event->location ) ? ' - ' . $event->location : '' );
+                                    ?>
+                                        <?php if ( $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary' ) ) ) : ?>
+                                            <a href="<?php echo build_team_url( 'index.php', array( 'person' => $event->person->username ) ); ?>"
+                                               class="calendar-event <?php echo $event->type; ?>"
+                                               title="<?php echo htmlspecialchars( $tooltip ); ?>"
+                                               style="color: inherit; text-decoration: none; display: block;">
+                                                <?php echo htmlspecialchars( $event_title ); ?>
+                                            </a>
+                                        <?php else : ?>
+                                            <div class="calendar-event <?php echo $event->type; ?>" title="<?php echo htmlspecialchars( $tooltip ); ?>">
+                                                <?php echo htmlspecialchars( $event_title ); ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    <?php
+                                        $event_count++;
+                                    endforeach;
+
+                                    if ( count( $day['events'] ) > $max_visible ) : ?>
+                                        <div class="calendar-event-more">
+                                            <?php echo count( $day['events'] ) - $max_visible; ?> more
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <!-- Past Events Section (Team Events Only, Last 3 Years) -->
         <?php if ( ! empty( $past_by_month ) ) : ?>
@@ -301,7 +492,6 @@ $available_teams = get_available_teams();
             const peopleData = <?php echo json_encode( get_all_people_from_all_teams( $privacy_mode ) ); ?>;
             const teamsData = <?php echo json_encode( get_all_teams_stats() ); ?>;
             initializeCommandK(peopleData, teamsData);
-            
         });
         
         // Team switching functionality
