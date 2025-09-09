@@ -79,6 +79,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 	foreach ( $recent_months as $month ) {
 		$completed = 0;
 		$not_necessary = 0;
+		$not_necessary_reasons = array();
 		
 		foreach ( $team_members_needing_hr as $username => $person ) {
 			$feedback_history = get_person_feedback_history( $username );
@@ -86,6 +87,11 @@ if ( ! empty( $team_members_needing_hr ) ) {
 			// Check if person has "not necessary" status for this month
 			if ( isset( $feedback_history[ $month . '_not_necessary' ] ) ) {
 				$not_necessary++;
+				$reason = $feedback_history[ $month . '_not_necessary' ];
+				if ( ! isset( $not_necessary_reasons[ $reason ] ) ) {
+					$not_necessary_reasons[ $reason ] = 0;
+				}
+				$not_necessary_reasons[ $reason ]++;
 			} elseif ( isset( $feedback_history[ $month ] ) && is_array( $feedback_history[ $month ] ) ) {
 				$completed++;
 			}
@@ -97,7 +103,8 @@ if ( ! empty( $team_members_needing_hr ) ) {
 		$hr_monthly_stats[ $month ] = array(
 			'completed' => $completed,
 			'total' => $people_needing_feedback,
-			'not_necessary' => $not_necessary
+			'not_necessary' => $not_necessary,
+			'not_necessary_reasons' => $not_necessary_reasons
 		);
 	}
 }
@@ -313,7 +320,17 @@ if ( ! empty( $team_members_needing_hr ) ) {
 											<strong><?php echo date( 'M Y', strtotime( $month . '-01' ) ); ?>:</strong>
 											<?php echo $stats['completed']; ?> of <?php echo $stats['total']; ?> submitted
 											<?php if ( isset( $stats['not_necessary'] ) && $stats['not_necessary'] > 0 ) : ?>
-												<span class="hr-stats-note">(<?php echo $stats['not_necessary']; ?> not needed)</span>
+												<span class="hr-stats-note">(<?php echo $stats['not_necessary']; ?> <?php
+												if ( ! empty( $stats['not_necessary_reasons'] ) ) {
+													$reason_parts = array();
+													foreach ( $stats['not_necessary_reasons'] as $reason => $count ) {
+														$reason_display = str_replace( '_', ' ', $reason );
+														$reason_display = ucwords( $reason_display );
+														$reason_parts[] = $reason_display;
+													}
+													echo implode( ', ', $reason_parts );
+												}
+												?>)</span>
 											<?php endif; ?>
 										</div>
 									<?php endforeach; ?>
