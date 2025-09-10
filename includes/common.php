@@ -94,16 +94,23 @@ function render_cmd_k_panel() {
  * Initialize Command-K functionality with JavaScript
  */
 function init_cmd_k_js( $privacy_mode = false ) {
-	$people_data = get_all_people_from_all_teams( $privacy_mode );
-	$teams_data = get_all_teams_stats();
+	$available_teams = get_available_teams();
+	$json_files = array();
+
+	foreach ( $available_teams as $team_slug ) {
+		$json_files[] = array(
+			'slug' => $team_slug,
+			'name' => get_team_name_from_file( $team_slug )
+		);
+	}
 	?>
 	<script>
-		// Initialize Command-K with data
+		// Initialize Command-K with list of JSON files
 		document.addEventListener('DOMContentLoaded', () => {
 			if (typeof CmdK !== 'undefined') {
-				const peopleData = <?php echo json_encode( $people_data ); ?>;
-				const teamsData = <?php echo json_encode( $teams_data ); ?>;
-				CmdK.init(peopleData, teamsData);
+				const jsonFiles = <?php echo json_encode( $json_files ); ?>;
+				const privacyMode = <?php echo $privacy_mode ? 'true' : 'false'; ?>;
+				CmdK.init(jsonFiles, privacyMode);
 			}
 		});
 	</script>
@@ -119,8 +126,14 @@ function get_all_upcoming_events( $team_data ) {
 	$cutoff_date = clone $current_date;
 	$cutoff_date->add( new DateInterval( 'P3M' ) ); // 3 months from now
 
-	// Get personal events from all team members, leadership, and alumni
-	$all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['alumni'] );
+	// Check if alumni events should be included (undocumented parameter)
+	$include_alumni = isset( $_GET['alumni'] ) && $_GET['alumni'] === '1';
+
+	// Get personal events from team members and leadership, optionally alumni
+	$all_people = array_merge( $team_data['team_members'], $team_data['leadership'] );
+	if ( $include_alumni ) {
+		$all_people = array_merge( $all_people, $team_data['alumni'] );
+	}
 	foreach ( $all_people as $person ) {
 		$personal_events = $person->get_upcoming_events();
 		$all_events = array_merge( $all_events, $personal_events );
@@ -574,6 +587,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 
 		// Set additional properties
 		$person->nickname = $privacy_mode ? '' : ( $member_data['nickname'] ?? '' );
+		$person->email = $member_data['email'] ?? '';
 		$person->birthday = $member_data['birthday'] ?? '';
 		$person->company_anniversary = $member_data['company_anniversary'] ?? '';
 		$person->partner = $member_data['partner'] ?? '';
@@ -585,6 +599,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->github_repos = $member_data['github_repos'] ?? array();
 		$person->wordpress = $member_data['wordpress'] ?? '';
 		$person->linkedin = $member_data['linkedin'] ?? '';
+		$person->website = $member_data['website'] ?? '';
 		$person->personal_events = $member_data['personal_events'] ?? array();
 
 		$team_members[$username] = $person;
@@ -622,6 +637,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 
 		// Set additional properties
 		$person->nickname = $privacy_mode ? '' : ( $leader_data['nickname'] ?? '' );
+		$person->email = $leader_data['email'] ?? '';
 		$person->birthday = $leader_data['birthday'] ?? '';
 		$person->company_anniversary = $leader_data['company_anniversary'] ?? '';
 		$person->partner = $leader_data['partner'] ?? '';
@@ -633,6 +649,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->github_repos = $leader_data['github_repos'] ?? array();
 		$person->wordpress = $leader_data['wordpress'] ?? '';
 		$person->linkedin = $leader_data['linkedin'] ?? '';
+		$person->website = $leader_data['website'] ?? '';
 		$person->personal_events = $leader_data['personal_events'] ?? array();
 
 		$leadership[$username] = $person;
@@ -673,6 +690,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 
 		// Set additional properties
 		$person->nickname = $privacy_mode ? '' : ( $alumni_data['nickname'] ?? '' );
+		$person->email = $alumni_data['email'] ?? '';
 		$person->birthday = $alumni_data['birthday'] ?? '';
 		$person->company_anniversary = $alumni_data['company_anniversary'] ?? '';
 		$person->partner = $alumni_data['partner'] ?? '';
@@ -684,6 +702,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->github_repos = $alumni_data['github_repos'] ?? array();
 		$person->wordpress = $alumni_data['wordpress'] ?? '';
 		$person->linkedin = $alumni_data['linkedin'] ?? '';
+		$person->website = $alumni_data['website'] ?? '';
 		$person->personal_events = $alumni_data['personal_events'] ?? array();
 
 		$alumni[$username] = $person;
@@ -743,8 +762,14 @@ function get_upcoming_events_for_display( $team_data ) {
 	$cutoff_date = clone $current_date;
 	$cutoff_date->add( new DateInterval( 'P3M' ) ); // 3 months from now
 
+	// Check if alumni events should be included (undocumented parameter)
+	$include_alumni = isset( $_GET['alumni'] ) && $_GET['alumni'] === '1';
+
 	// Check if we have Person objects or raw arrays
-	$all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['alumni'] );
+	$all_people = array_merge( $team_data['team_members'], $team_data['leadership'] );
+	if ( $include_alumni ) {
+		$all_people = array_merge( $all_people, $team_data['alumni'] );
+	}
 
 	// Only process personal events if we have Person objects (not raw arrays)
 	if ( ! empty( $all_people ) ) {
@@ -1017,14 +1042,53 @@ function render_dark_mode_toggle( $aria_label = 'Toggle dark mode' ) {
             <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
             <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
         </svg>
+        <svg class="sun-forced-icon" width="28" height="16" viewBox="0 0 34 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            <rect x="26" y="17" width="6" height="5" rx="1"></rect>
+            <path d="M27 17v-2a2 2 0 0 1 2-2 2 2 0 0 1 2 2v2"></path>
+        </svg>
         <svg class="moon-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
         </svg>
-        <svg class="auto-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-            <line x1="8" y1="21" x2="16" y2="21"></line>
-            <line x1="12" y1="17" x2="12" y2="21"></line>
+        <svg class="moon-forced-icon" width="28" height="16" viewBox="0 0 34 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            <rect x="26" y="17" width="6" height="5" rx="1"></rect>
+            <path d="M27 17v-2a2 2 0 0 1 2-2 2 2 0 0 1 2 2v2"></path>
         </svg>
     </button>
     <?php
+}
+
+/**
+ * Create backup of existing configuration file (max one per minute)
+ */
+function create_backup( $file_path ) {
+	if ( ! file_exists( $file_path ) ) {
+		return true; // No file to backup
+	}
+	// Create backups directory if it doesn't exist
+	$backups_dir = dirname( $file_path ) . '/backups';
+	if ( ! file_exists( $backups_dir ) ) {
+		mkdir( $backups_dir, 0755, true );
+	}
+	// Generate backup filename in backups directory (minute precision only)
+	$filename = basename( $file_path );
+	$backup_timestamp = date( '-Y-m-d-H-i' ); // No seconds - only minute precision
+	$backup_filename = substr( $filename, 0, -4 ) . 'bak' . $backup_timestamp . '.json';
+	$backup_path = $backups_dir . '/' . $backup_filename;
+
+	// Only create backup if one doesn't already exist for this minute
+	if ( file_exists( $backup_path ) ) {
+		return true; // Backup for this minute already exists
+	}
+
+	return copy( $file_path, $backup_path );
 }

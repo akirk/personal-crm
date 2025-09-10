@@ -96,35 +96,6 @@ function load_or_create_config( $file_path ) {
 	);
 }
 
-
-/**
- * Create backup of existing configuration file (max one per minute)
- */
-function create_backup( $file_path ) {
-	if ( ! file_exists( $file_path ) ) {
-		return true; // No file to backup
-	}
-
-	// Create backups directory if it doesn't exist
-	$backups_dir = __DIR__ . '/backups';
-	if ( ! file_exists( $backups_dir ) ) {
-		mkdir( $backups_dir, 0755, true );
-	}
-
-	// Generate backup filename in backups directory (minute precision only)
-	$filename = basename( $file_path );
-	$backup_timestamp = date( '-Y-m-d-H-i' ); // No seconds - only minute precision
-	$backup_filename = substr( $filename, 0, -4 ) . 'bak' . $backup_timestamp . '.json';
-	$backup_path = $backups_dir . '/' . $backup_filename;
-	
-	// Only create backup if one doesn't already exist for this minute
-	if ( file_exists( $backup_path ) ) {
-		return true; // Backup for this minute already exists
-	}
-	
-	return copy( $file_path, $backup_path );
-}
-
 /**
  * Save configuration to JSON file with backup
  */
@@ -415,6 +386,67 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			}
 			break;
 			
+		case 'move_to_team':
+			$username = $_POST['username'] ?? '';
+			$from_section = $_POST['from_section'] ?? '';
+			$target_team = $_POST['target_team'] ?? '';
+			$delete_if_empty = isset( $_POST['delete_if_empty'] );
+			
+			if ( empty( $target_team ) || $target_team === $current_team ) {
+				$error = 'Please select a different team to move to.';
+				break;
+			}
+			
+			// Get person data from current team
+			$person_data = null;
+			if ( $from_section === 'team_members' && isset( $config['team_members'][ $username ] ) ) {
+				$person_data = $config['team_members'][ $username ];
+				unset( $config['team_members'][ $username ] );
+			} elseif ( $from_section === 'leadership' && isset( $config['leadership'][ $username ] ) ) {
+				$person_data = $config['leadership'][ $username ];
+				unset( $config['leadership'][ $username ] );
+			}
+			
+			if ( $person_data ) {
+				// Load target team config
+				$target_team_file = __DIR__ . '/' . $target_team . '.json';
+				$target_config = load_or_create_config( $target_team_file );
+				
+				// Add person to target team (default to team_members)
+				$target_config['team_members'][ $username ] = $person_data;
+				
+				// Check if current team will be empty (excluding alumni)
+				$has_members = ! empty( $config['team_members'] ) || ! empty( $config['leadership'] );
+				
+				// Save both configs
+				$current_saved = save_config( $config, $config_file );
+				$target_saved = save_config( $target_config, $target_team_file );
+				
+				if ( $current_saved && $target_saved ) {
+					// Delete current team if requested and it's empty
+					if ( $delete_if_empty && ! $has_members && $current_team !== 'team' ) {
+						if ( unlink( $config_file ) ) {
+							// Redirect to person in new team after deleting current team
+							$redirect_url = build_team_url( 'index.php', array( 'team' => $target_team, 'person' => $username ) );
+							header( 'Location: ' . $redirect_url );
+							exit;
+						} else {
+							$message = "Person moved successfully but could not delete empty team file.";
+						}
+					} else {
+						// Redirect to person in new team
+						$redirect_url = build_team_url( 'index.php', array( 'team' => $target_team, 'person' => $username ) );
+						header( 'Location: ' . $redirect_url );
+						exit;
+					}
+				} else {
+					$error = 'Failed to move person to target team.';
+				}
+			} else {
+				$error = 'Person not found in current team.';
+			}
+			break;
+			
 		case 'delete_event':
 			$event_index = (int) ( $_POST['event_index'] ?? -1 );
 			if ( $event_index >= 0 && isset( $config['events'][ $event_index ] ) ) {
@@ -658,7 +690,7 @@ function create_person_data_from_form() {
 		'wordpress' => sanitize_text_field( $_POST['wordpress'] ?? '' ),
 		'linkedin' => sanitize_text_field( $_POST['linkedin'] ?? '' ),
 		'website' => sanitize_text_field( $_POST['website'] ?? '' ),
-		'email' => sanitize_email( $_POST['email'] ?? '' ),
+		'email' => filter_var( $_POST['email'] ?? '', FILTER_SANITIZE_EMAIL ),
 		'location' => sanitize_text_field( $_POST['location'] ?? '' ),
 		'timezone' => sanitize_text_field( $_POST['timezone'] ?? '' ),
 		'links' => $links,
@@ -807,6 +839,12 @@ function get_missing_data_points( $person, $person_type = 'member' ) {
 	}
 
 	// Recommended fields - likely to be filled out for most people
+	if ( empty( $person['email'] ) ) {
+		$missing[] = array( 'field' => 'Email address', 'priority' => 'recommended' );
+	}
+	if ( empty( $person['website'] ) ) {
+		$missing[] = array( 'field' => 'Website', 'priority' => 'recommended' );
+	}
 	if ( empty( $person['wordpress'] ) ) {
 		$missing[] = array( 'field' => 'WordPress.org profile', 'priority' => 'recommended' );
 	}
@@ -967,7 +1005,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<?php global $current_team; if ( $current_team !== 'team' ) : ?>
 		<input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
 	<?php endif; ?>
-	<button type="submit" class="btn" style="float: right; margin-top: -3em"><?php echo $submit_text; ?></button>
+	<button type="submit" class="btn btn-primary" style="float: right; margin-top: -3em"><?php echo $submit_text; ?></button>
 
 	<!-- Personal Information -->
 	<h4 class="section-heading">Personal Information</h4>
@@ -1182,9 +1220,9 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
 	<!-- GitHub Repositories -->
 	<div class="form-group">
-		<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-			<label>GitHub Repositories</label>
-			<button type="button" onclick="addRepoField('<?php echo $prefix; ?>')" class="btn-add-small">+ Add Repository</button>
+		<label>GitHub Repositories</label>
+		<div style="margin: 5px 0 10px 0;">
+			<button type="button" onclick="addRepoField('<?php echo $prefix; ?>')" class="btn-add-repo">+ Add Repository</button>
 		</div>
 		
 		<div id="<?php echo $prefix; ?>repo_fields">
@@ -1379,6 +1417,87 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			This will move the person to alumni status while preserving all their data.
 		</p>
 	</div>
+
+	<!-- Move to Another Team -->
+	<?php if ( $is_editing && ( $type === 'member' || $type === 'leader' ) ) : ?>
+		<?php 
+		$available_teams = get_available_teams();
+		$other_teams = array_filter( $available_teams, function( $team ) use ( $current_team ) {
+			return $team !== $current_team;
+		});
+		?>
+		<?php if ( ! empty( $other_teams ) ) : ?>
+			<div class="divider-section">
+				<h4 class="text-muted" style="margin-bottom: 10px;">Move to Another Team</h4>
+				<form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to move this person to another team?')">
+					<input type="hidden" name="action" value="move_to_team">
+					<input type="hidden" name="username" value="<?php echo htmlspecialchars( $edit_data['username'] ?? '' ); ?>">
+					<input type="hidden" name="from_section" value="<?php echo $config['section_key']; ?>">
+					
+					<div style="margin-bottom: 10px;">
+						<label for="target_team" style="display: block; margin-bottom: 5px; font-weight: bold;">Target Team:</label>
+						<select name="target_team" id="target_team" required style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px;">
+							<option value="">Select a team...</option>
+							<?php foreach ( $other_teams as $team_slug ) : ?>
+								<?php 
+								$team_name = get_team_name_from_file( $team_slug );
+								
+								// Load target team config to get member count
+								$target_team_file = __DIR__ . '/' . $team_slug . '.json';
+								$target_team_config = load_or_create_config( $target_team_file );
+								$member_count = count( $target_team_config['team_members'] ?? array() ) + count( $target_team_config['leadership'] ?? array() );
+								
+								$display_name = $team_name . ' (' . $member_count . ' members)';
+								?>
+								<option value="<?php echo htmlspecialchars( $team_slug ); ?>">
+									<?php echo htmlspecialchars( $display_name ); ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+					</div>
+					
+					<?php 
+					// Check if moving this person would leave current team empty (excluding alumni)
+					global $config_file;
+					$team_config = load_or_create_config( $config_file );
+					$current_username = $edit_data['username'] ?? '';
+					$temp_members = $team_config['team_members'] ?? array();
+					$temp_leadership = $team_config['leadership'] ?? array();
+					
+					// Remove this person from the appropriate section
+					if ( isset( $temp_members[ $current_username ] ) ) {
+						unset( $temp_members[ $current_username ] );
+					}
+					if ( isset( $temp_leadership[ $current_username ] ) ) {
+						unset( $temp_leadership[ $current_username ] );
+					}
+					
+					$would_be_empty = empty( $temp_members ) && empty( $temp_leadership );
+					$has_alumni = ! empty( $team_config['alumni'] );
+					?>
+					
+					<?php if ( $would_be_empty && ! $has_alumni && $current_team !== 'team' ) : ?>
+						<div style="margin-bottom: 10px;">
+							<label>
+								<input type="checkbox" name="delete_if_empty" checked style="margin-right: 5px;">
+								Delete current team if no members remain
+							</label>
+							<p class="text-small-muted" style="margin: 5px 0 0 20px;">
+								This person is the last active member. Check to delete the team file.
+							</p>
+						</div>
+					<?php endif; ?>
+					
+					<button type="submit" class="btn btn-primary">
+						🔄 Move to Team
+					</button>
+				</form>
+				<p class="text-small-muted" style="margin: 5px 0 0 0;">
+					This will move the person to the selected team as a regular member.
+				</p>
+			</div>
+		<?php endif; ?>
+	<?php endif; ?>
 <?php endif; ?>
 <?php
 }

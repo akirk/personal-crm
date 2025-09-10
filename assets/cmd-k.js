@@ -10,34 +10,222 @@ window.CmdK = {
     allPeople: [],
     teamStats: [],
     allItems: [], // Combined teams and people
+    jsonFiles: [], // List of available JSON files
+    dataLoaded: false,
+    privacyMode: false,
+    loadingError: null,
 
-    init(peopleData, teamsData) {
-        this.allPeople = peopleData || [];
-        this.teamStats = teamsData || [];
-        
-        // Combine teams and people into one searchable array
-        this.allItems = [
-            // Add teams first (they'll appear at the top)
-            ...this.teamStats.map(team => ({
-                ...team,
-                itemType: 'team',
-                searchText: team.name.toLowerCase()
-            })),
-            // Then add people
-            ...this.allPeople.map(person => ({
-                ...person,
-                itemType: 'person',
-                searchText: `${person.name} ${person.nickname || ''} ${person.username} ${person.role} ${person.type} ${person.team}`.toLowerCase()
-            }))
-        ];
-        
-        // Start with just teams for the overview
-        this.filteredItems = this.teamStats.map(team => ({
-            ...team,
-            itemType: 'team',
-            searchText: team.name.toLowerCase()
-        }));
+    init(jsonFiles, privacyMode = false) {
+        this.jsonFiles = jsonFiles || [];
+        this.privacyMode = privacyMode;
         this.bindEvents();
+    },
+
+    async loadData() {
+        if (this.dataLoaded) {
+            return;
+        }
+
+        try {
+            // Load all JSON files in parallel
+            const jsonPromises = this.jsonFiles.map(async (file) => {
+                try {
+                    const response = await fetch(file.slug + '.json');
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const text = await response.text();
+                    let data;
+                    try {
+                        data = JSON.parse(text);
+                    } catch (parseError) {
+                        console.error(`JSON parse error in ${file.slug}.json:`, parseError.message);
+                        console.error('Raw content preview:', text.substring(0, 200) + '...');
+                        throw new Error(`Invalid JSON in ${file.slug}.json: ${parseError.message}`);
+                    }
+                    
+                    return {
+                        slug: file.slug,
+                        name: file.name,
+                        data: data
+                    };
+                } catch (fileError) {
+                    console.error(`Error loading ${file.slug}.json:`, fileError);
+                    throw fileError;
+                }
+            });
+
+            const jsonResults = await Promise.all(jsonPromises);
+
+            // Process team stats
+            this.teamStats = jsonResults.map(result => {
+                const config = result.data;
+                const teamMembersCount = Object.keys(config.team_members || {}).length;
+                const leadershipCount = Object.keys(config.leadership || {}).length;
+                const alumniCount = Object.keys(config.alumni || {}).length;
+                const totalPeople = teamMembersCount + leadershipCount + alumniCount;
+
+                return {
+                    slug: result.slug,
+                    name: result.name,
+                    team_members: teamMembersCount,
+                    leadership: leadershipCount,
+                    alumni: alumniCount,
+                    total_people: totalPeople,
+                    is_default: config.default || false,
+                    url: this.buildTeamUrl('index.php', {}, result.slug)
+                };
+            });
+
+            // Process all people
+            this.allPeople = [];
+            jsonResults.forEach(result => {
+                const config = result.data;
+                const teamName = result.name;
+                const teamSlug = result.slug;
+
+                // Process team members
+                Object.entries(config.team_members || {}).forEach(([username, memberData]) => {
+                    this.allPeople.push(this.processPerson(username, memberData, 'Team Member', teamName, teamSlug));
+                });
+
+                // Process leadership
+                Object.entries(config.leadership || {}).forEach(([username, leaderData]) => {
+                    this.allPeople.push(this.processPerson(username, leaderData, 'Leadership', teamName, teamSlug));
+                });
+
+                // Process alumni
+                Object.entries(config.alumni || {}).forEach(([username, alumniData]) => {
+                    this.allPeople.push(this.processPerson(username, alumniData, 'Alumni', teamName, teamSlug));
+                });
+            });
+
+            // Sort people by name
+            this.allPeople.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Sort teams by name
+            this.teamStats.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Combine teams and people into one searchable array
+            this.allItems = [
+                // Add teams first (they'll appear at the top)
+                ...this.teamStats.map(team => ({
+                    ...team,
+                    itemType: 'team',
+                    searchText: team.name.toLowerCase()
+                })),
+                // Then add people
+                ...this.allPeople.map(person => ({
+                    ...person,
+                    itemType: 'person',
+                    searchText: `${person.name} ${person.nickname || ''} ${person.username} ${person.role} ${person.type} ${person.team}`.toLowerCase()
+                }))
+            ];
+
+            this.dataLoaded = true;
+        } catch (error) {
+            console.error('Failed to load cmd-k data:', error);
+            // Set error state for UI display
+            this.loadingError = error.message || 'Unknown error occurred';
+        }
+    },
+
+    processPerson(username, personData, type, teamName, teamSlug) {
+        const links = [];
+        
+        // Process links
+        Object.entries(personData.links || {}).forEach(([text, url]) => {
+            if (url) {
+                links.push({ text, url });
+            }
+        });
+
+        // Add Linear link if available
+        if (personData.linear) {
+            links.push({
+                text: 'Linear',
+                url: `https://linear.app/a8c/profiles/${personData.linear}`
+            });
+        }
+
+        return {
+            username: username,
+            name: this.privacyMode ? this.maskName(personData.name || '') : (personData.name || ''),
+            nickname: this.privacyMode ? '' : (personData.nickname || ''),
+            role: personData.role || '',
+            type: type,
+            team: teamName,
+            team_slug: teamSlug,
+            location: personData.location || '',
+            birthday: this.getBirthdayDisplay(personData),
+            links: links,
+            url: this.buildTeamUrl('index.php', {
+                person: username,
+                privacy: this.privacyMode ? '1' : '0'
+            }, teamSlug)
+        };
+    },
+
+    maskName(fullName) {
+        if (!this.privacyMode || !fullName) {
+            return fullName;
+        }
+        
+        const parts = fullName.trim().split(' ');
+        if (parts.length <= 1) {
+            return fullName;
+        }
+
+        const firstName = parts[0];
+        const lastNameInitial = parts[parts.length - 1].charAt(0) + '.';
+        return firstName + ' ' + lastNameInitial;
+    },
+
+    getBirthdayDisplay(personData) {
+        if (!personData.birthday) {
+            return '';
+        }
+
+        if (this.privacyMode) {
+            // For privacy mode, show age if available
+            if (/^\d{4}-\d{2}-\d{2}$/.test(personData.birthday)) {
+                const birthDate = new Date(personData.birthday);
+                const currentDate = new Date();
+                const age = currentDate.getFullYear() - birthDate.getFullYear();
+                return 'Age ' + age;
+            }
+            return '[Hidden]';
+        }
+
+        // For non-privacy mode, return formatted display
+        if (/^\d{4}-\d{2}-\d{2}$/.test(personData.birthday)) {
+            const birthDate = new Date(personData.birthday);
+            return birthDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        } else if (/^\d{2}-\d{2}$/.test(personData.birthday)) {
+            const [month, day] = personData.birthday.split('-');
+            const displayDate = new Date(2000, parseInt(month) - 1, parseInt(day));
+            return displayDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        return personData.birthday;
+    },
+
+    buildTeamUrl(baseUrl, additionalParams = {}, teamSlug = null) {
+        const params = new URLSearchParams();
+
+        if (teamSlug && teamSlug !== 'team') {
+            params.set('team', teamSlug);
+        }
+
+        Object.entries(additionalParams).forEach(([key, value]) => {
+            if (value) {
+                params.set(key, value);
+            }
+        });
+
+        const queryString = params.toString();
+        return queryString ? `${baseUrl}?${queryString}` : baseUrl;
     },
 
     bindEvents() {
@@ -88,16 +276,11 @@ window.CmdK = {
         }
     },
 
-    open() {
+    async open() {
         this.isOpen = true;
         this.selectedIndex = 0;
         this.selectedLinkIndex = -1;
-        // Show team overview by default
-        this.filteredItems = this.teamStats.map(team => ({
-            ...team,
-            itemType: 'team',
-            searchText: team.name.toLowerCase()
-        }));
+
         const overlay = document.getElementById('cmd-k-overlay');
         const searchInput = document.getElementById('cmd-k-search');
         
@@ -108,6 +291,20 @@ window.CmdK = {
             searchInput.focus();
         }
         this.updatePlaceholder();
+
+        // Show loading state
+        this.filteredItems = [];
+        this.renderResults();
+
+        // Load data if not already loaded
+        await this.loadData();
+
+        // Show team overview by default
+        this.filteredItems = this.teamStats.map(team => ({
+            ...team,
+            itemType: 'team',
+            searchText: team.name.toLowerCase()
+        }));
         this.renderResults();
     },
 
@@ -249,6 +446,20 @@ window.CmdK = {
         const resultsContainer = document.getElementById('cmd-k-results');
         if (!resultsContainer) return;
         
+        if (this.loadingError) {
+            resultsContainer.innerHTML = `<div class="cmd-k-error">
+                <div style="color: #ef4444; font-weight: bold;">Failed to load data</div>
+                <div style="font-size: 12px; margin-top: 8px; color: #6b7280;">${this.escapeHtml(this.loadingError)}</div>
+                <div style="font-size: 11px; margin-top: 4px; color: #9ca3af;">Check console for details</div>
+            </div>`;
+            return;
+        }
+        
+        if (!this.dataLoaded && this.filteredItems.length === 0) {
+            resultsContainer.innerHTML = `<div class="cmd-k-loading">Loading data...</div>`;
+            return;
+        }
+
         if (this.filteredItems.length === 0) {
             resultsContainer.innerHTML = `<div class="cmd-k-no-results">No teams or people found</div>`;
             return;

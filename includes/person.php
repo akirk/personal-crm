@@ -21,8 +21,9 @@ class Person {
 	public $github_repos; // Array of GitHub repositories
 	public $wordpress; // WordPress.org username
 	public $linkedin; // LinkedIn username
+	public $website; // Personal website URL
 	public $personal_events; // Array of personal events like "return from AFK", "vacation end", etc.
-
+	public $email;
 	private $original_username; // Store original username for data lookups
 
 	public function __construct( $name, $username = '', $links = array(), $role = '', $privacy_mode = false ) {
@@ -662,5 +663,42 @@ class Person {
 		} );
 
 		return $events;
+	}
+
+	/**
+	 * Get Gravatar URL for the person's email address
+	 *
+	 * @param int $size Size of the avatar in pixels
+	 * @param string $default Default image to use if no Gravatar is found
+	 * @param string $rating Maximum rating (g, pg, r, x)
+	 * @return string|null Gravatar URL or null if no email
+	 */
+	public function get_gravatar_url( $size = 80, $default = 'identicon', $rating = 'g' ) {
+		if ( empty( $this->email ) ) {
+			return null;
+		}
+
+		$hash = md5( strtolower( trim( $this->email ) ) );
+		$url = "https://www.gravatar.com/avatar/{$hash}?s={$size}&d={$default}&r={$rating}";
+
+		return $url;
+	}
+
+	/**
+	 * Check if the person has a Gravatar image (not just the default)
+	 *
+	 * @return bool True if person has a custom Gravatar
+	 */
+	public function has_gravatar() {
+		if ( empty( $this->email ) ) {
+			return false;
+		}
+
+		$hash = md5( strtolower( trim( $this->email ) ) );
+		$url = "https://www.gravatar.com/avatar/{$hash}?d=404";
+
+		// Check if Gravatar returns 404 (no custom avatar) or 200 (has avatar)
+		$headers = @get_headers( $url );
+		return $headers && strpos( $headers[0], '200' ) !== false;
 	}
 }

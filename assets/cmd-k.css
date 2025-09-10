@@ -201,6 +201,16 @@
 .cmd-k-no-results {
     padding: 40px 20px;
     text-align: center;
+}
+
+.cmd-k-loading {
+    padding: 40px 20px;
+    text-align: center;
     color: light-dark(#9ca3af, #888);
     font-style: italic;
+}
+
+.cmd-k-error {
+    padding: 40px 20px;
+    text-align: center;
 }

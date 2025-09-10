@@ -603,6 +603,7 @@ details summary span:last-child {
     color: light-dark(#666, #e0e0e0);
 }
 
+
 /* Common card and section styles */
 .stat-card {
     background: light-dark(white, #2d2d2d);
@@ -813,6 +814,23 @@ details summary span:last-child {
     border-radius: 4px;
     cursor: pointer;
     font-size: 12px;
+}
+
+.btn-add-repo {
+    padding: 6px 12px;
+    background: transparent;
+    color: light-dark(#6c757d, #b0b0b0);
+    border: 1px solid light-dark(#dee2e6, #555);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: normal;
+}
+
+.btn-add-repo:hover {
+    background: light-dark(#e9ecef, #3a3a3a);
+    color: light-dark(#495057, #d0d0d0);
+    border-color: light-dark(#adb5bd, #666);
 }
 
 .btn-remove-small {
@@ -1041,6 +1059,19 @@ details summary span:last-child {
 .btn-danger:hover {
     background: light-dark(#dc3545, #e74c3c);
     color: white;
+}
+
+.btn-primary {
+    background: light-dark(#007cba, #4a90e2) !important;
+    color: white !important;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0, 124, 186, 0.3);
+}
+
+.btn-primary:hover {
+    background: light-dark(#005a87, #5ba0ff) !important;
+    box-shadow: 0 3px 6px rgba(0, 124, 186, 0.4);
+    transform: translateY(-1px);
 }
 
 .message {
@@ -1373,6 +1404,41 @@ details summary span:last-child {
     border-bottom: 2px solid light-dark(#e9ecef, #444);
 }
 
+.people-section {
+    position: relative;
+}
+
+.section-with-avatar {
+    position: relative;
+    padding-right: 120px; /* Make room for avatar */
+}
+
+.person-avatar-section {
+    position: absolute;
+    top: 0;
+    right: 0;
+    text-align: center;
+    z-index: 1;
+}
+
+.person-avatar-section .gravatar-large {
+    border-radius: 50%;
+    border: 3px solid light-dark(#e9ecef, #555);
+    display: block;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.person-name-badge {
+    margin-top: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: light-dark(#666, #b0b0b0);
+    background: light-dark(#f8f9fa, #2a2a2a);
+    padding: 4px 8px;
+    border-radius: 12px;
+    border: 1px solid light-dark(#dee2e6, #444);
+}
+
 .person-title {
     margin: 0;
     font-size: 24px;
@@ -1424,6 +1490,7 @@ details summary span:last-child {
     align-items: center;
     padding: 6px 12px;
     color: white;
+    background: light-dark(#6c757d, #555); /* Default background for unknown link types */
     border-radius: 6px;
     text-decoration: none;
     font-size: 14px;
@@ -1444,6 +1511,11 @@ details summary span:last-child {
 
 .external-link.linear {
     background: #5e6ad2;
+    color: white;
+}
+
+.external-link.website {
+    background: light-dark(#28a745, #34ce57);
     color: white;
 }
 

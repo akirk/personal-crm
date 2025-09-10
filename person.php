@@ -137,8 +137,25 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 		<div class="overview-layout">
 			<div class="people-section">
 				<?php if ( ! empty( $person_data->birthday ) || ! empty( $person_data->company_anniversary ) || ! empty( $kids_with_ages ) || ! empty( $person_data->notes ) || ! empty( $person_data->location ) || ! empty( $person_data->partner ) ) : ?>
-					<div class="section">
+					<div class="section section-with-avatar">
+						<?php $gravatar_url = $person_data->get_gravatar_url( 100 ); ?>
+						<?php if ( $gravatar_url && ! $privacy_mode ) : ?>
+							<div class="person-avatar-section">
+								<img src="<?php echo htmlspecialchars( $gravatar_url ); ?>"
+									 alt="<?php echo htmlspecialchars( $person_data->get_display_name_with_nickname() ); ?>"
+									 class="gravatar-large"
+									 width="100"
+									 height="100">
+								<?php if ( ! empty( $person_data->role ) ) : ?>
+									<div class="person-name-badge"><?php echo htmlspecialchars( $person_data->name ); ?></div>
+								<?php endif; ?>
+							</div>
+						<?php endif; ?>
 						<h2>Personal Details</h2>
+
+						<?php if ( ! empty( $person_data->role ) ) : ?>
+							<p><strong>💼 Role:</strong> <?php echo htmlspecialchars( $person_data->role ); ?></p>
+						<?php endif; ?>
 
 						<?php if ( ! empty( $person_data->birthday ) ) : ?>
 							<?php
@@ -259,10 +276,9 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					$has_wordpress = ! empty( $person_data->wordpress );
 					$has_linkedin = ! empty( $person_data->linkedin );
 					$has_website = ! empty( $person_data->website );
-					$has_email = ! empty( $person_data->email );
 					$has_linear = ! empty( $person_data->links['Linear'] ?? '' );
 					$has_repos = ! empty( $person_data->github_repos );
-					$has_any_accounts = $has_github || $has_wordpress || $has_linkedin || $has_website || $has_email || $has_linear;
+					$has_any_accounts = $has_github || $has_wordpress || $has_linkedin || $has_website || $has_linear;
 					?>
 
 					<?php if ( $has_repos ) : ?>
@@ -369,12 +385,6 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 									</a>
 								<?php endif; ?>
 
-								<?php if ( $has_email ) : ?>
-									<a href="mailto:<?php echo htmlspecialchars( $person_data->email ); ?>" class="external-link email">
-										<?php echo get_link_icon('Email', 'mailto:' . $person_data->email, 16); ?>
-										Email
-									</a>
-								<?php endif; ?>
 
 								<?php if ( $has_wordpress ) : ?>
 									<a href="https://profiles.wordpress.org/<?php echo htmlspecialchars( $person_data->wordpress ); ?>" target="_blank" class="external-link wordpress">
@@ -513,8 +523,24 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
 			<?php if ( ! empty( $person_data ) && ( ! empty( $person_data->location ) || ! empty( $person_data->timezone ) ) ) : ?>
-			createTimeUpdater('<?php echo addslashes( $person_data->timezone ); ?>', '<?php echo addslashes( $person ); ?>');
+			createTimeUpdater('<?php echo addslashes( $person_data->timezone ); ?>', '<?php echo addslashes( $person ); ?>', {
+				verboseDifference: true
+			});
 			<?php endif; ?>
+
+			// Keyboard shortcut: Press 'e' to edit person
+			document.addEventListener('keydown', (event) => {
+				// Only trigger if not typing in an input field
+				if (event.target.tagName.toLowerCase() !== 'input' && 
+					event.target.tagName.toLowerCase() !== 'textarea' && 
+					!event.target.isContentEditable) {
+					
+					if (event.key.toLowerCase() === 'e') {
+						event.preventDefault();
+						window.location.href = '<?php echo addslashes( $person_data->get_edit_url() ); ?>';
+					}
+				}
+			});
 		});
 	</script>
 </body>
