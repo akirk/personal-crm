@@ -59,11 +59,19 @@ foreach ( $team_members as $username => $person ) {
 
 // Calculate monthly completion rates
 $current_month = get_hr_feedback_month();
+
+// Ensure current month is included when hr_view=current is set
+if ( isset( $_GET['hr_view'] ) && $_GET['hr_view'] === 'current' ) {
+	$current_month_actual = ( new DateTime() )->format('Y-m');
+	$feedback_stats['months_with_data'][ $current_month_actual ] = true;
+}
+
 $feedback_stats['months_with_data'] = array_keys( $feedback_stats['months_with_data'] );
 rsort( $feedback_stats['months_with_data'] ); // Sort newest first
 
 foreach ( $feedback_stats['months_with_data'] as $month ) {
-    if ( $month === $current_month ) continue; // Skip current month as it might not be complete
+    // Skip current month as it might not be complete, unless hr_view=current is set
+    if ( $month === $current_month && ! ( isset( $_GET['hr_view'] ) && $_GET['hr_view'] === 'current' ) ) continue;
     
     $completed_this_month = 0;
     $not_necessary_this_month = 0;

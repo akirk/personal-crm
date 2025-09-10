@@ -191,6 +191,12 @@ function mask_event_description( $description, $privacy_mode, $all_people ) {
  */
 function get_hr_feedback_month() {
 	$today = new DateTime();
+	
+	// Check for explicit hr_view parameter
+	if ( isset( $_GET['hr_view'] ) && $_GET['hr_view'] === 'current' ) {
+		return $today->format('Y-m');
+	}
+	
 	$day = (int) $today->format('d');
 	
 	if ( $day >= 15 ) {

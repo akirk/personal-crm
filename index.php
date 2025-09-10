@@ -66,6 +66,12 @@ if ( ! empty( $team_members_needing_hr ) ) {
 		}
 	}
 	
+	// Ensure current month is included when hr_view=current is set
+	if ( isset( $_GET['hr_view'] ) && $_GET['hr_view'] === 'current' ) {
+		$current_month_actual = ( new DateTime() )->format('Y-m');
+		$all_months[ $current_month_actual ] = true;
+	}
+	
 	// Sort months newest first and take the 6 most recent
 	$sorted_months = array_keys( $all_months );
 	rsort( $sorted_months );
@@ -290,7 +296,13 @@ if ( ! empty( $team_members_needing_hr ) ) {
 
 					<?php if ( ! empty( $team_members_needing_hr ) ) : ?>
 						<div style="margin-top: 30px;">
-							<a href="<?php echo build_team_url( 'hr-stats.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="sidebar-section-link">
+							<?php
+							$hr_stats_params = array( 'privacy' => $privacy_mode ? '1' : '0' );
+							if ( isset( $_GET['hr_view'] ) && $_GET['hr_view'] === 'current' ) {
+								$hr_stats_params['hr_view'] = 'current';
+							}
+							?>
+							<a href="<?php echo build_team_url( 'hr-stats.php', $hr_stats_params ); ?>" class="sidebar-section-link">
 								<h3 class="sidebar-section-heading">📊 HR Feedback Overview →</h3>
 							</a>
 							<?php if ( ! empty( $hr_monthly_stats ) ) : ?>
@@ -336,6 +348,11 @@ if ( ! empty( $team_members_needing_hr ) ) {
 				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" class="footer-link">🔒 Privacy Mode ON</a>
 			<?php else : ?>
 				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="footer-link">🔓 Privacy Mode OFF</a>
+			<?php endif; ?>
+			<?php if ( isset( $_GET['hr_view'] ) && $_GET['hr_view'] === 'current' ) : ?>
+				<a href="?<?php echo http_build_query( array_diff_key( $_GET, array( 'hr_view' => '' ) ) ); ?>" class="footer-link">📅 HR: Current Month</a>
+			<?php else : ?>
+				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'hr_view' => 'current' ) ) ); ?>" class="footer-link">📅 HR: Previous Month</a>
 			<?php endif; ?>
 			<a href="<?php echo build_team_url( 'admin.php' ); ?>" class="footer-link">⚙️ Admin Panel</a>
 		</footer>
