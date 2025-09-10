@@ -13,6 +13,13 @@ $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 $performance_filter = $_GET['performance'] ?? null;
 $team_data = load_team_config_with_objects( $current_team, $privacy_mode );
 
+// Check if this team is not managing and redirect to main page
+if ( isset( $team_data['not_managing_team'] ) && $team_data['not_managing_team'] ) {
+	$redirect_url = 'index.php' . ( $current_team !== 'team' ? '?team=' . urlencode( $current_team ) : '' );
+	header( 'Location: ' . $redirect_url );
+	exit;
+}
+
 // Get all team members (they all need HR feedback by default, unless marked as "not necessary")
 $team_members = $team_data['team_members'];
 
@@ -107,7 +114,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title>HR Feedback Statistics - <?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team</title>
+    <title><?php echo htmlspecialchars( $team_data['team_name'] ); ?> HR Feedbacks</title>
     <link rel="stylesheet" href="assets/style.css">
     <link rel="stylesheet" href="assets/hr-reports.css">
     <link rel="stylesheet" href="assets/cmd-k.css">
@@ -119,21 +126,35 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
     <div class="container">
         <div class="header">
             <div style="flex-grow: 1;">
-                <h1>📊 HR Feedback Statistics</h1>
+                <h1>📊 <?php echo htmlspecialchars( $team_data['team_name'] ); ?> HR Feedbacks</h1>
                 <div style="margin-top: 5px;">
                     <a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: #666; text-decoration: none; font-size: 14px;">← Back to Team Overview</a>
                 </div>
             </div>
             <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
-                <select id="team-selector" onchange="switchTeam()">
-                    <?php
-                    foreach ( $available_teams as $team_slug ) {
-                        $team_display_name = get_team_name_from_file( $team_slug );
-                        $selected = $team_slug === $current_team ? 'selected' : '';
-                        echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
+                <?php
+                // Build array of teams that are managing HR feedback
+                $managing_teams = array();
+                foreach ( $available_teams as $team_slug ) {
+                    $team_config = load_team_config_with_objects( $team_slug, false );
+                    if ( ! ( isset( $team_config['not_managing_team'] ) && $team_config['not_managing_team'] ) ) {
+                        $managing_teams[] = $team_slug;
                     }
-                    ?>
-                </select>
+                }
+
+                // Only show team selector if there are multiple managing teams
+                if ( count( $managing_teams ) > 1 ) :
+                ?>
+                    <select id="team-selector" onchange="switchTeam()">
+                        <?php
+                        foreach ( $managing_teams as $team_slug ) {
+                            $team_display_name = get_team_name_from_file( $team_slug );
+                            $selected = $team_slug === $current_team ? 'selected' : '';
+                            echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
+                        }
+                        ?>
+                    </select>
+                <?php endif; ?>
             </div>
         </div>
 

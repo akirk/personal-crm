@@ -94,7 +94,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 			<div class="person-tabs">
 				<a href="<?php echo build_team_url( 'person.php', array( 'person' => $person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
 				   class="tab-link active">👤 Member Overview</a>
-				<?php if ( $is_team_member ) : ?>
+				<?php if ( $is_team_member && ! ( isset( $team_data['not_managing_team'] ) && $team_data['not_managing_team'] ) ) : ?>
 					<?php
 					$feedback_status = $person_data->get_monthly_feedback_status();
 					$status_class = '';
@@ -405,7 +405,8 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 				krsort( $past_feedback ); // Sort by month descending
 
 				// Show HR Feedbacks section if there's past feedback OR if they're a team member (all team members need HR feedback)
-				$show_hr_section = ! empty( $past_feedback ) || $is_team_member;
+				// but don't show if the team is not managing HR feedback
+				$show_hr_section = ( ! empty( $past_feedback ) || $is_team_member ) && ! ( isset( $team_data['not_managing_team'] ) && $team_data['not_managing_team'] );
 				?>
 				<?php if ( $show_hr_section ) : ?>
 					<div style="margin-top: 30px">

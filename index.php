@@ -178,41 +178,43 @@ if ( ! empty( $team_members_needing_hr ) ) {
 											</a>
 											<div class="person-links">
 												<?php render_person_links( $member->links ); ?>
-												<?php
-												// Check if person is marked as "not necessary" for current month
-												$current_month = get_hr_feedback_month();
-												$person_feedback = get_person_feedback_history( $username );
-												$not_necessary_key = $current_month . '_not_necessary';
-												$is_not_necessary = isset( $person_feedback[ $not_necessary_key ] );
-												
-												if ( $is_not_necessary ) {
-													$not_necessary_reason = $person_feedback[ $not_necessary_key ];
-													$reason_display = str_replace( '_', ' ', $not_necessary_reason );
-													$reason_display = ucwords( $reason_display );
-												} else {
-													// All team members need HR feedback by default
-													$feedback_status = $member->get_monthly_feedback_status();
-												}
-												?>
-												<?php
-												$hr_params = array(
-													'person' => $username,
-													'month' => $current_month,
-													'privacy' => $privacy_mode ? '1' : '0'
-												);
-												?>
-												<?php if ( $is_not_necessary ) : ?>
-													<span class="feedback-status-link not-necessary" title="<?php echo htmlspecialchars( $reason_display ); ?>">– Not needed</span>
-												<?php elseif ( $feedback_status['status'] === 'submitted' ) : ?>
-													<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link submitted">✅ Submitted</a>
-												<?php elseif ( $feedback_status['status'] === 'ready-for-review' ) : ?>
-													<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link review">📤 Ready for review</a>
-												<?php elseif ( $feedback_status['status'] === 'draft-finalized' ) : ?>
-													<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link draft-finalized">📋 Draft finalized</a>
-												<?php elseif ( $feedback_status['status'] === 'started' ) : ?>
-													<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link draft">📝 Started</a>
-												<?php else : ?>
-													<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link none">🔴 Not started</a>
+												<?php if ( ! ( isset( $team_data['not_managing_team'] ) && $team_data['not_managing_team'] ) ) : ?>
+													<?php
+													// Check if person is marked as "not necessary" for current month
+													$current_month = get_hr_feedback_month();
+													$person_feedback = get_person_feedback_history( $username );
+													$not_necessary_key = $current_month . '_not_necessary';
+													$is_not_necessary = isset( $person_feedback[ $not_necessary_key ] );
+													
+													if ( $is_not_necessary ) {
+														$not_necessary_reason = $person_feedback[ $not_necessary_key ];
+														$reason_display = str_replace( '_', ' ', $not_necessary_reason );
+														$reason_display = ucwords( $reason_display );
+													} else {
+														// All team members need HR feedback by default
+														$feedback_status = $member->get_monthly_feedback_status();
+													}
+													?>
+													<?php
+													$hr_params = array(
+														'person' => $username,
+														'month' => $current_month,
+														'privacy' => $privacy_mode ? '1' : '0'
+													);
+													?>
+													<?php if ( $is_not_necessary ) : ?>
+														<span class="feedback-status-link not-necessary" title="<?php echo htmlspecialchars( $reason_display ); ?>">– Not needed</span>
+													<?php elseif ( $feedback_status['status'] === 'submitted' ) : ?>
+														<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link submitted">✅ Submitted</a>
+													<?php elseif ( $feedback_status['status'] === 'ready-for-review' ) : ?>
+														<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link review">📤 Ready for review</a>
+													<?php elseif ( $feedback_status['status'] === 'draft-finalized' ) : ?>
+														<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link draft-finalized">📋 Draft finalized</a>
+													<?php elseif ( $feedback_status['status'] === 'started' ) : ?>
+														<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link draft">📝 Started</a>
+													<?php else : ?>
+														<a href="<?php echo build_team_url( 'hr-reports.php', $hr_params ); ?>" class="feedback-status-link none">🔴 Not started</a>
+													<?php endif; ?>
 												<?php endif; ?>
 											</div>
 										</div>
@@ -294,7 +296,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 					render_upcoming_events_sidebar( null, 6 );
 					?>
 
-					<?php if ( ! empty( $team_members_needing_hr ) ) : ?>
+					<?php if ( ! empty( $team_members_needing_hr ) && ! ( isset( $team_data['not_managing_team'] ) && $team_data['not_managing_team'] ) ) : ?>
 						<div style="margin-top: 30px;">
 							<?php
 							$hr_stats_params = array( 'privacy' => $privacy_mode ? '1' : '0' );
@@ -349,10 +351,12 @@ if ( ! empty( $team_members_needing_hr ) ) {
 			<?php else : ?>
 				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="footer-link">🔓 Privacy Mode OFF</a>
 			<?php endif; ?>
-			<?php if ( isset( $_GET['hr_view'] ) && $_GET['hr_view'] === 'current' ) : ?>
-				<a href="?<?php echo http_build_query( array_diff_key( $_GET, array( 'hr_view' => '' ) ) ); ?>" class="footer-link">📅 HR: Current Month</a>
-			<?php else : ?>
-				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'hr_view' => 'current' ) ) ); ?>" class="footer-link">📅 HR: Previous Month</a>
+			<?php if ( ! ( isset( $team_data['not_managing_team'] ) && $team_data['not_managing_team'] ) ) : ?>
+				<?php if ( isset( $_GET['hr_view'] ) && $_GET['hr_view'] === 'current' ) : ?>
+					<a href="?<?php echo http_build_query( array_diff_key( $_GET, array( 'hr_view' => '' ) ) ); ?>" class="footer-link">📅 HR: Current Month</a>
+				<?php else : ?>
+					<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'hr_view' => 'current' ) ) ); ?>" class="footer-link">📅 HR: Previous Month</a>
+				<?php endif; ?>
 			<?php endif; ?>
 			<a href="<?php echo build_team_url( 'admin.php' ); ?>" class="footer-link">⚙️ Admin Panel</a>
 		</footer>

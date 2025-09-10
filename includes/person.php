@@ -646,8 +646,12 @@ class Person {
 		foreach ( $other_events as $event ) {
 			// Only add events that are not the person's own birthday or anniversary
 			// (we already added those above)
-			if ( ! ( $event->type === 'birthday' && $event->person === $this ) && 
-			     ! ( $event->type === 'anniversary' && $event->person === $this ) ) {
+			// But include kids' birthdays (which have kid's name in description, not parent's name)
+			$is_own_birthday = $event->type === 'birthday' && $event->person === $this && 
+			                  strpos( $event->description, $this->name . "'s" ) === 0;
+			$is_own_anniversary = $event->type === 'anniversary' && $event->person === $this;
+			
+			if ( ! $is_own_birthday && ! $is_own_anniversary ) {
 				$events[] = $event;
 			}
 		}

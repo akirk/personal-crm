@@ -186,6 +186,18 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				}
 			}
 			
+			// Handle not managing team setting
+			$not_managing_team = isset( $_POST['not_managing_team'] ) && $_POST['not_managing_team'] === '1';
+
+			if ( $not_managing_team ) {
+				$config['not_managing_team'] = true;
+			} else {
+				// Remove not managing team flag if unchecked
+				if ( isset( $config['not_managing_team'] ) ) {
+					unset( $config['not_managing_team'] );
+				}
+			}
+
 			if ( save_config( $config, $config_file ) ) {
 				$message = 'General settings saved successfully!';
 			} else {
@@ -913,9 +925,9 @@ function format_kids_for_form( $kids ) {
 	$lines = array();
 	foreach ( $kids as $kid ) {
 		if ( ! empty( $kid['birthday'] ) ) {
-			$lines[] = $kid['name'] . ' (' . $kid['birthday'] . ')';
+			$lines[] = $kid['name'] . ' ' . $kid['birthday'];
 		} elseif ( ! empty( $kid['birth_year'] ) ) {
-			$lines[] = $kid['name'] . ' (' . $kid['birth_year'] . ')';
+			$lines[] = $kid['name'] . ' ' . $kid['birth_year'];
 		} else {
 			$lines[] = $kid['name'];
 		}
@@ -1476,6 +1488,16 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     </label>
                     <small class="text-small-muted" style="margin-left: 20px;">
                         When users visit the site without specifying a team, they'll be redirected to this team automatically.
+                    </small>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 600;">
+                        <input type="checkbox" id="not_managing_team" name="not_managing_team" value="1" <?php echo isset( $config['not_managing_team'] ) && $config['not_managing_team'] ? 'checked' : ''; ?> style="width: auto;">
+                        <span>Not managing this team</span>
+                    </label>
+                    <small class="text-small-muted" style="margin-left: 20px;">
+                        Check this if you are not currently responsible for HR feedbacks and team management.
                     </small>
                 </div>
 
