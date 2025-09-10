@@ -10,8 +10,10 @@ require_once __DIR__ . '/includes/common.php';
 require_once __DIR__ . '/includes/person.php';
 
 // Team redirection logic - handle cases where no team parameter is provided
+$all_teams_mode = false;
 if ( isset( $_GET['team'] ) ) {
 	$current_team = $_GET['team'];
+	$all_teams_mode = $current_team === 'all-teams';
 } else {
 	$current_team = get_default_team();
 	$available_teams = get_available_teams();
@@ -43,7 +45,34 @@ if ( $calendar_year < 2000 || $calendar_year > 2100 ) {
 }
 
 // Load team configuration with Person objects
-$team_data = load_team_config_with_objects( $current_team, $privacy_mode );
+if ( $all_teams_mode ) {
+	// Load events from all teams
+	$all_teams_data = array();
+	$available_teams = get_available_teams();
+	foreach ( $available_teams as $team_slug ) {
+		$all_teams_data[$team_slug] = load_team_config_with_objects( $team_slug, $privacy_mode );
+	}
+	// Create a combined team_data structure
+	$team_data = array(
+		'team_name' => 'All Teams',
+		'events' => array(),
+		'people' => array(),
+		'team_members' => array(),
+		'leadership' => array(),
+		'alumni' => array()
+	);
+	
+	// Combine all events and people from all teams
+	foreach ( $all_teams_data as $team_slug => $data ) {
+		$team_data['events'] = array_merge( $team_data['events'], $data['events'] ?? array() );
+		$team_data['people'] = array_merge( $team_data['people'], $data['people'] ?? array() );
+		$team_data['team_members'] = array_merge( $team_data['team_members'], $data['team_members'] ?? array() );
+		$team_data['leadership'] = array_merge( $team_data['leadership'], $data['leadership'] ?? array() );
+		$team_data['alumni'] = array_merge( $team_data['alumni'], $data['alumni'] ?? array() );
+	}
+} else {
+	$team_data = load_team_config_with_objects( $current_team, $privacy_mode );
+}
 
 // Process team events only (for past events section)
 $team_events = array();
@@ -62,8 +91,8 @@ $all_upcoming_events = get_upcoming_events_for_display( $team_data );
 
 // Calendar helper functions
 function build_calendar_url( $params = array() ) {
-    global $current_team;
-    $base_params = array( 'team' => $current_team );
+    global $current_team, $all_teams_mode;
+    $base_params = array( 'team' => $all_teams_mode ? 'all-teams' : $current_team );
     if ( isset( $_GET['privacy'] ) ) {
         $base_params['privacy'] = $_GET['privacy'];
     }
@@ -191,24 +220,40 @@ $available_teams = get_available_teams();
     <div class="container">
         <div class="header">
             <div class="header-container">
-                <h1><a href="<?php echo build_team_url( 'index.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a></h1>
+                <h1>
+                    <?php if ( $all_teams_mode ) : ?>
+                        <a href="team-selection.php" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
+                    <?php else : ?>
+                        <a href="<?php echo build_team_url( 'index.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
+                    <?php endif; ?>
+                </h1>
                 <div class="back-nav">
-                    <a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to Team Overview</a>
+                    <?php if ( $all_teams_mode ) : ?>
+                        <a href="team-selection.php">← Back to Team Selection</a>
+                    <?php else : ?>
+                        <a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to Team Overview</a>
+                    <?php endif; ?>
                 </div>
             </div>
             <div class="nav-container">
                 <!-- Team Switcher -->
                 <select id="team-selector" onchange="switchTeam()">
                     <?php
+                    // Add "All Teams" option
+                    $selected_all = $all_teams_mode ? 'selected' : '';
+                    echo '<option value="all-teams" ' . $selected_all . '>All Teams</option>';
+                    
                     foreach ( $available_teams as $team_slug ) {
                         $team_display_name = get_team_name_from_file( $team_slug );
-                        $selected = $team_slug === $current_team ? 'selected' : '';
+                        $selected = ! $all_teams_mode && $team_slug === $current_team ? 'selected' : '';
                         echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
                     }
                     ?>
                 </select>
                 
-                <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events', 'add' => 'new' ) ); ?>" class="nav-link green">+ Add Event</a>
+                <?php if ( ! $all_teams_mode ) : ?>
+                    <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events', 'add' => 'new' ) ); ?>" class="nav-link green">+ Add Event</a>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -322,10 +367,14 @@ $available_teams = get_available_teams();
             <?php else : ?>
                 <div class="no-content-card">
                     <h3>No upcoming events</h3>
-                    <p>There are no scheduled events for this team.</p>
-                    <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-link inline">
-                        Add an Event →
-                    </a>
+                    <?php if ( $all_teams_mode ) : ?>
+                        <p>There are no scheduled events across all teams.</p>
+                    <?php else : ?>
+                        <p>There are no scheduled events for this team.</p>
+                        <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-link inline">
+                            Add an Event →
+                        </a>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
         </div>
