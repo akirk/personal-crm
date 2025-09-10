@@ -675,8 +675,8 @@ function parse_kids_data( $kids_input ) {
 			continue;
 		}
 
-		// Format: "Name (YYYY-MM-DD)" or "Name (MM-DD)" or "Name (YYYY)" or "Name - YYYY" or just "Name"
-		if ( preg_match( '/^(.+?)\s*[\(\-]\s*(\d{4}-\d{2}-\d{2})\s*[\)]?\s*$/', $line, $matches ) ) {
+		// Format: "Name YYYY-MM-DD", "Name MM-DD", "Name YYYY", or just "Name"
+		if ( preg_match( '/^(.+?)\s+(\d{4}-\d{2}-\d{2})\s*$/', $line, $matches ) ) {
 			// Full birthday date
 			$birth_date = DateTime::createFromFormat( 'Y-m-d', $matches[2] );
 			if ( $birth_date ) {
@@ -692,14 +692,14 @@ function parse_kids_data( $kids_input ) {
 					'birthday' => ''
 				);
 			}
-		} elseif ( preg_match( '/^(.+?)\s*[\(\-]\s*(\d{2}-\d{2})\s*[\)]?\s*$/', $line, $matches ) ) {
+		} elseif ( preg_match( '/^(.+?)\s+(\d{2}-\d{2})\s*$/', $line, $matches ) ) {
 			// Month-day format (MM-DD)
 			$kids[] = array(
 				'name' => trim( $matches[1] ),
 				'birth_year' => '',
 				'birthday' => $matches[2] // Store as MM-DD
 			);
-		} elseif ( preg_match( '/^(.+?)\s*[\(\-]\s*(\d{4})\s*[\)]?\s*$/', $line, $matches ) ) {
+		} elseif ( preg_match( '/^(.+?)\s+(\d{4})\s*$/', $line, $matches ) ) {
 			// Just birth year
 			$kids[] = array(
 				'name' => trim( $matches[1] ),
@@ -1074,8 +1074,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>kids">Kids (one per line, formats: "Name (YYYY-MM-DD)", "Name (MM-DD)", "Name (YYYY)" or just "Name")</label>
-			<textarea id="<?php echo $prefix; ?>kids" name="kids" rows="4" placeholder="Emma (2010-03-15)&#10;Jake (12-25)&#10;Sam (2012)&#10;Alex"><?php echo $is_editing ? htmlspecialchars( format_kids_for_form( $edit_data['kids'] ?? array() ) ) : ''; ?></textarea>
+			<label for="<?php echo $prefix; ?>kids">Kids (one per line, formats: "Name YYYY-MM-DD", "Name MM-DD", "Name YYYY" or just "Name")</label>
+			<textarea id="<?php echo $prefix; ?>kids" name="kids" rows="4" placeholder="Emma 2010-03-15&#10;Jake 12-25&#10;Sam 2012&#10;Alex"><?php echo $is_editing ? htmlspecialchars( format_kids_for_form( $edit_data['kids'] ?? array() ) ) : ''; ?></textarea>
 		</div>
 	</details>
 
