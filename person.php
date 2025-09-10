@@ -258,9 +258,10 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					$has_github = ! empty( $person_data->github );
 					$has_wordpress = ! empty( $person_data->wordpress );
 					$has_linkedin = ! empty( $person_data->linkedin );
+					$has_website = ! empty( $person_data->website );
 					$has_linear = ! empty( $person_data->links['Linear'] ?? '' );
 					$has_repos = ! empty( $person_data->github_repos );
-					$has_any_accounts = $has_github || $has_wordpress || $has_linkedin || $has_linear;
+					$has_any_accounts = $has_github || $has_wordpress || $has_linkedin || $has_website || $has_linear;
 					?>
 
 					<?php if ( $has_repos ) : ?>
@@ -344,7 +345,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 
 					<?php if ( $has_any_accounts ) : ?>
 						<div class="section">
-							<h2>External Accounts</h2>
+							<h2>Online Profiles</h2>
 							<div class="external-account-links">
 								<?php if ( $has_github ) : ?>
 									<a href="https://github.com/<?php echo htmlspecialchars( $person_data->github ); ?>" target="_blank" class="external-link github">
@@ -357,6 +358,13 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 									<a href="https://linkedin.com/in/<?php echo htmlspecialchars( $person_data->linkedin ); ?>" target="_blank" class="external-link linkedin">
 										<?php echo get_link_icon('LinkedIn', 'https://linkedin.com/in/' . $person_data->linkedin, 16); ?>
 										LinkedIn
+									</a>
+								<?php endif; ?>
+
+								<?php if ( $has_website ) : ?>
+									<a href="<?php echo htmlspecialchars( $person_data->website ); ?>" target="_blank" class="external-link website">
+										<?php echo get_link_icon('Website', $person_data->website, 16); ?>
+										Website
 									</a>
 								<?php endif; ?>
 

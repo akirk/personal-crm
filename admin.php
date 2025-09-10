@@ -657,6 +657,7 @@ function create_person_data_from_form() {
 		'linear' => sanitize_text_field( $_POST['linear'] ?? '' ),
 		'wordpress' => sanitize_text_field( $_POST['wordpress'] ?? '' ),
 		'linkedin' => sanitize_text_field( $_POST['linkedin'] ?? '' ),
+		'website' => sanitize_text_field( $_POST['website'] ?? '' ),
 		'location' => sanitize_text_field( $_POST['location'] ?? '' ),
 		'timezone' => sanitize_text_field( $_POST['timezone'] ?? '' ),
 		'links' => $links,
@@ -1145,7 +1146,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	</div>
 
 	<!-- Usernames -->
-	<h4 class="section-heading">External Accounts</h4>
+	<h4 class="section-heading">Online Profiles</h4>
 	<div class="form-grid">
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>github">GitHub Username</label>
@@ -1165,6 +1166,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>linkedin">LinkedIn Username</label>
 			<input type="text" id="<?php echo $prefix; ?>linkedin" name="linkedin" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['linkedin'] ?? '' ) : ''; ?>">
+		</div>
+
+		<div class="form-group">
+			<label for="<?php echo $prefix; ?>website">Website URL</label>
+			<input type="text" id="<?php echo $prefix; ?>website" name="website" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['website'] ?? '' ) : ''; ?>">
 		</div>
 	</div>
 
