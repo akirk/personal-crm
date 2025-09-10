@@ -658,6 +658,7 @@ function create_person_data_from_form() {
 		'wordpress' => sanitize_text_field( $_POST['wordpress'] ?? '' ),
 		'linkedin' => sanitize_text_field( $_POST['linkedin'] ?? '' ),
 		'website' => sanitize_text_field( $_POST['website'] ?? '' ),
+		'email' => sanitize_email( $_POST['email'] ?? '' ),
 		'location' => sanitize_text_field( $_POST['location'] ?? '' ),
 		'timezone' => sanitize_text_field( $_POST['timezone'] ?? '' ),
 		'links' => $links,
@@ -1171,6 +1172,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>website">Website URL</label>
 			<input type="text" id="<?php echo $prefix; ?>website" name="website" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['website'] ?? '' ) : ''; ?>">
+		</div>
+
+		<div class="form-group">
+			<label for="<?php echo $prefix; ?>email">Email Address</label>
+			<input type="email" id="<?php echo $prefix; ?>email" name="email" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['email'] ?? '' ) : ''; ?>">
 		</div>
 	</div>
 

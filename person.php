@@ -259,9 +259,10 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					$has_wordpress = ! empty( $person_data->wordpress );
 					$has_linkedin = ! empty( $person_data->linkedin );
 					$has_website = ! empty( $person_data->website );
+					$has_email = ! empty( $person_data->email );
 					$has_linear = ! empty( $person_data->links['Linear'] ?? '' );
 					$has_repos = ! empty( $person_data->github_repos );
-					$has_any_accounts = $has_github || $has_wordpress || $has_linkedin || $has_website || $has_linear;
+					$has_any_accounts = $has_github || $has_wordpress || $has_linkedin || $has_website || $has_email || $has_linear;
 					?>
 
 					<?php if ( $has_repos ) : ?>
@@ -365,6 +366,13 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 									<a href="<?php echo htmlspecialchars( $person_data->website ); ?>" target="_blank" class="external-link website">
 										<?php echo get_link_icon('Website', $person_data->website, 16); ?>
 										Website
+									</a>
+								<?php endif; ?>
+
+								<?php if ( $has_email ) : ?>
+									<a href="mailto:<?php echo htmlspecialchars( $person_data->email ); ?>" class="external-link email">
+										<?php echo get_link_icon('Email', 'mailto:' . $person_data->email, 16); ?>
+										Email
 									</a>
 								<?php endif; ?>
 
