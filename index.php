@@ -11,8 +11,13 @@ require_once __DIR__ . '/includes/person.php';
 if ( isset( $_GET['team'] ) ) {
 	$current_team = $_GET['team'];
 	if ( $current_team === get_default_team() && ! isset( $_GET['person'] ) ) {
-		// Redirect to root if default team is selected
-		header( 'Location: ./' );
+		// Redirect to root if default team is selected, preserve privacy parameter
+		$redirect_params = array();
+		if ( isset( $_GET['privacy'] ) && $_GET['privacy'] === '1' ) {
+			$redirect_params['privacy'] = '1';
+		}
+		$redirect_url = './' . ( ! empty( $redirect_params ) ? '?' . http_build_query( $redirect_params ) : '' );
+		header( 'Location: ' . $redirect_url );
 		exit;
 	}
 } else {
@@ -275,6 +280,18 @@ if ( ! empty( $team_members_needing_hr ) ) {
 													</div>
 												</div>
 											</a>
+											<?php if ( ! empty( $alumnus->new_company ) ) : ?>
+												<div class="alumni-company-display">
+													<span class="alumni-company-text">
+														Now at: 
+														<?php if ( ! empty( $alumnus->new_company_website ) ) : ?>
+															<a href="<?php echo htmlspecialchars( $alumnus->new_company_website ); ?>" target="_blank" class="company-link"><?php echo htmlspecialchars( $alumnus->new_company ); ?></a>
+														<?php else : ?>
+															<?php echo htmlspecialchars( $alumnus->new_company ); ?>
+														<?php endif; ?>
+													</span>
+												</div>
+											<?php endif; ?>
 											<div class="person-links">
 												<?php render_person_links( $alumnus->links ); ?>
 											</div>

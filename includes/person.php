@@ -24,6 +24,9 @@ class Person {
 	public $website; // Personal website URL
 	public $personal_events; // Array of personal events like "return from AFK", "vacation end", etc.
 	public $email;
+	public $left_company; // Boolean indicating if person has left the company (for alumni)
+	public $new_company; // New company name (for alumni)
+	public $new_company_website; // New company website (for alumni)
 	private $original_username; // Store original username for data lookups
 
 	public function __construct( $name, $username = '', $links = array(), $role = '', $privacy_mode = false ) {

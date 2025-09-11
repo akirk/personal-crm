@@ -32,7 +32,7 @@ $team_data = load_team_config_with_objects( $current_team, $privacy_mode );
 $person = $_GET['person'] ?? null;
 
 if ( empty( $person ) ) {
-	header( 'Location: ' . build_team_url( 'index.php' ) );
+	header( 'Location: ' . build_team_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
 	exit;
 }
 
@@ -47,7 +47,7 @@ if ( isset( $team_data['team_members'][ $person ] ) ) {
 }
 
 if ( ! $person_data ) {
-	header( 'Location: ' . build_team_url( 'index.php' ) );
+	header( 'Location: ' . build_team_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
 	exit;
 }
 
@@ -87,7 +87,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					</span>
 				</h1>
 				<div class="back-nav">
-					<a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to Team Overview</a>
+					<a href="<?php echo build_team_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">← Back to Team Overview</a>
 				</div>
 			</div>
 
@@ -139,13 +139,21 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 				<?php if ( ! empty( $person_data->birthday ) || ! empty( $person_data->company_anniversary ) || ! empty( $kids_with_ages ) || ! empty( $person_data->notes ) || ! empty( $person_data->location ) || ! empty( $person_data->partner ) ) : ?>
 					<div class="section section-with-avatar">
 						<?php $gravatar_url = $person_data->get_gravatar_url( 100 ); ?>
-						<?php if ( $gravatar_url && ! $privacy_mode ) : ?>
+						<?php if ( $gravatar_url ) : ?>
 							<div class="person-avatar-section">
-								<img src="<?php echo htmlspecialchars( $gravatar_url ); ?>"
-									 alt="<?php echo htmlspecialchars( $person_data->get_display_name_with_nickname() ); ?>"
-									 class="gravatar-large"
-									 width="100"
-									 height="100">
+								<?php if ( $privacy_mode ) : ?>
+									<img src="<?php echo htmlspecialchars( $gravatar_url ); ?>"
+										 alt="<?php echo htmlspecialchars( $person_data->get_display_name_with_nickname() ); ?>"
+										 class="gravatar-large privacy-blur"
+										 width="100"
+										 height="100">
+								<?php else : ?>
+									<img src="<?php echo htmlspecialchars( $gravatar_url ); ?>"
+										 alt="<?php echo htmlspecialchars( $person_data->get_display_name_with_nickname() ); ?>"
+										 class="gravatar-large"
+										 width="100"
+										 height="100">
+								<?php endif; ?>
 								<?php if ( ! empty( $person_data->role ) ) : ?>
 									<div class="person-name-badge"><?php echo htmlspecialchars( $person_data->name ); ?></div>
 								<?php endif; ?>
@@ -167,7 +175,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 									$current_date = new DateTime();
 									$age = $current_date->diff( $birth_date )->y;
 									if ( $privacy_mode ) {
-										$age_display = '[Hidden]';
+										$age_display = $birth_date->format( 'F' );
 									} else {
 										$age_display = $age . ' (born ' . $birth_date->format( 'F j, Y' ) . ')';
 									}
@@ -175,7 +183,10 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 							} elseif ( preg_match( '/^\d{2}-\d{2}$/', $person_data->birthday ) ) {
 								// Legacy MM-DD format - can't calculate exact age
 								if ( $privacy_mode ) {
-									$age_display = '[Hidden]';
+									$display_date = DateTime::createFromFormat( 'm-d', $person_data->birthday );
+									if ( $display_date ) {
+										$age_display = $display_date->format( 'F' );
+									}
 								} else {
 									$display_date = DateTime::createFromFormat( 'm-d', $person_data->birthday );
 									if ( $display_date ) {
@@ -185,11 +196,11 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 							}
 							?>
 							<?php if ( $age_display ) : ?>
-								<p><strong>🎂 Age:</strong> <?php echo htmlspecialchars( $age_display ); ?></p>
+								<p><strong>🎂 <?php echo $privacy_mode ? 'Birthday:' : 'Age:'; ?></strong> <?php echo htmlspecialchars( $age_display ); ?></p>
 							<?php endif; ?>
 						<?php endif; ?>
 
-						<?php if ( ! empty( $person_data->company_anniversary ) ) : ?>
+						<?php if ( ! empty( $person_data->company_anniversary ) && ! ( $is_alumni && ! empty( $person_data->left_company ) ) ) : ?>
 							<?php
 							$anniversary_date = DateTime::createFromFormat( 'Y-m-d', $person_data->company_anniversary );
 							if ( $anniversary_date ) {
@@ -209,6 +220,25 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 								}
 							}
 							?>
+						<?php endif; ?>
+
+						<?php if ( $is_alumni && ! empty( $person_data->left_company ) ) : ?>
+							<div class="alumni-company-info">
+								<?php if ( ! empty( $person_data->new_company ) ) : ?>
+									<p>
+										<strong>🆕 New Company:</strong>
+										<?php if ( ! empty( $person_data->new_company_website ) ) : ?>
+											<a href="<?php echo htmlspecialchars( $person_data->new_company_website ); ?>" target="_blank" class="company-link">
+												<?php echo htmlspecialchars( $person_data->new_company ); ?>
+											</a>
+										<?php else : ?>
+											<?php echo htmlspecialchars( $person_data->new_company ); ?>
+										<?php endif; ?>
+									</p>
+								<?php else : ?>
+									<p><strong>🏢 Company Status:</strong> Has left the company</p>
+								<?php endif; ?>
+							</div>
 						<?php endif; ?>
 
 						<?php if ( ! empty( $person_data->location ) ) : ?>
@@ -289,16 +319,26 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 							if ( ! empty( $repos ) ) :
 							?>
 								<div class="github-repo-grid">
-									<?php foreach ( $repos as $repo ) : ?>
-										<div class="github-repo-card">
-											<a href="https://github.com/<?php echo htmlspecialchars( $repo ); ?>" target="_blank" class="github-repo-link">
-												📦 <?php echo htmlspecialchars( $repo ); ?>
-											</a>
-											<?php if ( $has_github ) : ?>
-												<a href="https://github.com/<?php echo htmlspecialchars( $repo ); ?>/pulls/<?php echo htmlspecialchars( $person_data->github ); ?>" target="_blank" class="github-pr-link">PRs</a>
-											<?php endif; ?>
-										</div>
-									<?php endforeach; ?>
+									<?php if ( $privacy_mode ) : ?>
+										<?php for ( $i = 0; $i < count( $repos ); $i++ ) : ?>
+											<div class="github-repo-card">
+												<span class="github-repo-link privacy-hidden">
+													📦 [Repository <?php echo $i + 1; ?>]
+												</span>
+											</div>
+										<?php endfor; ?>
+									<?php else : ?>
+										<?php foreach ( $repos as $repo ) : ?>
+											<div class="github-repo-card">
+												<a href="https://github.com/<?php echo htmlspecialchars( $repo ); ?>" target="_blank" class="github-repo-link">
+													📦 <?php echo htmlspecialchars( $repo ); ?>
+												</a>
+												<?php if ( $has_github ) : ?>
+													<a href="https://github.com/<?php echo htmlspecialchars( $repo ); ?>/pulls/<?php echo htmlspecialchars( $person_data->github ); ?>" target="_blank" class="github-pr-link">PRs</a>
+												<?php endif; ?>
+											</div>
+										<?php endforeach; ?>
+									<?php endif; ?>
 								</div>
 							<?php endif; ?>
 						</div>

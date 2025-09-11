@@ -700,7 +700,10 @@ function create_person_data_from_form() {
 		'kids' => parse_kids_data( $_POST['kids'] ?? '' ),
 		'notes' => sanitize_textarea_field( $_POST['notes'] ?? '' ),
 		'github_repos' => isset( $_POST['github_repos'] ) ? array_filter( array_map( 'sanitize_text_field', $_POST['github_repos'] ) ) : array(),
-		'personal_events' => parse_personal_events_data( $_POST['personal_events'] ?? array() )
+		'personal_events' => parse_personal_events_data( $_POST['personal_events'] ?? array() ),
+		'left_company' => isset( $_POST['left_company'] ) ? 1 : 0,
+		'new_company' => sanitize_text_field( $_POST['new_company'] ?? '' ),
+		'new_company_website' => sanitize_url( $_POST['new_company_website'] ?? '' )
 	);
 }
 
@@ -1390,6 +1393,32 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			button.parentElement.remove();
 		}
 	</script>
+
+	<?php if ( $type === 'alumni' ) : ?>
+	<!-- Alumni-specific fields -->
+	<h4 class="section-heading">Alumni Information</h4>
+	<div class="form-grid">
+		<div class="form-group" style="grid-column: 1 / -1;">
+			<label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 600;">
+				<input type="checkbox" id="<?php echo $prefix; ?>left_company" name="left_company" value="1" <?php echo $is_editing && !empty($edit_data['left_company']) ? 'checked' : ''; ?> style="width: auto;">
+				<span>Has left the company</span>
+			</label>
+			<small class="text-small-muted" style="margin-left: 20px;">
+				Check if this person is no longer with the company
+			</small>
+		</div>
+		
+		<div class="form-group">
+			<label for="<?php echo $prefix; ?>new_company">New Company</label>
+			<input type="text" id="<?php echo $prefix; ?>new_company" name="new_company" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['new_company'] ?? '' ) : ''; ?>" placeholder="e.g., Google, Microsoft, etc.">
+		</div>
+		
+		<div class="form-group">
+			<label for="<?php echo $prefix; ?>new_company_website">New Company Website</label>
+			<input type="url" id="<?php echo $prefix; ?>new_company_website" name="new_company_website" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['new_company_website'] ?? '' ) : ''; ?>" placeholder="https://example.com">
+		</div>
+	</div>
+	<?php endif; ?>
 
 	<div class="form-group">
 		<label for="<?php echo $prefix; ?>notes">Notes</label>

@@ -454,6 +454,25 @@ body {
     text-decoration: underline;
 }
 
+.company-link {
+    color: light-dark(#007cba, #4a90e2);
+    text-decoration: none;
+}
+
+.company-link:hover {
+    text-decoration: underline;
+}
+
+.alumni-company-display {
+    margin-top: 2px;
+    text-align: left;
+}
+
+.alumni-company-text {
+    color: light-dark(#666, #999);
+    font-size: 0.9em;
+}
+
 .event-link-main {
     color: light-dark(#007cba, #4a90e2);
     text-decoration: none;
@@ -1425,6 +1444,108 @@ details summary span:last-child {
     border-radius: 50%;
     border: 3px solid light-dark(#e9ecef, #555);
     display: block;
+}
+
+.person-avatar-section .gravatar-large.privacy-blur {
+    filter: blur(8px);
+}
+
+/* Privacy effect options - choose one by changing the class name in PHP */
+
+/* Option 1: Standard blur */
+.person-avatar-section .gravatar-large.privacy-blur {
+    filter: blur(8px);
+}
+
+/* Option 2: Heavy blur */
+.person-avatar-section .gravatar-large.privacy-blur-heavy {
+    filter: blur(15px);
+}
+
+/* Option 3: Fade/transparency */
+.person-avatar-section .gravatar-large.privacy-fade {
+    opacity: 0.3;
+    filter: brightness(0.7);
+}
+
+/* Option 4: Grayscale + blur */
+.person-avatar-section .gravatar-large.privacy-grayscale {
+    filter: grayscale(1) blur(6px);
+}
+
+/* Option 5: Dark overlay */
+.person-avatar-section .gravatar-large.privacy-dark {
+    filter: brightness(0.3) contrast(1.5);
+}
+
+/* Option 6: Color distortion */
+.person-avatar-section .gravatar-large.privacy-distort {
+    filter: hue-rotate(180deg) saturate(3) blur(4px);
+}
+
+/* Option 7: Blur + sharpen/contrast */
+.person-avatar-section .gravatar-large.privacy-blur-sharpen {
+    filter: blur(6px) contrast(3) brightness(1.2);
+}
+
+/* Option 8: Double processing effect */
+.person-avatar-section .gravatar-large.privacy-double {
+    filter: blur(10px) contrast(2) saturate(2) blur(2px);
+}
+
+/* Option 9: Pixelation attempt */
+.person-avatar-section .gravatar-large.privacy-pixelate {
+    filter: contrast(1) brightness(1);
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    width: 80px;
+    height: 80px;
+    transform: scale(0.25);
+    transform-origin: top left;
+}
+
+/* Option 10: CSS mosaic effect */
+.person-avatar-section .gravatar-large.privacy-mosaic {
+    position: relative;
+    filter: blur(1px);
+}
+
+.person-avatar-section .gravatar-large.privacy-mosaic::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        repeating-linear-gradient(
+            0deg,
+            rgba(0,0,0,0.1) 0px,
+            rgba(0,0,0,0.1) 8px,
+            transparent 8px,
+            transparent 16px
+        ),
+        repeating-linear-gradient(
+            90deg,
+            rgba(255,255,255,0.1) 0px,
+            rgba(255,255,255,0.1) 8px,
+            transparent 8px,
+            transparent 16px
+        );
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+/* Privacy mode hidden content styling */
+.privacy-hidden {
+    color: #999;
+    font-style: italic;
+    cursor: default;
+    text-decoration: none;
+}
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 

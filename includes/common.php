@@ -601,6 +601,9 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->linkedin = $member_data['linkedin'] ?? '';
 		$person->website = $member_data['website'] ?? '';
 		$person->personal_events = $member_data['personal_events'] ?? array();
+		$person->left_company = $member_data['left_company'] ?? 0;
+		$person->new_company = $member_data['new_company'] ?? '';
+		$person->new_company_website = $member_data['new_company_website'] ?? '';
 
 		$team_members[$username] = $person;
 	}
@@ -651,6 +654,9 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->linkedin = $leader_data['linkedin'] ?? '';
 		$person->website = $leader_data['website'] ?? '';
 		$person->personal_events = $leader_data['personal_events'] ?? array();
+		$person->left_company = $leader_data['left_company'] ?? 0;
+		$person->new_company = $leader_data['new_company'] ?? '';
+		$person->new_company_website = $leader_data['new_company_website'] ?? '';
 
 		$leadership[$username] = $person;
 	}
@@ -704,6 +710,9 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		$person->linkedin = $alumni_data['linkedin'] ?? '';
 		$person->website = $alumni_data['website'] ?? '';
 		$person->personal_events = $alumni_data['personal_events'] ?? array();
+		$person->left_company = $alumni_data['left_company'] ?? 0;
+		$person->new_company = $alumni_data['new_company'] ?? '';
+		$person->new_company_website = $alumni_data['new_company_website'] ?? '';
 
 		$alumni[$username] = $person;
 	}
@@ -860,18 +869,26 @@ function render_upcoming_events_sidebar( $upcoming_events_or_person = null, $pri
 		?>
 		<div class="event-item">
 			<div style="display: flex; justify-content: space-between; align-items: flex-start;">
-				<div class="event-date"><?php echo $privacy_mode && in_array( $event->type, array( 'birthday', 'anniversary' ) ) ? '[Hidden]' : $event->date->format( 'M j, Y' ); ?></div>
+				<div class="event-date"><?php echo $privacy_mode && $event->person ? '[Hidden]' : $event->date->format( 'M j, Y' ); ?></div>
 				<?php if ( ! $is_past && $days_until <= 120 ) : // Show for events within 30 days ?>
 					<div style="font-size: 11px; color: #999; font-weight: normal;">
 						<?php
-						if ( $days_until == 0 ) {
-							echo 'today';
-						} elseif ( $days_until == 1 ) {
-							echo 'in 1d';
-						} elseif ( $days_until > 60 ) {
-							echo 'in ' . floor( $days_until / 30 ) . 'mo';
+						if ( $privacy_mode ) {
+							if ( $days_until == 0 ) {
+								echo 'today';
+							} else {
+								echo 'in x days';
+							}
 						} else {
-							echo 'in ' . $days_until . 'd';
+							if ( $days_until == 0 ) {
+								echo 'today';
+							} elseif ( $days_until == 1 ) {
+								echo 'in 1d';
+							} elseif ( $days_until > 60 ) {
+								echo 'in ' . floor( $days_until / 30 ) . 'mo';
+							} else {
+								echo 'in ' . $days_until . 'd';
+							}
 						}
 						?>
 					</div>
