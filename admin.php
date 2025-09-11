@@ -41,6 +41,7 @@ $edit_event_index = $_GET['edit_event'] ?? '';
 $edit_data = null;
 $is_editing_member = false;
 $is_editing_leader = false;
+$is_editing_consultant = false;
 $is_editing_alumni = false;
 $is_editing_event = false;
 
@@ -57,6 +58,11 @@ if ( ! empty( $edit_member ) ) {
 		$edit_data['username'] = $edit_member;
 		$is_editing_leader = true;
 		$active_tab = 'leadership';
+	} elseif ( isset( $config['consultants'][ $edit_member ] ) ) {
+		$edit_data = $config['consultants'][ $edit_member ];
+		$edit_data['username'] = $edit_member;
+		$is_editing_consultant = true;
+		$active_tab = 'consultants';
 	} elseif ( isset( $config['alumni'][ $edit_member ] ) ) {
 		$edit_data = $config['alumni'][ $edit_member ];
 		$edit_data['username'] = $edit_member;
@@ -91,6 +97,7 @@ function load_or_create_config( $file_path ) {
 		'team_name' => '',
 		'team_members' => array(),
 		'leadership' => array(),
+		'consultants' => array(),
 		'alumni' => array(),
 		'events' => array()
 	);
@@ -221,6 +228,18 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			}
 			break;
 			
+		case 'edit_consultants':
+		case 'add_consultants':
+			$consultant_config = get_person_type_config( 'consultants' );
+			$person_data = create_person_data_from_form();
+			$result = handle_person_action( $action, $consultant_config, $person_data );
+			if ( isset( $result['error'] ) ) {
+				$error = $result['error'];
+			} elseif ( isset( $result['message'] ) ) {
+				$message = $result['message'];
+			}
+			break;
+			
 		case 'edit_event':
 			$event_index = (int) ( $_POST['event_index'] ?? -1 );
 			if ( $event_index < 0 || ! isset( $config['events'][ $event_index ] ) ) {
@@ -308,6 +327,16 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 		case 'delete_member':
 			$member_config = get_person_type_config( 'member' );
 			$result = handle_person_action( $action, $member_config, array() );
+			if ( isset( $result['error'] ) ) {
+				$error = $result['error'];
+			} elseif ( isset( $result['message'] ) ) {
+				$message = $result['message'];
+			}
+			break;
+			
+		case 'delete_consultant':
+			$consultant_config = get_person_type_config( 'consultants' );
+			$result = handle_person_action( $action, $consultant_config, array() );
 			if ( isset( $result['error'] ) ) {
 				$error = $result['error'];
 			} elseif ( isset( $result['message'] ) ) {
@@ -506,6 +535,53 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$error = 'Failed to create team.';
 			}
 			break;
+			
+		case 'add_note':
+			$username = sanitize_text_field( $_POST['username'] ?? '' );
+			$new_note = sanitize_textarea_field( $_POST['new_note'] ?? '' );
+			
+			if ( ! empty( $username ) && ! empty( $new_note ) ) {
+				// Find the person in any section and add the note
+				$person_found = false;
+				foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $type ) {
+					if ( isset( $config[$type][$username] ) ) {
+						// Initialize notes array if it doesn't exist or isn't an array
+						if ( ! isset( $config[$type][$username]['notes'] ) || ! is_array( $config[$type][$username]['notes'] ) ) {
+							$config[$type][$username]['notes'] = array();
+						}
+						
+						// Add the new note
+						$config[$type][$username]['notes'][] = array(
+							'date' => date( 'Y-m-d H:i' ),
+							'text' => $new_note
+						);
+						
+						$person_found = true;
+						break;
+					}
+				}
+				
+				if ( $person_found ) {
+					$json = json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+					if ( file_put_contents( $config_file, $json ) !== false ) {
+						$message = 'Note added successfully!';
+						// Redirect back to person.php
+						$redirect_params = array( 'person' => $username );
+						if ( isset( $_POST['privacy'] ) ) $redirect_params['privacy'] = '1';
+						if ( isset( $_POST['notes_view'] ) ) $redirect_params['notes_view'] = $_POST['notes_view'];
+						header( 'Location: ' . build_team_url( 'person.php', $redirect_params ) );
+						exit;
+					} else {
+						$error = 'Failed to save note.';
+					}
+				} else {
+					$error = 'Person not found.';
+				}
+			} else {
+				$error = 'Username and note are required.';
+			}
+			break;
+			
 	}
 }
 
@@ -513,18 +589,6 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 $config = load_or_create_config( $config_file );
 
 // WordPress-style sanitization functions (simplified versions)
-function sanitize_text_field( $str ) {
-	return trim( strip_tags( $str ) );
-}
-
-function sanitize_url( $url ) {
-	return filter_var( trim( $url ), FILTER_SANITIZE_URL );
-}
-
-function sanitize_textarea_field( $str ) {
-	return trim( strip_tags( $str ) );
-}
-
 function mask_date_input( $date, $privacy_mode ) {
 	if ( ! $privacy_mode || empty( $date ) ) {
 		return $date;
@@ -563,6 +627,19 @@ function get_person_type_config( $person_type ) {
 			'display_name' => 'Leadership',
 			'show_hr_feedback' => false,
 			'show_alumni_actions' => true,
+		),
+		'consultants' => array(
+			'section_key' => 'consultants',
+			'form_prefix' => 'consultant-',
+			'form_id' => 'consultant-form',
+			'edit_action' => 'edit_consultants',
+			'add_action' => 'add_consultants',
+			'delete_action' => 'delete_consultant',
+			'edit_text' => 'Update Consultant',
+			'add_text' => 'Add Consultant',
+			'display_name' => 'Consultant',
+			'show_hr_feedback' => false,
+			'show_alumni_actions' => false,
 		),
 		'alumni' => array(
 			'section_key' => 'alumni',
@@ -698,13 +775,49 @@ function create_person_data_from_form() {
 		'company_anniversary' => sanitize_text_field( $_POST['company_anniversary'] ?? '' ),
 		'partner' => sanitize_text_field( $_POST['partner'] ?? '' ),
 		'kids' => parse_kids_data( $_POST['kids'] ?? '' ),
-		'notes' => sanitize_textarea_field( $_POST['notes'] ?? '' ),
+		'notes' => create_notes_from_form(),
 		'github_repos' => isset( $_POST['github_repos'] ) ? array_filter( array_map( 'sanitize_text_field', $_POST['github_repos'] ) ) : array(),
 		'personal_events' => parse_personal_events_data( $_POST['personal_events'] ?? array() ),
 		'left_company' => isset( $_POST['left_company'] ) ? 1 : 0,
 		'new_company' => sanitize_text_field( $_POST['new_company'] ?? '' ),
 		'new_company_website' => sanitize_url( $_POST['new_company_website'] ?? '' )
 	);
+}
+
+/**
+ * Create notes array from form input
+ */
+function create_notes_from_form() {
+	global $config_file;
+	$notes = array();
+	
+	// Get existing notes if we're editing
+	if ( isset( $_POST['action'] ) && in_array( $_POST['action'], array( 'edit_member', 'edit_leadership', 'edit_consultants', 'edit_alumni' ) ) && isset( $_POST['username'] ) ) {
+		$team_data = load_or_create_config( $config_file );
+		$username = sanitize_text_field( $_POST['username'] );
+		
+		// Check all person types for existing data
+		foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $type ) {
+			if ( isset( $team_data[$type][$username] ) ) {
+				$existing_data = $team_data[$type][$username];
+				if ( ! empty( $existing_data['notes'] ) && is_array( $existing_data['notes'] ) ) {
+					$notes = $existing_data['notes'];
+				}
+				break;
+			}
+		}
+	}
+	
+	// Add new note if provided
+	$new_note = sanitize_textarea_field( $_POST['new_note'] ?? '' );
+	if ( ! empty( $new_note ) ) {
+		$notes[] = array(
+			'date' => date( 'Y-m-d H:i' ),
+			'text' => $new_note
+		);
+	}
+	
+	return $notes;
 }
 
 /**
@@ -822,8 +935,8 @@ function get_missing_data_points( $person, $person_type = 'member' ) {
 		$missing[] = array( 'field' => 'Timezone', 'priority' => 'required' );
 	}
 
-	// Birthday
-	if ( empty( $person['birthday'] ) ) {
+	// Birthday (not required for consultants)
+	if ( empty( $person['birthday'] ) && $person_type !== 'consultants' ) {
 		$missing[] = array( 'field' => 'Birthday', 'priority' => 'required' );
 	}
 
@@ -832,8 +945,11 @@ function get_missing_data_points( $person, $person_type = 'member' ) {
 		$missing[] = array( 'field' => 'Company Anniversary', 'priority' => 'required' );
 	}
 
-	// Links - check for key links
-	$expected_links = array( '1:1 doc' );
+	// Links - check for key links (1:1 doc not required for consultants)
+	$expected_links = array();
+	if ( $person_type !== 'consultants' ) {
+		$expected_links[] = '1:1 doc';
+	}
 
 	foreach ( $expected_links as $expected_link ) {
 		if ( ! isset( $person['links'][ $expected_link ] ) || empty( $person['links'][ $expected_link ] ) ) {
@@ -862,7 +978,7 @@ function get_missing_data_points( $person, $person_type = 'member' ) {
 	if ( empty( $person['kids'] ) ) {
 		$missing[] = array( 'field' => 'Kids info', 'priority' => 'optional' );
 	}
-	if ( empty( $person['notes'] ) ) {
+	if ( empty( $person['notes'] ) || ( is_array( $person['notes'] ) && count( $person['notes'] ) === 0 ) ) {
 		$missing[] = array( 'field' => 'Notes', 'priority' => 'optional' );
 	}
 
@@ -1421,8 +1537,21 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<?php endif; ?>
 
 	<div class="form-group">
-		<label for="<?php echo $prefix; ?>notes">Notes</label>
-		<textarea id="<?php echo $prefix; ?>notes" name="notes"><?php echo $is_editing ? htmlspecialchars( $edit_data['notes'] ?? '' ) : ''; ?></textarea>
+		<label>Notes</label>
+		
+		<?php if ( $is_editing && ! empty( $edit_data['notes'] ) && is_array( $edit_data['notes'] ) ) : ?>
+			<div class="existing-notes">
+				<?php foreach ( $edit_data['notes'] as $note ) : ?>
+					<div class="note">
+						<small class="note-date"><?php echo htmlspecialchars( $note['date'] ); ?></small>
+						<p class="note-text"><?php echo nl2br( htmlspecialchars( $note['text'] ) ); ?></p>
+					</div>
+				<?php endforeach; ?>
+			</div>
+		<?php endif; ?>
+		
+		<label for="<?php echo $prefix; ?>new_note">Add new note</label>
+		<textarea id="<?php echo $prefix; ?>new_note" name="new_note" placeholder="Add what you learned today..."></textarea>
 	</div>
 
 	<button type="submit" class="btn"><?php echo $submit_text; ?></button>
@@ -1612,15 +1741,93 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         <?php else : ?>
 
         <div class="nav-tabs">
-            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'general' ) ); ?>" class="nav-tab <?php echo $active_tab === 'general' ? 'active' : ''; ?>">General Settings</a>
-            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'team_links' ) ); ?>" class="nav-tab <?php echo $active_tab === 'team_links' ? 'active' : ''; ?>">Team Links (<?php echo count( $config['team_links'] ?? array() ); ?>)</a>
-            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'members' ) ); ?>" class="nav-tab <?php echo $active_tab === 'members' ? 'active' : ''; ?>">Team Members (<?php echo count( $config['team_members'] ); ?>)</a>
-            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'leadership' ) ); ?>" class="nav-tab <?php echo $active_tab === 'leadership' ? 'active' : ''; ?>">Leadership (<?php echo count( $config['leadership'] ); ?>)</a>
-            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'alumni' ) ); ?>" class="nav-tab <?php echo $active_tab === 'alumni' ? 'active' : ''; ?>">Alumni (<?php echo count( $config['alumni'] ?? array() ); ?>)</a>
-            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-tab <?php echo $active_tab === 'events' ? 'active' : ''; ?>">Events (<?php echo count( $config['events'] ); ?>)</a>
-            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'audit' ) ); ?>" class="nav-tab <?php echo $active_tab === 'audit' ? 'active' : ''; ?>">📊 Audit</a>
-            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'json' ) ); ?>" class="nav-tab <?php echo $active_tab === 'json' ? 'active' : ''; ?>">View JSON</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'general' ) ); ?>" class="nav-tab <?php echo $active_tab === 'general' ? 'active' : ''; ?>">General</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'team_links' ) ); ?>" class="nav-tab <?php echo $active_tab === 'team_links' ? 'active' : ''; ?>">Links</a>
+            <div class="nav-dropdown">
+                <span class="nav-tab nav-dropdown-trigger <?php echo in_array( $active_tab, array( 'members', 'leadership', 'consultants', 'alumni' ) ) ? 'active' : ''; ?>">
+                    People (<?php echo count( $config['team_members'] ) + count( $config['leadership'] ) + count( $config['consultants'] ?? array() ) + count( $config['alumni'] ?? array() ); ?>) ▾
+                </span>
+                <div class="nav-dropdown-menu">
+                    <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'members' ) ); ?>" class="nav-dropdown-item <?php echo $active_tab === 'members' ? 'active' : ''; ?>">👥 Members (<?php echo count( $config['team_members'] ); ?>)</a>
+                    <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'leadership' ) ); ?>" class="nav-dropdown-item <?php echo $active_tab === 'leadership' ? 'active' : ''; ?>">👑 Leaders (<?php echo count( $config['leadership'] ); ?>)</a>
+                    <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'consultants' ) ); ?>" class="nav-dropdown-item <?php echo $active_tab === 'consultants' ? 'active' : ''; ?>">🤝 Consultants (<?php echo count( $config['consultants'] ?? array() ); ?>)</a>
+                    <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'alumni' ) ); ?>" class="nav-dropdown-item <?php echo $active_tab === 'alumni' ? 'active' : ''; ?>">🎓 Alumni (<?php echo count( $config['alumni'] ?? array() ); ?>)</a>
+                </div>
+            </div>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-tab <?php echo $active_tab === 'events' ? 'active' : ''; ?>">Events</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'audit' ) ); ?>" class="nav-tab <?php echo $active_tab === 'audit' ? 'active' : ''; ?>">Audit</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'json' ) ); ?>" class="nav-tab <?php echo $active_tab === 'json' ? 'active' : ''; ?>">JSON</a>
         </div>
+        
+        <style>
+        .nav-dropdown {
+            position: relative;
+            display: inline-block;
+            vertical-align: top;
+            margin: 0;
+        }
+        
+        .nav-dropdown-trigger {
+            cursor: pointer;
+            display: inline-block;
+            vertical-align: top;
+            margin: 0;
+            line-height: inherit;
+        }
+        
+        .nav-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            min-width: 180px;
+            z-index: 1000;
+        }
+        
+        .nav-dropdown:hover .nav-dropdown-menu {
+            display: block;
+        }
+        
+        .nav-dropdown-item {
+            display: block;
+            padding: 8px 12px;
+            color: inherit;
+            text-decoration: none;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .nav-dropdown-item:last-child {
+            border-bottom: none;
+        }
+        
+        .nav-dropdown-item:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .nav-dropdown-item.active {
+            background-color: #007cba;
+            color: white;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .nav-dropdown-menu {
+                background: #2c3338;
+                border-color: #50575e;
+            }
+            
+            .nav-dropdown-item:hover {
+                background-color: #3c434a;
+            }
+            
+            .nav-dropdown-item {
+                border-color: #50575e;
+            }
+        }
+        </style>
 
         <!-- General Settings Tab -->
         <div id="general" class="tab-content <?php echo $active_tab === 'general' ? 'active' : ''; ?>">
@@ -1840,6 +2047,71 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <?php endif; ?>
         </div>
 
+        <!-- Consultants Tab -->
+        <div id="consultants" class="tab-content <?php echo $active_tab === 'consultants' ? 'active' : ''; ?>">
+            <?php if ( $is_editing_consultant ) : ?>
+                <h2>Edit Consultant: <?php echo htmlspecialchars( mask_name( $edit_data['name'] ?? $edit_data['username'], $privacy_mode ) ); ?></h2>
+                <?php render_person_form( 'consultants', $edit_data, $is_editing_consultant ); ?>
+            <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
+                <div style="margin-bottom: 20px;">
+                    <?php
+                    $back_params = array( 'tab' => 'consultants' );
+                    if ( $privacy_mode ) $back_params['privacy'] = '1';
+                    ?>
+                    <a href="<?php echo build_team_url( 'admin.php', $back_params ); ?>" class="btn">← Back to Consultants</a>
+                </div>
+                <h3>Add New Consultant</h3>
+                <?php render_person_form( 'consultants', null, false ); ?>
+            <?php else : ?>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3>Current Consultants</h3>
+                    <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'consultants', 'add' => 'new' ) ); ?>" class="btn-add">+ Add Consultant</a>
+                </div>
+                <?php if ( ! empty( $config['consultants'] ) ) : ?>
+                    <div class="person-list">
+                        <?php
+                        // Sort consultants by name
+                        $sorted_consultants = $config['consultants'];
+                        uasort( $sorted_consultants, function( $a, $b ) {
+                            return strcasecmp( $a['name'] ?? '', $b['name'] ?? '' );
+                        });
+                        ?>
+                        <?php foreach ( $sorted_consultants as $username => $consultant ) : ?>
+                            <div class="person-item">
+                                <div class="person-info">
+                                    <strong><?php echo htmlspecialchars( mask_name( $consultant['name'], $privacy_mode ) ); ?></strong>
+                                    <span class="person-meta">@<?php echo htmlspecialchars( mask_username( $username, $privacy_mode ) ); ?></span>
+                                    <?php if ( ! empty( $consultant['role'] ) ) : ?>
+                                        <span class="person-role"><?php echo htmlspecialchars( $consultant['role'] ); ?></span>
+                                    <?php endif; ?>
+                                    <?php if ( ! empty( $consultant['location'] ) ) : ?>
+                                        <span class="person-location"><?php echo htmlspecialchars( $consultant['location'] ); ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="person-actions">
+                                    <?php
+                                    $edit_params = array( 'edit_member' => $username );
+                                    if ( $privacy_mode ) $edit_params['privacy'] = '1';
+                                    ?>
+                                    <a href="<?php echo build_team_url( 'admin.php', $edit_params ); ?>" class="btn">Edit</a>
+                                    <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this consultant?')">
+                                        <input type="hidden" name="action" value="delete_consultant">
+                                        <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
+                                        <?php if ( $current_team !== 'team' ) : ?>
+                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
+                                        <?php endif; ?>
+                                        <button type="submit" class="btn btn-danger">Delete</button>
+                                    </form>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else : ?>
+                    <p>No consultants added yet.</p>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div>
+
         <!-- Alumni Tab -->
         <div id="alumni" class="tab-content <?php echo $active_tab === 'alumni' ? 'active' : ''; ?>">
             <?php if ( $is_editing_alumni ) : ?>
@@ -2041,46 +2313,27 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             // Get audit data for all people
             $audit_data = array();
 
-            // Team members
-            foreach ( $config['team_members'] as $username => $member ) {
-                $missing = get_missing_data_points( $member, 'member' );
-                $score = get_completeness_score( $missing, 'member' );
-                $audit_data[] = array(
-                    'type' => 'Team Member',
-                    'name' => $member['name'],
-                    'username' => $username,
-                    'missing' => $missing,
-                    'score' => $score,
-                    'person' => $member
-                );
-            }
-
-            // Leadership
-            foreach ( $config['leadership'] as $username => $leader ) {
-                $missing = get_missing_data_points( $leader, 'leader' );
-                $score = get_completeness_score( $missing, 'leader' );
-                $audit_data[] = array(
-                    'type' => 'Leadership',
-                    'name' => $leader['name'],
-                    'username' => $username,
-                    'missing' => $missing,
-                    'score' => $score,
-                    'person' => $leader
-                );
-            }
-
-            // Alumni
-            foreach ( $config['alumni'] ?? array() as $username => $alumnus ) {
-                $missing = get_missing_data_points( $alumnus, 'alumni' );
-                $score = get_completeness_score( $missing, 'alumni' );
-                $audit_data[] = array(
-                    'type' => 'Alumni',
-                    'name' => $alumnus['name'],
-                    'username' => $username,
-                    'missing' => $missing,
-                    'score' => $score,
-                    'person' => $alumnus
-                );
+            // Process all person types using unified approach
+            $person_type_mappings = array(
+                'team_members' => array('type_name' => 'Team Member', 'audit_type' => 'member'),
+                'leadership' => array('type_name' => 'Leadership', 'audit_type' => 'leader'),
+                'consultants' => array('type_name' => 'Consultant', 'audit_type' => 'consultants'),
+                'alumni' => array('type_name' => 'Alumni', 'audit_type' => 'alumni'),
+            );
+            
+            foreach ( $person_type_mappings as $section_key => $type_info ) {
+                foreach ( $config[ $section_key ] ?? array() as $username => $person ) {
+                    $missing = get_missing_data_points( $person, $type_info['audit_type'] );
+                    $score = get_completeness_score( $missing, $type_info['audit_type'] );
+                    $audit_data[] = array(
+                        'type' => $type_info['type_name'],
+                        'name' => $person['name'],
+                        'username' => $username,
+                        'missing' => $missing,
+                        'score' => $score,
+                        'person' => $person
+                    );
+                }
             }
 
             // Sort by completeness score (lowest first to prioritize fixes)
@@ -2123,6 +2376,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     <option value="">All Types</option>
                     <option value="Team Member">Team Members</option>
                     <option value="Leadership">Leadership</option>
+                    <option value="Consultant">Consultants</option>
                     <option value="Alumni">Alumni</option>
                 </select>
                 <select class="form-select-small" id="score-filter" onchange="filterAuditTable()">

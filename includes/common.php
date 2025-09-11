@@ -129,8 +129,8 @@ function get_all_upcoming_events( $team_data ) {
 	// Check if alumni events should be included (undocumented parameter)
 	$include_alumni = isset( $_GET['alumni'] ) && $_GET['alumni'] === '1';
 
-	// Get personal events from team members and leadership, optionally alumni
-	$all_people = array_merge( $team_data['team_members'], $team_data['leadership'] );
+	// Get personal events from team members, leadership, consultants, and optionally alumni
+	$all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['consultants'] ?? array() );
 	if ( $include_alumni ) {
 		$all_people = array_merge( $all_people, $team_data['alumni'] );
 	}
@@ -339,14 +339,16 @@ function get_all_teams_stats() {
 			if ( json_last_error() === JSON_ERROR_NONE ) {
 				$team_members_count = count( $config['team_members'] ?? array() );
 				$leadership_count = count( $config['leadership'] ?? array() );
+				$consultants_count = count( $config['consultants'] ?? array() );
 				$alumni_count = count( $config['alumni'] ?? array() );
-				$total_people = $team_members_count + $leadership_count + $alumni_count;
+				$total_people = $team_members_count + $leadership_count + $consultants_count + $alumni_count;
 				
 				$stats[] = array(
 					'slug' => $team_slug,
 					'name' => $config['team_name'] ?? ucfirst( str_replace( '_', ' ', $team_slug ) ),
 					'team_members' => $team_members_count,
 					'leadership' => $leadership_count,
+					'consultants' => $consultants_count,
 					'alumni' => $alumni_count,
 					'total_people' => $total_people,
 					'is_default' => isset( $config['default'] ) && $config['default'],
@@ -431,6 +433,39 @@ function get_all_people_from_all_teams( $privacy_mode = false ) {
 						'team_slug' => $team_slug,
 						'location' => $leader_data['location'] ?? '',
 						'birthday' => get_birthday_display_for_js( $leader_data, $privacy_mode ),
+						'links' => $links_js,
+						'url' => build_team_url_extended( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ), $team_slug )
+					);
+				}
+				
+				// Consultants
+				foreach ( $config['consultants'] ?? array() as $username => $consultant_data ) {
+					$links_js = array();
+					foreach ( $consultant_data['links'] ?? array() as $text => $url ) {
+						$links_js[] = array(
+							'text' => $text,
+							'url' => $url
+						);
+					}
+					
+					// Handle Linear links
+					if ( isset( $consultant_data['linear'] ) && ! empty( $consultant_data['linear'] ) ) {
+						$links_js[] = array(
+							'text' => 'Linear',
+							'url' => 'https://linear.app/a8c/profiles/' . $consultant_data['linear']
+						);
+					}
+					
+					$all_people[] = array(
+						'username' => $username,
+						'name' => mask_name( $consultant_data['name'] ?? '', $privacy_mode ),
+						'nickname' => $privacy_mode ? '' : ( $consultant_data['nickname'] ?? '' ),
+						'role' => $consultant_data['role'] ?? '',
+						'type' => 'Consultant',
+						'team' => $team_name,
+						'team_slug' => $team_slug,
+						'location' => $consultant_data['location'] ?? '',
+						'birthday' => get_birthday_display_for_js( $consultant_data, $privacy_mode ),
 						'links' => $links_js,
 						'url' => build_team_url_extended( 'index.php', array( 'person' => $username, 'privacy' => $privacy_mode ? '1' : '0' ), $team_slug )
 					);
@@ -528,6 +563,65 @@ function get_birthday_display_for_js( $person_data, $privacy_mode ) {
 }
 
 /**
+ * Create Person object from person data array
+ */
+function create_person_from_data( $username, $person_data, $privacy_mode = false ) {
+	// Handle migration from old format to new format
+	$links = array();
+	if ( isset( $person_data['links'] ) ) {
+		// New format - use links directly
+		$links = $person_data['links'];
+	} else {
+		// Old format - migrate one_on_one and hr_feedback to links
+		if ( ! empty( $person_data['one_on_one'] ) ) {
+			$links['1:1 doc'] = $person_data['one_on_one'];
+		}
+		if ( ! empty( $person_data['hr_feedback'] ) ) {
+			$links['HR monthly'] = $person_data['hr_feedback'];
+		}
+	}
+
+	if ( isset( $person_data['linear'] ) && ! empty( $person_data['linear'] ) ) {
+		$links['Linear'] = 'https://linear.app/a8c/profiles/' . $person_data['linear'];
+	}
+
+	if ( isset( $person_data['wordpress'] ) && ! empty( $person_data['wordpress'] ) ) {
+		$links['WordPress.org'] = 'https://profiles.wordpress.org/' . $person_data['wordpress'];
+	}
+
+	if ( isset( $person_data['linkedin'] ) && ! empty( $person_data['linkedin'] ) ) {
+		$links['LinkedIn'] = 'https://linkedin.com/in/' . $person_data['linkedin'];
+	}
+
+	$person = new Person(
+		$person_data['name'],
+		$username,
+		$links,
+		$person_data['role'] ?? '',
+		$privacy_mode
+	);
+
+	// Set properties with empty string defaults
+	$string_properties = array( 'email', 'birthday', 'company_anniversary', 'partner', 'timezone', 'github', 'wordpress', 'linkedin', 'website', 'new_company', 'new_company_website' );
+	foreach ( $string_properties as $property ) {
+		$person->$property = $person_data[$property] ?? '';
+	}
+
+	// Set properties with array defaults
+	$array_properties = array( 'kids', 'github_repos', 'personal_events', 'notes' );
+	foreach ( $array_properties as $property ) {
+		$person->$property = $person_data[$property] ?? array();
+	}
+
+	// Special cases
+	$person->nickname = $privacy_mode ? '' : ( $person_data['nickname'] ?? '' );
+	$person->location = $person_data['location'] ?? $person_data['town'] ?? ''; // Support both 'location' and legacy 'town'
+	$person->left_company = $person_data['left_company'] ?? 0;
+
+	return $person;
+}
+
+/**
  * Load team configuration from JSON file and convert to Person objects
  */
 function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = false ) {
@@ -550,171 +644,22 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 	// Convert arrays to Person objects
 	$team_members = array();
 	foreach ( $config['team_members'] as $username => $member_data ) {
-		// Handle migration from old format to new format
-		$links = array();
-		if ( isset( $member_data['links'] ) ) {
-			// New format - use links directly
-			$links = $member_data['links'];
-		} else {
-			// Old format - migrate one_on_one and hr_feedback to links
-			if ( ! empty( $member_data['one_on_one'] ) ) {
-				$links['1:1 doc'] = $member_data['one_on_one'];
-			}
-			if ( ! empty( $member_data['hr_feedback'] ) ) {
-				$links['HR monthly'] = $member_data['hr_feedback'];
-			}
-		}
-
-		if ( isset( $member_data['linear'] ) && ! empty( $member_data['linear'] ) ) {
-			$links['Linear'] = 'https://linear.app/a8c/profiles/' . $member_data['linear'];
-		}
-
-		if ( isset( $member_data['wordpress'] ) && ! empty( $member_data['wordpress'] ) ) {
-			$links['WordPress.org'] = 'https://profiles.wordpress.org/' . $member_data['wordpress'];
-		}
-
-		if ( isset( $member_data['linkedin'] ) && ! empty( $member_data['linkedin'] ) ) {
-			$links['LinkedIn'] = 'https://linkedin.com/in/' . $member_data['linkedin'];
-		}
-
-		$person = new Person(
-			$member_data['name'],
-			$username,
-			$links,
-			$member_data['role'] ?? '',
-			$privacy_mode
-		);
-
-		// Set additional properties
-		$person->nickname = $privacy_mode ? '' : ( $member_data['nickname'] ?? '' );
-		$person->email = $member_data['email'] ?? '';
-		$person->birthday = $member_data['birthday'] ?? '';
-		$person->company_anniversary = $member_data['company_anniversary'] ?? '';
-		$person->partner = $member_data['partner'] ?? '';
-		$person->kids = $member_data['kids'] ?? array();
-		$person->notes = $member_data['notes'] ?? '';
-		$person->location = $member_data['location'] ?? $member_data['town'] ?? ''; // Support both 'location' and legacy 'town'
-		$person->timezone = $member_data['timezone'] ?? '';
-		$person->github = $member_data['github'] ?? '';
-		$person->github_repos = $member_data['github_repos'] ?? array();
-		$person->wordpress = $member_data['wordpress'] ?? '';
-		$person->linkedin = $member_data['linkedin'] ?? '';
-		$person->website = $member_data['website'] ?? '';
-		$person->personal_events = $member_data['personal_events'] ?? array();
-		$person->left_company = $member_data['left_company'] ?? 0;
-		$person->new_company = $member_data['new_company'] ?? '';
-		$person->new_company_website = $member_data['new_company_website'] ?? '';
-
-		$team_members[$username] = $person;
+		$team_members[$username] = create_person_from_data( $username, $member_data, $privacy_mode );
 	}
 
 	$leadership = array();
 	foreach ( $config['leadership'] as $username => $leader_data ) {
-		// Handle migration from old format to new format
-		$links = array();
-		if ( isset( $leader_data['links'] ) ) {
-			// New format - use links directly
-			$links = $leader_data['links'];
-		} else {
-			// Old format - migrate one_on_one to links (no hr_feedback for leaders)
-			if ( ! empty( $leader_data['one_on_one'] ) ) {
-				$links['1:1 doc'] = $leader_data['one_on_one'];
-			}
-		}
+		$leadership[$username] = create_person_from_data( $username, $leader_data, $privacy_mode );
+	}
 
-		if ( isset( $leader_data['wordpress'] ) && ! empty( $leader_data['wordpress'] ) ) {
-			$links['WordPress.org'] = 'https://profiles.wordpress.org/' . $leader_data['wordpress'];
-		}
-
-		if ( isset( $leader_data['linkedin'] ) && ! empty( $leader_data['linkedin'] ) ) {
-			$links['LinkedIn'] = 'https://linkedin.com/in/' . $leader_data['linkedin'];
-		}
-
-		$person = new Person(
-			$leader_data['name'],
-			$username,
-			$links,
-			$leader_data['role'] ?? '',
-			$privacy_mode
-		);
-
-		// Set additional properties
-		$person->nickname = $privacy_mode ? '' : ( $leader_data['nickname'] ?? '' );
-		$person->email = $leader_data['email'] ?? '';
-		$person->birthday = $leader_data['birthday'] ?? '';
-		$person->company_anniversary = $leader_data['company_anniversary'] ?? '';
-		$person->partner = $leader_data['partner'] ?? '';
-		$person->kids = $leader_data['kids'] ?? array();
-		$person->notes = $leader_data['notes'] ?? '';
-		$person->location = $leader_data['location'] ?? $leader_data['town'] ?? ''; // Support both 'location' and legacy 'town'
-		$person->timezone = $leader_data['timezone'] ?? '';
-		$person->github = $leader_data['github'] ?? '';
-		$person->github_repos = $leader_data['github_repos'] ?? array();
-		$person->wordpress = $leader_data['wordpress'] ?? '';
-		$person->linkedin = $leader_data['linkedin'] ?? '';
-		$person->website = $leader_data['website'] ?? '';
-		$person->personal_events = $leader_data['personal_events'] ?? array();
-		$person->left_company = $leader_data['left_company'] ?? 0;
-		$person->new_company = $leader_data['new_company'] ?? '';
-		$person->new_company_website = $leader_data['new_company_website'] ?? '';
-
-		$leadership[$username] = $person;
+	$consultants = array();
+	foreach ( $config['consultants'] ?? array() as $username => $consultant_data ) {
+		$consultants[$username] = create_person_from_data( $username, $consultant_data, $privacy_mode );
 	}
 
 	$alumni = array();
 	foreach ( $config['alumni'] ?? array() as $username => $alumni_data ) {
-		// Handle migration from old format to new format
-		$links = array();
-		if ( isset( $alumni_data['links'] ) ) {
-			// New format - use links directly
-			$links = $alumni_data['links'];
-		} else {
-			// Old format - migrate one_on_one and hr_feedback to links
-			if ( ! empty( $alumni_data['one_on_one'] ) ) {
-				$links['1:1 doc'] = $alumni_data['one_on_one'];
-			}
-			if ( ! empty( $alumni_data['hr_feedback'] ) ) {
-				$links['HR monthly'] = $alumni_data['hr_feedback'];
-			}
-		}
-
-		if ( isset( $alumni_data['wordpress'] ) && ! empty( $alumni_data['wordpress'] ) ) {
-			$links['WordPress.org'] = 'https://profiles.wordpress.org/' . $alumni_data['wordpress'];
-		}
-
-		if ( isset( $alumni_data['linkedin'] ) && ! empty( $alumni_data['linkedin'] ) ) {
-			$links['LinkedIn'] = 'https://linkedin.com/in/' . $alumni_data['linkedin'];
-		}
-
-		$person = new Person(
-			$alumni_data['name'],
-			$username,
-			$links,
-			$alumni_data['role'] ?? '',
-			$privacy_mode
-		);
-
-		// Set additional properties
-		$person->nickname = $privacy_mode ? '' : ( $alumni_data['nickname'] ?? '' );
-		$person->email = $alumni_data['email'] ?? '';
-		$person->birthday = $alumni_data['birthday'] ?? '';
-		$person->company_anniversary = $alumni_data['company_anniversary'] ?? '';
-		$person->partner = $alumni_data['partner'] ?? '';
-		$person->kids = $alumni_data['kids'] ?? array();
-		$person->notes = $alumni_data['notes'] ?? '';
-		$person->location = $alumni_data['location'] ?? $alumni_data['town'] ?? '';
-		$person->timezone = $alumni_data['timezone'] ?? '';
-		$person->github = $alumni_data['github'] ?? '';
-		$person->github_repos = $alumni_data['github_repos'] ?? array();
-		$person->wordpress = $alumni_data['wordpress'] ?? '';
-		$person->linkedin = $alumni_data['linkedin'] ?? '';
-		$person->website = $alumni_data['website'] ?? '';
-		$person->personal_events = $alumni_data['personal_events'] ?? array();
-		$person->left_company = $alumni_data['left_company'] ?? 0;
-		$person->new_company = $alumni_data['new_company'] ?? '';
-		$person->new_company_website = $alumni_data['new_company_website'] ?? '';
-
-		$alumni[$username] = $person;
+		$alumni[$username] = create_person_from_data( $username, $alumni_data, $privacy_mode );
 	}
 
 	// Sort all collections by name
@@ -723,6 +668,10 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 	} );
 
 	uasort( $leadership, function( $a, $b ) {
+		return strcasecmp( $a->name, $b->name );
+	} );
+
+	uasort( $consultants, function( $a, $b ) {
 		return strcasecmp( $a->name, $b->name );
 	} );
 
@@ -743,6 +692,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 		'team_links' => $config['team_links'] ?? array(),
 		'team_members' => $team_members,
 		'leadership' => $leadership,
+		'consultants' => $consultants,
 		'alumni' => $alumni,
 		'events' => $events,
 	);
@@ -775,7 +725,7 @@ function get_upcoming_events_for_display( $team_data ) {
 	$include_alumni = isset( $_GET['alumni'] ) && $_GET['alumni'] === '1';
 
 	// Check if we have Person objects or raw arrays
-	$all_people = array_merge( $team_data['team_members'], $team_data['leadership'] );
+	$all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['consultants'] ?? array() );
 	if ( $include_alumni ) {
 		$all_people = array_merge( $all_people, $team_data['alumni'] );
 	}
@@ -837,6 +787,8 @@ function render_upcoming_events_sidebar( $upcoming_events_or_person = null, $pri
 				$person_data = $team_data['team_members'][ $current_person ];
 			} elseif ( isset( $team_data['leadership'][ $current_person ] ) ) {
 				$person_data = $team_data['leadership'][ $current_person ];
+			} elseif ( isset( $team_data['consultants'][ $current_person ] ) ) {
+				$person_data = $team_data['consultants'][ $current_person ];
 			} elseif ( isset( $team_data['alumni'][ $current_person ] ) ) {
 				$person_data = $team_data['alumni'][ $current_person ];
 			}
@@ -955,6 +907,27 @@ function get_person_feedback_history( $username ) {
     $feedback_data = json_decode( $content, true ) ?: array();
 
     return $feedback_data['feedback'][$username] ?? array();
+}
+
+/**
+ * Sanitize text field by removing tags and trimming
+ */
+function sanitize_text_field( $str ) {
+	return trim( strip_tags( $str ) );
+}
+
+/**
+ * Sanitize URL
+ */
+function sanitize_url( $url ) {
+	return filter_var( trim( $url ), FILTER_SANITIZE_URL );
+}
+
+/**
+ * Sanitize textarea field by removing tags and trimming
+ */
+function sanitize_textarea_field( $str ) {
+	return trim( strip_tags( $str ) );
 }
 
 /**

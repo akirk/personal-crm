@@ -42,6 +42,8 @@ if ( isset( $team_data['team_members'][ $person ] ) ) {
 	$person_data = $team_data['team_members'][ $person ];
 } elseif ( isset( $team_data['leadership'][ $person ] ) ) {
 	$person_data = $team_data['leadership'][ $person ];
+} elseif ( isset( $team_data['consultants'][ $person ] ) ) {
+	$person_data = $team_data['consultants'][ $person ];
 } elseif ( isset( $team_data['alumni'][ $person ] ) ) {
 	$person_data = $team_data['alumni'][ $person ];
 }
@@ -53,6 +55,7 @@ if ( ! $person_data ) {
 
 // Determine person type
 $is_team_member = isset( $team_data['team_members'][ $person ] );
+$is_consultant = isset( $team_data['consultants'][ $person ] );
 $is_alumni = isset( $team_data['alumni'][ $person ] );
 
 ?>
@@ -81,7 +84,9 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						<?php if ( ! empty( $person_data->role ) ) : ?>
 							• <?php echo htmlspecialchars( $person_data->role ); ?>
 						<?php endif; ?>
-						<?php if ( $is_alumni ) : ?>
+						<?php if ( $is_consultant ) : ?>
+							• Consultant
+						<?php elseif ( $is_alumni ) : ?>
 							• Alumni
 						<?php endif; ?>
 					</span>
@@ -257,7 +262,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 							</p>
 						<?php endif; ?>
 
-						<?php if ( ! empty( $person_data->partner ) ) : ?>
+						<?php if ( ! empty( $person_data->partner ) && ! $privacy_mode ) : ?>
 							<p><strong>💑 Partner:</strong> <?php echo htmlspecialchars( $person_data->partner ); ?></p>
 						<?php endif; ?>
 
@@ -309,6 +314,9 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					$has_linear = ! empty( $person_data->links['Linear'] ?? '' );
 					$has_repos = ! empty( $person_data->github_repos );
 					$has_any_accounts = $has_github || $has_wordpress || $has_linkedin || $has_website || $has_linear;
+					
+					// Check if person has notes (needed for Quick Links)
+					$has_notes = ! empty( $person_data->notes ) && is_array( $person_data->notes ) && count( $person_data->notes ) > 0;
 					?>
 
 					<?php if ( $has_repos ) : ?>
@@ -374,6 +382,13 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 									<?php endforeach; ?>
 							<?php endif; ?>
 
+							<?php if ( ! $privacy_mode && ! $has_notes ) : ?>
+								<a href="#" onclick="toggleAddNoteForm(); return false;" class="quick-link">
+									<span style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; margin-right: 8px; font-size: 14px;">📝</span>
+									Add note
+								</a>
+							<?php endif; ?>
+
 							<?php if ( $is_team_member && ! empty( $person_data->username ) && isset( $team_data['activity_url_prefix'] ) ) : ?>
 								<?php
 								$last_month = date( 'Y-m', strtotime( 'last month') );
@@ -393,11 +408,87 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						</div>
 					<?php endif; ?>
 
-					<?php if ( ! empty( $person_data->notes ) ) : ?>
-						<div class="notes-section">
-							<strong>📝 Notes:</strong>
-							<p class="notes-content"><?php echo nl2br( htmlspecialchars( $person_data->notes ) ); ?></p>
-						</div>
+					<?php if ( ! $privacy_mode ) : ?>
+						<?php 
+						$view_mode = $_GET['notes_view'] ?? 'compiled'; 
+						?>
+						<?php if ( $has_notes ) : ?>
+							<div class="notes-section">
+								<div class="notes-header">
+									<strong>📝 Notes:</strong>
+									<div class="notes-controls">
+										<?php if ( $view_mode === 'chronological' ) : ?>
+											<a href="<?php echo build_team_url( 'person.php', array( 'person' => $person, 'notes_view' => 'compiled', 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" 
+											   class="timeline-toggle">← Compiled view</a>
+										<?php else : ?>
+											<a href="<?php echo build_team_url( 'person.php', array( 'person' => $person, 'notes_view' => 'chronological', 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" 
+											   class="timeline-toggle">Timeline view →</a>
+										<?php endif; ?>
+										<button type="button" onclick="toggleAddNoteForm()" class="add-note-btn">Add note</button>
+									</div>
+								</div>
+								
+								<?php if ( $view_mode === 'chronological' ) : ?>
+									<div class="notes-chronological">
+										<?php foreach ( $person_data->notes as $note ) : ?>
+											<div class="note">
+												<small class="note-date"><?php echo htmlspecialchars( $note['date'] ); ?></small>
+												<p class="note-text"><?php echo nl2br( htmlspecialchars( $note['text'] ) ); ?></p>
+											</div>
+										<?php endforeach; ?>
+									</div>
+								<?php else : ?>
+									<div class="notes-compiled">
+										<?php 
+										$compiled_text = '';
+										foreach ( $person_data->notes as $note ) {
+											$compiled_text .= $note['text'] . "\n\n";
+										}
+										?>
+										<p class="notes-content"><?php echo nl2br( htmlspecialchars( trim( $compiled_text ) ) ); ?></p>
+									</div>
+								<?php endif; ?>
+								
+								<form method="post" action="<?php echo build_team_url( 'admin.php', array( 'team' => $current_team ) ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
+									<input type="hidden" name="action" value="add_note">
+									<input type="hidden" name="username" value="<?php echo htmlspecialchars( $person ); ?>">
+									<input type="hidden" name="return_to_person" value="1">
+									<?php if ( $privacy_mode ) : ?>
+										<input type="hidden" name="privacy" value="1">
+									<?php endif; ?>
+									<?php if ( isset( $_GET['notes_view'] ) ) : ?>
+										<input type="hidden" name="notes_view" value="<?php echo htmlspecialchars( $_GET['notes_view'] ); ?>">
+									<?php endif; ?>
+									<textarea name="new_note" placeholder="Add a new note..." rows="3" required></textarea>
+									<div class="form-actions">
+										<button type="submit">Save Note</button>
+										<button type="button" onclick="toggleAddNoteForm()" class="cancel-btn">Cancel</button>
+									</div>
+								</form>
+							</div>
+						<?php endif; ?>
+						
+						<?php if ( ! $privacy_mode && ! $has_notes ) : ?>
+							<!-- Hidden form for adding notes when no notes exist -->
+							<form method="post" action="<?php echo build_team_url( 'admin.php', array( 'team' => $current_team ) ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
+								<input type="hidden" name="action" value="add_note">
+								<input type="hidden" name="username" value="<?php echo htmlspecialchars( $person ); ?>">
+								<input type="hidden" name="return_to_person" value="1">
+								<?php if ( $privacy_mode ) : ?>
+									<input type="hidden" name="privacy" value="1">
+								<?php endif; ?>
+								<div class="notes-section">
+									<div class="notes-header">
+										<strong>📝 Add your first note:</strong>
+									</div>
+									<textarea name="new_note" placeholder="Add a new note..." rows="3" required></textarea>
+									<div class="form-actions">
+										<button type="submit">Save Note</button>
+										<button type="button" onclick="toggleAddNoteForm()" class="cancel-btn">Cancel</button>
+									</div>
+								</div>
+							</form>
+						<?php endif; ?>
 					<?php endif; ?>
 
 					<?php if ( $has_any_accounts ) : ?>
@@ -582,6 +673,20 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 				}
 			});
 		});
+		
+		// Toggle add note form
+		function toggleAddNoteForm() {
+			const form = document.getElementById('add-note-form');
+			const isVisible = form.style.display !== 'none';
+			
+			if (isVisible) {
+				form.style.display = 'none';
+				form.querySelector('textarea').value = ''; // Clear form when hiding
+			} else {
+				form.style.display = 'block';
+				form.querySelector('textarea').focus(); // Focus textarea when showing
+			}
+		}
 	</script>
 </body>
 </html>

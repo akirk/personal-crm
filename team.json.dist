@@ -34,6 +34,20 @@
       "notes": ""
     }
   },
+  "consultants": {
+    "consultant-username": {
+      "name": "Consultant Name",
+      "github": "github-username",
+      "linear": "linear-username",
+      "town": "City, Country",
+      "role": "Consultant",
+      "one_on_one": "https://docs.google.com/document/d/YOUR_DOCUMENT_ID/edit",
+      "birthday": "YYYY-MM-DD",
+      "company_anniversary": "YYYY-MM-DD",
+      "kids": [],
+      "notes": ""
+    }
+  },
   "events": [
     {
       "name": "Team Event Name",

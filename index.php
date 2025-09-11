@@ -263,6 +263,36 @@ if ( ! empty( $team_members_needing_hr ) ) {
 					</div>
 
 					<div class="section">
+						<h3>Consultants (<?php echo count( $team_data['consultants'] ); ?>)</h3>
+						<?php if ( ! empty( $team_data['consultants'] ) ) : ?>
+							<ul class="people-list">
+								<?php foreach ( $team_data['consultants'] as $username => $consultant ) : ?>
+									<li>
+										<div class="person-row-container">
+											<a href="<?php echo $consultant->get_profile_url(); ?>" class="person-row">
+												<div class="person-info">
+													<div class="person-name"><?php echo htmlspecialchars( $consultant->get_display_name_with_nickname() ); ?> <span class="person-role">(<?php echo htmlspecialchars( $consultant->role ); ?>)</span></div>
+													<div class="person-username">
+														@<?php echo htmlspecialchars( $consultant->get_username() ); ?>
+														<?php if ( ! empty( $consultant->timezone ) || ! empty( $consultant->location ) ) : ?>
+															<span id="time-<?php echo htmlspecialchars( $username ); ?>" class="timezone-display"></span>
+														<?php endif; ?>
+													</div>
+												</div>
+											</a>
+											<div class="person-links">
+												<?php render_person_links( $consultant->links ); ?>
+											</div>
+										</div>
+									</li>
+								<?php endforeach; ?>
+							</ul>
+						<?php else : ?>
+							<p class="empty-state-message">No consultants yet. <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'consultants', 'add' => 'new' ) ); ?>" class="action-link">Add your first consultant →</a></p>
+						<?php endif; ?>
+					</div>
+
+					<div class="section">
 						<h3>Alumni (<?php echo count( $team_data['alumni'] ); ?>)</h3>
 						<?php if ( ! empty( $team_data['alumni'] ) ) : ?>
 							<ul class="people-list">
@@ -385,7 +415,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
 			<?php 
-			$all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['alumni'] );
+			$all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['consultants'], $team_data['alumni'] );
 			foreach ( $all_people as $username => $person_obj ) :
 				if ( ! empty( $person_obj->timezone ) ) :
 			?>

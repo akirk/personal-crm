@@ -269,8 +269,11 @@ class Event {
 						$age = $additional_info['age'];
 						$ordinal = self::get_ordinal_number( $age );
 						$description = $additional_info['kid_name'] . "'s " . $ordinal . " Birthday 🎈";
-					} else {
+					} elseif ( ! $privacy_mode ) {
 						$description = $additional_info['kid_name'] . "'s Birthday 🎈";
+					} else {
+						// Privacy mode - hide kid's name
+						$description = "Child's Birthday 🎈";
 					}
 					
 					// Add parent info if not in privacy mode

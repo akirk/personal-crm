@@ -41,7 +41,7 @@ class Person {
 		$this->company_anniversary = '';
 		$this->partner = '';
 		$this->kids = array();
-		$this->notes = '';
+		$this->notes = array();
 		$this->location = '';
 		$this->timezone = '';
 		$this->privacy_mode = $privacy_mode;
