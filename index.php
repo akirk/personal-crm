@@ -37,6 +37,20 @@ $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 // Load team configuration with Person objects
 $team_data = load_team_config_with_objects( $current_team, $privacy_mode );
 
+// Separate deceased people from their original sections
+$deceased_people = array();
+foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $section ) {
+	if ( isset( $team_data[$section] ) ) {
+		foreach ( $team_data[$section] as $username => $person ) {
+			if ( ! empty( $person->deceased ) ) {
+				$deceased_people[$username] = $person;
+				unset( $team_data[$section][$username] );
+			}
+		}
+	}
+}
+$team_data['deceased'] = $deceased_people;
+
 
 // Redirect person pages to person.php
 if ( isset( $_GET['person'] ) && ! empty( $_GET['person'] ) ) {
@@ -389,6 +403,31 @@ if ( ! empty( $team_members_needing_hr ) ) {
 						<?php endif; ?>
 					</div>
 					<?php endif; ?>
+
+					<?php if ( ! empty( $team_data['deceased'] ) ) : ?>
+					<div class="section">
+						<h3>Deceased (<?php echo count( $team_data['deceased'] ); ?>)</h3>
+						<ul class="people-list">
+							<?php foreach ( $team_data['deceased'] as $username => $deceased_person ) : ?>
+								<li>
+									<div class="person-row-container">
+										<a href="<?php echo $deceased_person->get_profile_url(); ?>" class="person-row">
+											<div class="person-info">
+												<div class="person-name"><?php echo htmlspecialchars( $deceased_person->get_display_name_with_nickname() ); ?> <span style="color: #666; font-weight: normal;">†</span></div>
+												<div class="person-username">
+													@<?php echo htmlspecialchars( $deceased_person->get_username() ); ?>
+												</div>
+											</div>
+										</a>
+										<div class="person-links">
+											<?php render_person_links( $deceased_person->links ); ?>
+										</div>
+									</div>
+								</li>
+							<?php endforeach; ?>
+						</ul>
+					</div>
+					<?php endif; ?>
 				</div>
 
 				<div class="events-sidebar">
@@ -473,7 +512,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 			<?php 
 			$all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['consultants'], $team_data['alumni'] );
 			foreach ( $all_people as $username => $person_obj ) :
-				if ( ! empty( $person_obj->timezone ) ) :
+				if ( ! empty( $person_obj->timezone ) && empty( $person_obj->deceased ) ) :
 			?>
 			createSimpleTimeUpdater('<?php echo addslashes( $person_obj->timezone ); ?>', '<?php echo addslashes( $username ); ?>');
 			<?php 

@@ -28,6 +28,8 @@ class Person {
 	public $left_company; // Boolean indicating if person has left the company (for alumni)
 	public $new_company; // New company name (for alumni)
 	public $new_company_website; // New company website (for alumni)
+	public $deceased; // Boolean indicating if person is deceased (excludes from birthday reminders)
+	public $deceased_date; // Date of passing (YYYY-MM-DD format)
 	private $original_username; // Store original username for data lookups
 
 	public function __construct( $name, $username = '', $links = array(), $role = '', $privacy_mode = false ) {
@@ -52,6 +54,8 @@ class Person {
 		$this->wordpress = '';
 		$this->linkedin = '';
 		$this->personal_events = array();
+		$this->deceased = 0;
+		$this->deceased_date = '';
 	}
 
 	/**
@@ -159,8 +163,8 @@ class Person {
 		$cutoff_date = clone $current_date;
 		$cutoff_date->add( new DateInterval( 'P1Y' ) )->sub( new DateInterval( 'P1D' ) ); // 1 year minus 1 day from now
 
-		// Birthday
-		if ( ! empty( $this->birthday ) ) {
+		// Birthday - skip if person is deceased
+		if ( ! empty( $this->birthday ) && empty( $this->deceased ) ) {
 			$birthday_date = null;
 			$birth_date = null;
 
@@ -638,8 +642,8 @@ class Person {
 		$cutoff_date = clone $current_date;
 		$cutoff_date->add( new DateInterval( 'P1Y' ) ); // 1 year from now
 
-		// Always include birthday - find the next occurrence (this year or next year)
-		if ( ! empty( $this->birthday ) ) {
+		// Always include birthday - find the next occurrence (this year or next year) - skip if deceased
+		if ( ! empty( $this->birthday ) && empty( $this->deceased ) ) {
 			$birthday_date = null;
 
 			// Check if it's full YYYY-MM-DD format

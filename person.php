@@ -48,6 +48,17 @@ if ( isset( $team_data['team_members'][ $person ] ) ) {
 	$person_data = $team_data['alumni'][ $person ];
 }
 
+// Check if person is in deceased list and load from original data before it was moved
+if ( ! $person_data ) {
+	$original_team_data = load_team_config_with_objects( $current_team, $privacy_mode );
+	foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $section ) {
+		if ( isset( $original_team_data[$section][ $person ] ) && ! empty( $original_team_data[$section][ $person ]->deceased ) ) {
+			$person_data = $original_team_data[$section][ $person ];
+			break;
+		}
+	}
+}
+
 if ( ! $person_data ) {
 	header( 'Location: ' . build_team_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
 	exit;
@@ -79,6 +90,9 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 			<div>
 				<h1 class="person-title">
 					<?php echo htmlspecialchars( $person_data->get_display_name_with_nickname() ); ?>
+					<?php if ( ! empty( $person_data->deceased ) ) : ?>
+						<span style="color: #666; font-weight: normal; margin-left: 8px;">†</span>
+					<?php endif; ?>
 					<span class="person-subtitle">
 						@<?php echo htmlspecialchars( $person_data->get_username() ); ?>
 						<?php if ( ! empty( $person_data->role ) ) : ?>
@@ -88,6 +102,8 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 							• Consultant
 						<?php elseif ( $is_alumni ) : ?>
 							• Alumni
+						<?php elseif ( ! empty( $person_data->deceased ) ) : ?>
+							• Deceased
 						<?php endif; ?>
 					</span>
 				</h1>
@@ -172,21 +188,39 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 
 						<?php if ( ! empty( $person_data->birthday ) ) : ?>
 							<?php
-							// Calculate age from birthday
+							// Calculate age from birthday - different logic for deceased people
 							$age_display = '';
+							$is_deceased = ! empty( $person_data->deceased );
+							$deceased_date = null;
+							
+							if ( $is_deceased && ! empty( $person_data->deceased_date ) ) {
+								$deceased_date = DateTime::createFromFormat( 'Y-m-d', $person_data->deceased_date );
+							}
+							
 							if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $person_data->birthday ) ) {
 								$birth_date = DateTime::createFromFormat( 'Y-m-d', $person_data->birthday );
 								if ( $birth_date ) {
-									$current_date = new DateTime();
-									$age = $current_date->diff( $birth_date )->y;
-									if ( $privacy_mode ) {
-										$age_display = $birth_date->format( 'F' );
+									if ( $is_deceased && $deceased_date ) {
+										// For deceased people, show birth-death dates with age at death
+										$age_at_death = $deceased_date->diff( $birth_date )->y;
+										if ( $privacy_mode ) {
+											$age_display = $birth_date->format( 'F Y' ) . ' - ' . $deceased_date->format( 'F Y' ) . ' (aged ' . $age_at_death . ')';
+										} else {
+											$age_display = $birth_date->format( 'F j, Y' ) . ' - ' . $deceased_date->format( 'F j, Y' ) . ' (aged ' . $age_at_death . ')';
+										}
 									} else {
-										$age_display = $age . ' (born ' . $birth_date->format( 'F j, Y' ) . ')';
+										// For living people, calculate current age
+										$current_date = new DateTime();
+										$age = $current_date->diff( $birth_date )->y;
+										if ( $privacy_mode ) {
+											$age_display = $birth_date->format( 'F' );
+										} else {
+											$age_display = $age . ' (born ' . $birth_date->format( 'F j, Y' ) . ')';
+										}
 									}
 								}
 							} elseif ( preg_match( '/^\d{2}-\d{2}$/', $person_data->birthday ) ) {
-								// Legacy MM-DD format - can't calculate exact age
+								// Legacy MM-DD format - limited calculation
 								if ( $privacy_mode ) {
 									$display_date = DateTime::createFromFormat( 'm-d', $person_data->birthday );
 									if ( $display_date ) {
@@ -195,15 +229,20 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 								} else {
 									$display_date = DateTime::createFromFormat( 'm-d', $person_data->birthday );
 									if ( $display_date ) {
-										$age_display = 'Birthday ' . $display_date->format( 'F j' );
+										if ( $is_deceased && $deceased_date ) {
+											$age_display = 'Birthday ' . $display_date->format( 'F j' ) . ' - passed away ' . $deceased_date->format( 'F j, Y' );
+										} else {
+											$age_display = 'Birthday ' . $display_date->format( 'F j' );
+										}
 									}
 								}
 							}
 							?>
 							<?php if ( $age_display ) : ?>
-								<p><strong>🎂 <?php echo $privacy_mode ? 'Birthday:' : 'Age:'; ?></strong> <?php echo htmlspecialchars( $age_display ); ?></p>
+								<p><strong>🎂 <?php echo $privacy_mode ? 'Birthday:' : ($is_deceased ? 'Life span:' : 'Age:'); ?></strong> <?php echo htmlspecialchars( $age_display ); ?></p>
 							<?php endif; ?>
 						<?php endif; ?>
+
 
 						<?php if ( ! empty( $person_data->company_anniversary ) && ! ( $is_alumni && ! empty( $person_data->left_company ) ) ) : ?>
 							<?php
@@ -258,7 +297,9 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 								}
 								?>
 								<a href="https://maps.google.com/maps?q=<?php echo urlencode( $privacy_mode ? $display_location : $person_data->location ); ?>" target="_blank" class="location-link"><?php echo htmlspecialchars( $display_location ); ?></a>
-								<span id="time-<?php echo htmlspecialchars( $person ); ?>" class="timezone-display"></span>
+								<?php if ( empty( $person_data->deceased ) ) : ?>
+									<span id="time-<?php echo htmlspecialchars( $person ); ?>" class="timezone-display"></span>
+								<?php endif; ?>
 							</p>
 						<?php endif; ?>
 
@@ -700,7 +741,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 	<?php init_cmd_k_js( $privacy_mode ); ?>
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
-			<?php if ( ! empty( $person_data ) && ( ! empty( $person_data->location ) || ! empty( $person_data->timezone ) ) ) : ?>
+			<?php if ( ! empty( $person_data ) && ( ! empty( $person_data->location ) || ! empty( $person_data->timezone ) ) && empty( $person_data->deceased ) ) : ?>
 			createTimeUpdater('<?php echo addslashes( $person_data->timezone ); ?>', '<?php echo addslashes( $person ); ?>', {
 				verboseDifference: true
 			});

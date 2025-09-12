@@ -75,7 +75,7 @@ if ( empty( $available_teams ) ) {
                 $team_name = get_team_name_from_file( $team_slug ); 
                 $team_type = get_team_type_from_file( $team_slug );
                 $people_count = get_team_people_count( $team_slug );
-                $people_names = get_team_people_names( $team_slug );
+                $people_data = get_team_people_data( $team_slug );
                 $param_name = ( $team_type === 'group' ) ? 'group' : 'team';
                 ?>
                 <a href="index.php<?php if ( get_default_team() !== $team_slug ) echo '?' . $param_name . '=' . urlencode( $team_slug ); ?>" 
@@ -83,14 +83,14 @@ if ( empty( $available_teams ) ) {
                    data-team-name="<?php echo htmlspecialchars( $team_name ); ?>"
                    data-team-slug="<?php echo htmlspecialchars( $team_slug ); ?>"
                    data-team-type="<?php echo htmlspecialchars( $team_type ); ?>"
-                   data-people-names="<?php echo htmlspecialchars( json_encode( $people_names ) ); ?>">
+                   data-people-data="<?php echo htmlspecialchars( json_encode( $people_data ) ); ?>">
                     <h3><?php echo htmlspecialchars( $team_name ); ?></h3>
                     <div class="team-card-details">
                         <p class="team-file-name"><?php echo htmlspecialchars( $team_slug ); ?>.json</p>
                         <p class="team-people-count"><?php echo $people_count; ?> <?php echo $people_count === 1 ? 'person' : 'people'; ?></p>
                         <div class="team-matched-person" style="display: none;">
                             <span class="match-label">Found:</span>
-                            <span class="match-name"></span>
+                            <span class="match-name" data-team-slug="<?php echo htmlspecialchars( $team_slug ); ?>" style="cursor: pointer; text-decoration: underline; color: #007cba;"></span>
                         </div>
                     </div>
                 </a>
@@ -117,6 +117,7 @@ if ( empty( $available_teams ) ) {
         const teamCards = document.querySelectorAll('.team-card');
         const teamGrid = document.getElementById('team-grid');
         const noResults = document.getElementById('no-results');
+	searchInput.focus();
         
         function performSearch() {
             const searchTerm = searchInput.value.toLowerCase().trim();
@@ -126,7 +127,10 @@ if ( empty( $available_teams ) ) {
                 // Show all cards when search is empty
                 teamCards.forEach(card => {
                     card.style.display = 'block';
-                    card.querySelector('.team-matched-person').style.display = 'none';
+                    const matchedPersonElement = card.querySelector('.team-matched-person');
+                    if (matchedPersonElement) {
+                        matchedPersonElement.style.display = 'none';
+                    }
                 });
                 clearButton.style.display = 'none';
                 noResults.style.display = 'none';
@@ -137,30 +141,47 @@ if ( empty( $available_teams ) ) {
                 teamCards.forEach(card => {
                     const teamName = card.getAttribute('data-team-name').toLowerCase();
                     const teamSlug = card.getAttribute('data-team-slug').toLowerCase();
-                    const peopleNames = JSON.parse(card.getAttribute('data-people-names') || '[]');
+                    const peopleData = JSON.parse(card.getAttribute('data-people-data') || '{}');
                     const matchedPersonElement = card.querySelector('.team-matched-person');
                     const matchNameElement = card.querySelector('.match-name');
                     
                     // Check if search term matches team name, slug, or any person name
                     const matchesTeam = teamName.includes(searchTerm) || teamSlug.includes(searchTerm);
-                    const matchedPerson = peopleNames.find(name => 
-                        name.toLowerCase().includes(searchTerm)
-                    );
+                    let matchedPerson = null;
+                    let matchedUsername = null;
+                    
+                    // Search through people data (username -> {name, ...})
+                    for (const [username, personData] of Object.entries(peopleData)) {
+                        if (personData.name && personData.name.toLowerCase().includes(searchTerm)) {
+                            matchedPerson = personData.name;
+                            matchedUsername = username;
+                            break;
+                        }
+                    }
                     
                     if (matchesTeam || matchedPerson) {
                         card.style.display = 'block';
                         visibleCount++;
                         
                         // Show matched person if search matched a person name
-                        if (matchedPerson && !matchesTeam) {
+                        if (matchedPerson && !matchesTeam && matchedPersonElement && matchNameElement) {
                             matchedPersonElement.style.display = 'block';
                             matchNameElement.textContent = matchedPerson;
-                        } else {
+                            const teamSlug = matchNameElement.getAttribute('data-team-slug');
+                            matchNameElement.onclick = function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                window.location.href = `person.php?team=${encodeURIComponent(teamSlug)}&person=${encodeURIComponent(matchedUsername)}`;
+                                return false;
+                            };
+                        } else if (matchedPersonElement) {
                             matchedPersonElement.style.display = 'none';
                         }
                     } else {
                         card.style.display = 'none';
-                        matchedPersonElement.style.display = 'none';
+                        if (matchedPersonElement) {
+                            matchedPersonElement.style.display = 'none';
+                        }
                     }
                 });
             }

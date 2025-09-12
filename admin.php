@@ -730,7 +730,7 @@ function handle_person_action( $action, $config, $person_data ) {
 	$main_config = load_or_create_config( $config_file );
 
 	if ( strpos( $action, 'edit_' ) === 0 ) {
-		$username = sanitize_text_field( $_POST['username'] ?? '' );
+		$username = $person_data['username'] ?? '';
 		$original_username = sanitize_text_field( $_POST['original_username'] ?? '' );
 
 		if ( empty( $username ) ) {
@@ -753,7 +753,7 @@ function handle_person_action( $action, $config, $person_data ) {
 			return array( 'error' => 'Failed to update ' . strtolower( $config['display_name'] ) . '.' );
 		}
 	} elseif ( strpos( $action, 'add_' ) === 0 ) {
-		$username = sanitize_text_field( $_POST['username'] ?? '' );
+		$username = $person_data['username'] ?? '';
 
 		if ( empty( $username ) ) {
 			return array( 'error' => 'Username is required.' );
@@ -782,6 +782,23 @@ function handle_person_action( $action, $config, $person_data ) {
 	}
 
 	return array();
+}
+
+/**
+ * Generate username from name for social groups
+ */
+function generate_username_from_name( $name ) {
+	if ( empty( $name ) ) {
+		return null;
+	}
+	
+	// Convert to lowercase, remove special characters, replace spaces with dots
+	$username = strtolower( $name );
+	$username = iconv( 'UTF-8', 'ASCII//TRANSLIT', $username ); // Remove accents
+	$username = preg_replace( '/[^a-z0-9\s]/', '', $username );
+	$username = preg_replace( '/\s+/', '.', trim( $username ) );
+	
+	return $username;
 }
 
 /**
@@ -862,6 +879,8 @@ function create_person_data_from_form() {
 		'kids' => parse_kids_data( $_POST['kids'] ?? '' ),
 		'notes' => create_notes_from_form(),
 		'personal_events' => parse_personal_events_data( $_POST['personal_events'] ?? array() ),
+		'deceased' => !empty( $_POST['deceased'] ) ? 1 : 0,
+		'deceased_date' => sanitize_text_field( $_POST['deceased_date'] ?? '' ),
 	);
 
 	// Only add business-specific fields for teams (not social groups)
@@ -874,6 +893,17 @@ function create_person_data_from_form() {
 		$data['role'] = '';
 		$data['company_anniversary'] = '';
 		$data['github_repos'] = array();
+	}
+
+	// Add alumni-specific fields if present
+	if ( isset( $_POST['left_company'] ) ) {
+		$data['left_company'] = !empty( $_POST['left_company'] ) ? 1 : 0;
+	}
+	if ( isset( $_POST['new_company'] ) ) {
+		$data['new_company'] = sanitize_text_field( $_POST['new_company'] ?? '' );
+	}
+	if ( isset( $_POST['new_company_website'] ) ) {
+		$data['new_company_website'] = sanitize_text_field( $_POST['new_company_website'] ?? '' );
 	}
 
 	return $data;
@@ -1221,6 +1251,53 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	$prefix = $config['form_prefix'];
 	$show_hr_feedback = $config['show_hr_feedback'];
 	$show_alumni_actions = $config['show_alumni_actions'];
+
+	// Helper function to get form field values (POST data if error, edit data if editing, empty if new)
+	function get_form_value( $field_name, $edit_data = array(), $is_editing = false, $error = '' ) {
+		global $privacy_mode;
+		
+		// Use global error if no error parameter provided
+		if ( empty( $error ) ) {
+			global $error;
+		}
+		
+		// If there's an error, prioritize POST data
+		if ( ! empty( $error ) && isset( $_POST[ $field_name ] ) ) {
+			$value = sanitize_text_field( $_POST[ $field_name ] );
+		} elseif ( $is_editing && isset( $edit_data[ $field_name ] ) ) {
+			$value = $edit_data[ $field_name ];
+		} else {
+			$value = '';
+		}
+		
+		// Handle special cases
+		if ( $field_name === 'name' && $privacy_mode && ! empty( $value ) ) {
+			$value = mask_name( $value, true );
+		} elseif ( $field_name === 'location' && empty( $value ) && $is_editing ) {
+			// Fallback to 'town' field for backward compatibility
+			$value = $edit_data['town'] ?? '';
+		} elseif ( $field_name === 'company_anniversary' && $privacy_mode ) {
+			$value = mask_date_input( $value, $privacy_mode );
+		}
+		
+		return htmlspecialchars( $value );
+	}
+	
+	// Helper function for checkbox fields
+	function get_checkbox_checked( $field_name, $edit_data = array(), $is_editing = false, $error = '' ) {
+		// Use global error if no error parameter provided
+		if ( empty( $error ) ) {
+			global $error;
+		}
+		
+		// If there's an error, prioritize POST data
+		if ( ! empty( $error ) ) {
+			return isset( $_POST[ $field_name ] ) ? 'checked' : '';
+		} elseif ( $is_editing && ! empty( $edit_data[ $field_name ] ) ) {
+			return 'checked';
+		}
+		return '';
+	}
 ?>
 <form method="post" id="<?php echo $form_id; ?>">
 	<input type="hidden" name="action" value="<?php echo $action; ?>">
@@ -1235,17 +1312,17 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<div class="form-grid">
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>name">Full Name<?php echo $privacy_mode ? ' (Privacy Mode - Last name will be masked)' : ''; ?></label>
-			<input type="text" id="<?php echo $prefix; ?>name" name="name" value="<?php echo $is_editing ? htmlspecialchars( $privacy_mode ? mask_name( $edit_data['name'] ?? '', true ) : ( $edit_data['name'] ?? '' ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="First name visible only"' : ''; ?> autofocus>
+			<input type="text" id="<?php echo $prefix; ?>name" name="name" value="<?php echo get_form_value( 'name', $edit_data, $is_editing ); ?>"<?php echo $privacy_mode ? ' placeholder="First name visible only"' : ''; ?> autofocus>
 		</div>
 
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>nickname">Nickname <small class="optional-label">(optional)</small></label>
-			<input type="text" id="<?php echo $prefix; ?>nickname" name="nickname" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['nickname'] ?? '' ) : ''; ?>" placeholder="e.g., Mike, Lizzy, DJ">
+			<input type="text" id="<?php echo $prefix; ?>nickname" name="nickname" value="<?php echo get_form_value( 'nickname', $edit_data, $is_editing ); ?>" placeholder="e.g., Mike, Lizzy, DJ">
 		</div>
 
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>location">Location</label>
-			<input type="text" id="<?php echo $prefix; ?>location" name="location" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['location'] ?? $edit_data['town'] ?? '' ) : ''; ?>">
+			<input type="text" id="<?php echo $prefix; ?>location" name="location" value="<?php echo get_form_value( 'location', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
@@ -1254,7 +1331,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 				<input type="text"
 					   id="<?php echo $prefix; ?>timezone"
 					   name="timezone"
-					   value="<?php echo $is_editing ? htmlspecialchars( $edit_data['timezone'] ?? '' ) : ''; ?>"
+					   value="<?php echo get_form_value( 'timezone', $edit_data, $is_editing ); ?>"
 					   placeholder="e.g., America/New_York or type city like 'madrid'"
 					   autocomplete="off">
 				<div id="<?php echo $prefix; ?>timezone-suggestions" class="timezone-suggestions"></div>
@@ -1318,7 +1395,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 					
 					<select name="birthday_year" class="form-select">
 						<option value="">Year (optional)</option>
-						<?php for ( $y = date( 'Y' ) - 80; $y <= date( 'Y' ) - 16; $y++ ) : ?>
+						<?php for ( $y = 1900; $y <= date( 'Y' ); $y++ ) : ?>
 							<option value="<?php echo $y; ?>" <?php echo $year === (string) $y ? 'selected' : ''; ?>>
 								<?php echo $y; ?>
 							</option>
@@ -1344,7 +1421,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		<div class="form-grid">
 			<div class="form-group">
 				<label for="<?php echo $prefix; ?>partner">Partner</label>
-				<input type="text" id="<?php echo $prefix; ?>partner" name="partner" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['partner'] ?? '' ) : ''; ?>">
+				<input type="text" id="<?php echo $prefix; ?>partner" name="partner" value="<?php echo get_form_value( 'partner', $edit_data, $is_editing ); ?>">
 			</div>
 
 			<div class="form-group">
@@ -1396,7 +1473,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
 						<select name="partner_birthday_year" class="form-select">
 							<option value="">Year (optional)</option>
-							<?php for ( $y = date( 'Y' ) - 80; $y <= date( 'Y' ) - 16; $y++ ) : ?>
+							<?php for ( $y = 1900; $y <= date( 'Y' ); $y++ ) : ?>
 								<option value="<?php echo $y; ?>" <?php echo $partner_year === (string) $y ? 'selected' : ''; ?>>
 									<?php echo $y; ?>
 								</option>
@@ -1426,7 +1503,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<div class="form-grid">
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>username">Username *<?php if ( is_social_group( $current_team ) ) echo ' (auto-generated if empty)'; ?></label>
-			<input type="text" id="<?php echo $prefix; ?>username" name="username" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['username'] ?? '' ) : ''; ?>" <?php echo is_social_group( $current_team ) ? '' : 'required'; ?>>
+			<input type="text" id="<?php echo $prefix; ?>username" name="username" value="<?php echo get_form_value( 'username', $edit_data, $is_editing ); ?>" <?php echo is_social_group( $current_team ) ? '' : 'required'; ?>>
 			<?php if ( is_social_group( $current_team ) ) : ?>
 				<small style="color: #666;">Leave empty to auto-generate from name (e.g., "John Smith" → "john.smith")</small>
 			<?php endif; ?>
@@ -1435,14 +1512,14 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		<?php if ( ! is_social_group( $current_team ) ) : ?>
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>role">Role</label>
-			<input type="text" id="<?php echo $prefix; ?>role" name="role" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['role'] ?? '' ) : ''; ?>" placeholder="e.g., Developer, Lead, HR">
+			<input type="text" id="<?php echo $prefix; ?>role" name="role" value="<?php echo get_form_value( 'role', $edit_data, $is_editing ); ?>" placeholder="e.g., Developer, Lead, HR">
 		</div>
 		<?php endif; ?>
 
 		<?php if ( ! is_social_group( $current_team ) ) : ?>
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>company_anniversary">Company Anniversary<?php echo $privacy_mode ? ' (Hidden in Privacy Mode)' : ''; ?></label>
-			<input type="date" id="<?php echo $prefix; ?>company_anniversary" name="company_anniversary" value="<?php echo $is_editing ? htmlspecialchars( mask_date_input( $edit_data['company_anniversary'] ?? '', $privacy_mode ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="Hidden for privacy"' : ''; ?>>
+			<input type="date" id="<?php echo $prefix; ?>company_anniversary" name="company_anniversary" value="<?php echo get_form_value( 'company_anniversary', $edit_data, $is_editing ); ?>"<?php echo $privacy_mode ? ' placeholder="Hidden for privacy"' : ''; ?>>
 		</div>
 		<?php endif; ?>
 
@@ -1486,32 +1563,32 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<div class="form-grid">
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>github">GitHub Username</label>
-			<input type="text" id="<?php echo $prefix; ?>github" name="github" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['github'] ?? '' ) : ''; ?>">
+			<input type="text" id="<?php echo $prefix; ?>github" name="github" value="<?php echo get_form_value( 'github', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>linear">Linear Username</label>
-			<input type="text" id="<?php echo $prefix; ?>linear" name="linear" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['linear'] ?? '' ) : ''; ?>">
+			<input type="text" id="<?php echo $prefix; ?>linear" name="linear" value="<?php echo get_form_value( 'linear', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>wordpress">WordPress.org Username</label>
-			<input type="text" id="<?php echo $prefix; ?>wordpress" name="wordpress" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['wordpress'] ?? '' ) : ''; ?>">
+			<input type="text" id="<?php echo $prefix; ?>wordpress" name="wordpress" value="<?php echo get_form_value( 'wordpress', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>linkedin">LinkedIn Username</label>
-			<input type="text" id="<?php echo $prefix; ?>linkedin" name="linkedin" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['linkedin'] ?? '' ) : ''; ?>">
+			<input type="text" id="<?php echo $prefix; ?>linkedin" name="linkedin" value="<?php echo get_form_value( 'linkedin', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>website">Website URL</label>
-			<input type="text" id="<?php echo $prefix; ?>website" name="website" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['website'] ?? '' ) : ''; ?>">
+			<input type="text" id="<?php echo $prefix; ?>website" name="website" value="<?php echo get_form_value( 'website', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>email">Email Address</label>
-			<input type="email" id="<?php echo $prefix; ?>email" name="email" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['email'] ?? '' ) : ''; ?>">
+			<input type="email" id="<?php echo $prefix; ?>email" name="email" value="<?php echo get_form_value( 'email', $edit_data, $is_editing ); ?>">
 		</div>
 	</div>
 
@@ -1696,7 +1773,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<div class="form-grid">
 		<div class="form-group" style="grid-column: 1 / -1;">
 			<label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 600;">
-				<input type="checkbox" id="<?php echo $prefix; ?>left_company" name="left_company" value="1" <?php echo $is_editing && !empty($edit_data['left_company']) ? 'checked' : ''; ?> style="width: auto;">
+				<input type="checkbox" id="<?php echo $prefix; ?>left_company" name="left_company" value="1" <?php echo get_checkbox_checked( 'left_company', $edit_data, $is_editing ); ?> style="width: auto;">
 				<span>Has left the company</span>
 			</label>
 			<small class="text-small-muted" style="margin-left: 20px;">
@@ -1706,15 +1783,52 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>new_company">New Company</label>
-			<input type="text" id="<?php echo $prefix; ?>new_company" name="new_company" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['new_company'] ?? '' ) : ''; ?>" placeholder="e.g., Google, Microsoft, etc.">
+			<input type="text" id="<?php echo $prefix; ?>new_company" name="new_company" value="<?php echo get_form_value( 'new_company', $edit_data, $is_editing ); ?>" placeholder="e.g., Google, Microsoft, etc.">
 		</div>
 		
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>new_company_website">New Company Website</label>
-			<input type="url" id="<?php echo $prefix; ?>new_company_website" name="new_company_website" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['new_company_website'] ?? '' ) : ''; ?>" placeholder="https://example.com">
+			<input type="url" id="<?php echo $prefix; ?>new_company_website" name="new_company_website" value="<?php echo get_form_value( 'new_company_website', $edit_data, $is_editing ); ?>" placeholder="https://example.com">
 		</div>
 	</div>
 	<?php endif; ?>
+
+	<!-- Deceased Status -->
+	<div class="form-group">
+		<label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 400; color: #666;">
+			<input type="checkbox" id="<?php echo $prefix; ?>deceased" name="deceased" value="1" <?php echo get_checkbox_checked( 'deceased', $edit_data, $is_editing ); ?> style="width: auto;" onchange="toggleDeceasedDate()">
+			<span>Mark as deceased</span>
+		</label>
+		<small class="text-small-muted" style="margin-left: 20px; color: #888;">
+			This will remove them from birthday reminders
+		</small>
+		
+		<div id="deceased-date-container" style="margin-top: 10px; margin-left: 20px; <?php 
+			global $error; 
+			echo (!empty($error) && isset($_POST['deceased'])) || ($is_editing && !empty($edit_data['deceased'])) ? '' : 'display: none;'; 
+		?>">
+			<label for="<?php echo $prefix; ?>deceased_date">Date of passing:</label>
+			<input type="date" id="<?php echo $prefix; ?>deceased_date" name="deceased_date" value="<?php echo get_form_value( 'deceased_date', $edit_data, $is_editing ); ?>">
+			<small class="text-small-muted" style="display: block; margin-top: 5px;">
+				Optional - leave empty if unknown
+			</small>
+		</div>
+	</div>
+
+	<script>
+	function toggleDeceasedDate() {
+		const checkbox = document.getElementById('<?php echo $prefix; ?>deceased');
+		const container = document.getElementById('deceased-date-container');
+		const dateInput = document.getElementById('<?php echo $prefix; ?>deceased_date');
+		
+		if (checkbox.checked) {
+			container.style.display = 'block';
+		} else {
+			container.style.display = 'none';
+			dateInput.value = ''; // Clear the date when unchecked
+		}
+	}
+	</script>
 
 	<div class="form-group">
 		<label>Notes</label>

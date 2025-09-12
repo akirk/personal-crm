@@ -385,6 +385,52 @@ function get_team_people_names( $team_slug ) {
 }
 
 /**
+ * Get all people data (username => person data) from team config file for search purposes
+ */
+function get_team_people_data( $team_slug ) {
+	$file_path = __DIR__ . '/../' . $team_slug . '.json';
+	if ( ! file_exists( $file_path ) ) {
+		return array();
+	}
+	
+	$config = json_decode( file_get_contents( $file_path ), true );
+	if ( json_last_error() !== JSON_ERROR_NONE ) {
+		return array();
+	}
+	
+	$people_data = array();
+	
+	// Get data from team members
+	if ( isset( $config['team_members'] ) && is_array( $config['team_members'] ) ) {
+		foreach ( $config['team_members'] as $username => $person ) {
+			if ( isset( $person['name'] ) ) {
+				$people_data[$username] = $person;
+			}
+		}
+	}
+	
+	// Get data from leadership
+	if ( isset( $config['leadership'] ) && is_array( $config['leadership'] ) ) {
+		foreach ( $config['leadership'] as $username => $person ) {
+			if ( isset( $person['name'] ) ) {
+				$people_data[$username] = $person;
+			}
+		}
+	}
+	
+	// Get data from consultants
+	if ( isset( $config['consultants'] ) && is_array( $config['consultants'] ) ) {
+		foreach ( $config['consultants'] as $username => $person ) {
+			if ( isset( $person['name'] ) ) {
+				$people_data[$username] = $person;
+			}
+		}
+	}
+	
+	return $people_data;
+}
+
+/**
  * Get display word for team type ('team' -> 'team', 'group' -> 'group')
  */
 function get_type_display_word( $team_slug ) {
@@ -768,7 +814,7 @@ function create_person_from_data( $username, $person_data, $privacy_mode = false
 	);
 
 	// Set properties with empty string defaults
-	$string_properties = array( 'email', 'birthday', 'company_anniversary', 'partner', 'partner_birthday', 'timezone', 'github', 'wordpress', 'linkedin', 'website', 'new_company', 'new_company_website' );
+	$string_properties = array( 'email', 'birthday', 'company_anniversary', 'partner', 'partner_birthday', 'timezone', 'github', 'wordpress', 'linkedin', 'website', 'new_company', 'new_company_website', 'deceased_date' );
 	foreach ( $string_properties as $property ) {
 		$person->$property = $person_data[$property] ?? '';
 	}
@@ -783,6 +829,7 @@ function create_person_from_data( $username, $person_data, $privacy_mode = false
 	$person->nickname = $privacy_mode ? '' : ( $person_data['nickname'] ?? '' );
 	$person->location = $person_data['location'] ?? $person_data['town'] ?? ''; // Support both 'location' and legacy 'town'
 	$person->left_company = $person_data['left_company'] ?? 0;
+	$person->deceased = $person_data['deceased'] ?? 0;
 
 	return $person;
 }
