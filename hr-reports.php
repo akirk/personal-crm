@@ -72,7 +72,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
     }
 }
 
-function create_backup( $file_path ) {
+function create_backupx( $file_path ) {
     if ( ! file_exists( $file_path ) ) {
         return true; // No file to backup
     }

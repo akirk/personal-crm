@@ -96,42 +96,42 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 				</div>
 			</div>
 
-			<div class="person-tabs">
-				<a href="<?php echo build_team_url( 'person.php', array( 'person' => $person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
-				   class="tab-link active">👤 Member Overview</a>
-				<?php if ( $is_team_member && ! ( isset( $team_data['not_managing_team'] ) && $team_data['not_managing_team'] ) ) : ?>
-					<?php
-					$feedback_status = $person_data->get_monthly_feedback_status();
-					$status_class = '';
-					$status_icon = '';
-					switch ( $feedback_status['status'] ) {
-						case 'submitted':
-							$status_class = 'tab-status-submitted';
-							$status_icon = '✅';
-							break;
-						case 'ready-for-review':
-							$status_class = 'tab-status-review';
-							$status_icon = '📤';
-							break;
-						case 'draft-finalized':
-							$status_class = 'tab-status-draft-finalized';
-							$status_icon = '📋';
-							break;
-						case 'started':
-							$status_class = 'tab-status-draft';
-							$status_icon = '📝';
-							break;
-						default:
-							$status_class = 'tab-status-none';
-							$status_icon = '🔴';
-					}
-					?>
-					<a href="<?php echo build_team_url( 'hr-reports.php', array( 'person' => $person, 'month' => get_hr_feedback_month(), 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
-					   class="tab-link <?php echo $status_class; ?>">
-					   <?php echo $status_icon; ?> HR Feedback
-					</a>
-				<?php endif; ?>
-			</div>
+			<?php if ( $is_team_member && ! ( isset( $team_data['not_managing_team'] ) && $team_data['not_managing_team'] ) ) : ?>
+				<div class="person-tabs">
+					<a href="<?php echo build_team_url( 'person.php', array( 'person' => $person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
+					   class="tab-link active">👤 Member Overview</a>
+						<?php
+						$feedback_status = $person_data->get_monthly_feedback_status();
+						$status_class = '';
+						$status_icon = '';
+						switch ( $feedback_status['status'] ) {
+							case 'submitted':
+								$status_class = 'tab-status-submitted';
+								$status_icon = '✅';
+								break;
+							case 'ready-for-review':
+								$status_class = 'tab-status-review';
+								$status_icon = '📤';
+								break;
+							case 'draft-finalized':
+								$status_class = 'tab-status-draft-finalized';
+								$status_icon = '📋';
+								break;
+							case 'started':
+								$status_class = 'tab-status-draft';
+								$status_icon = '📝';
+								break;
+							default:
+								$status_class = 'tab-status-none';
+								$status_icon = '🔴';
+						}
+						?>
+						<a href="<?php echo build_team_url( 'hr-reports.php', array( 'person' => $person, 'month' => get_hr_feedback_month(), 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
+						   class="tab-link <?php echo $status_class; ?>">
+						   <?php echo $status_icon; ?> HR Feedback
+						</a>
+				</div>
+			<?php endif; ?>
 		</div>
 
 		<?php
