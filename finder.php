@@ -9,6 +9,7 @@ class PeopleFinderCLI {
     private array $teams = [];
     private array $people = [];
     private array $allItems = [];
+    private string $lastSearchQuery = '';
 
     public function __construct() {
         $this->loadData();
@@ -66,7 +67,7 @@ class PeopleFinderCLI {
                 }
 
                 $categoryLabel = match( $category ) {
-                    'team_members' => 'Team Member',
+                    'team_members' => 'Member',
                     'leadership' => 'Leadership',
                     'consultants' => 'Consultant',
                     'alumni' => 'Alumni'
@@ -172,13 +173,40 @@ class PeopleFinderCLI {
     }
 
     /**
-     * Get current time in a specific timezone
+     * Get current time in a specific timezone with offset
      */
     private function getCurrentTimeInTimezone( string $timezone ): string {
         try {
-            $tz = new DateTimeZone( $timezone );
-            $now = new DateTime( 'now', $tz );
-            return $now->format( 'H:i' );
+            $personTz = new DateTimeZone( $timezone );
+            $personTime = new DateTime( 'now', $personTz );
+            
+            // Check if PHP timezone is properly configured
+            $defaultTz = date_default_timezone_get();
+            if ( $defaultTz === 'UTC' && ini_get( 'date.timezone' ) === false ) {
+                echo "\033[33mWarning: PHP timezone not configured. Please set 'date.timezone' in your php.ini\033[0m\n";
+                echo "Current default: {$defaultTz} - offsets will be calculated from UTC\n\n";
+            }
+            
+            $localTz = new DateTimeZone( $defaultTz );
+            $localTime = new DateTime( 'now', $localTz );
+            
+            // Calculate offset in hours
+            $offsetSeconds = $personTime->getOffset() - $localTime->getOffset();
+            $offsetHours = $offsetSeconds / 3600;
+            
+            // Determine if it's after hours (before 8 AM or after 6 PM)
+            $hour = (int)$personTime->format( 'H' );
+            $isAfterHours = $hour < 8 || $hour >= 18;
+            $timeEmoji = $isAfterHours ? '🌙' : '🕒';
+            
+            $offsetText = '';
+            if ( $offsetHours > 0 ) {
+                $offsetText = ' +' . (int)$offsetHours . ' hrs';
+            } elseif ( $offsetHours < 0 ) {
+                $offsetText = ' ' . (int)$offsetHours . ' hrs';
+            }
+            
+            return $timeEmoji . ' ' . $personTime->format( 'H:i' ) . $offsetText;
         } catch ( Exception $e ) {
             return 'Unknown';
         }
@@ -251,6 +279,72 @@ class PeopleFinderCLI {
             }
         }
 
+        // Children's birthdays
+        if ( !empty( $personData['kids'] ) ) {
+            foreach ( $personData['kids'] as $kid ) {
+                if ( !empty( $kid['birthday'] ) ) {
+                    if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $kid['birthday'] ) ) {
+                        // Full date - use this year and next year
+                        $birthDate = new DateTime( $kid['birthday'] );
+                        $thisYearBirthday = new DateTime( $currentDate->format( 'Y' ) . '-' . $birthDate->format( 'm-d' ) );
+                        $nextYearBirthday = new DateTime( ( $currentDate->format( 'Y' ) + 1 ) . '-' . $birthDate->format( 'm-d' ) );
+                        
+                        // Check if this year's birthday hasn't passed yet
+                        if ( $thisYearBirthday >= $currentDate && $thisYearBirthday <= $cutoffDate ) {
+                            $events[] = ['date' => $thisYearBirthday, 'type' => "{$kid['name']}'s birthday"];
+                        }
+                        // Always check next year's birthday if it's within our window
+                        if ( $nextYearBirthday <= $cutoffDate ) {
+                            $events[] = ['date' => $nextYearBirthday, 'type' => "{$kid['name']}'s birthday"];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Partner's birthday
+        if ( !empty( $personData['partner_birthday'] ) ) {
+            if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $personData['partner_birthday'] ) ) {
+                // Full date - use this year and next year
+                $birthDate = new DateTime( $personData['partner_birthday'] );
+                $thisYearBirthday = new DateTime( $currentDate->format( 'Y' ) . '-' . $birthDate->format( 'm-d' ) );
+                $nextYearBirthday = new DateTime( ( $currentDate->format( 'Y' ) + 1 ) . '-' . $birthDate->format( 'm-d' ) );
+                
+                // Check if this year's birthday hasn't passed yet
+                if ( $thisYearBirthday >= $currentDate && $thisYearBirthday <= $cutoffDate ) {
+                    $partnerName = $personData['partner'] ?? 'Partner';
+                    $events[] = ['date' => $thisYearBirthday, 'type' => "{$partnerName}'s birthday"];
+                }
+                // Always check next year's birthday if it's within our window
+                if ( $nextYearBirthday <= $cutoffDate ) {
+                    $partnerName = $personData['partner'] ?? 'Partner';
+                    $events[] = ['date' => $nextYearBirthday, 'type' => "{$partnerName}'s birthday"];
+                }
+            } elseif ( preg_match( '/^\d{2}-\d{2}$/', $personData['partner_birthday'] ) ) {
+                // Month-day only
+                $thisYear = $currentDate->format( 'Y' );
+                $nextYear = $thisYear + 1;
+                
+                try {
+                    $thisYearBirthday = new DateTime( $thisYear . '-' . $personData['partner_birthday'] );
+                    $nextYearBirthday = new DateTime( $nextYear . '-' . $personData['partner_birthday'] );
+                    
+                    // Check if this year's birthday hasn't passed yet
+                    if ( $thisYearBirthday >= $currentDate && $thisYearBirthday <= $cutoffDate ) {
+                        $partnerName = $personData['partner'] ?? 'Partner';
+                        $events[] = ['date' => $thisYearBirthday, 'type' => "{$partnerName}'s birthday"];
+                    }
+                    // Always check next year's birthday if it's within our window
+                    if ( $nextYearBirthday <= $cutoffDate ) {
+                        $partnerName = $personData['partner'] ?? 'Partner';
+                        $events[] = ['date' => $nextYearBirthday, 'type' => "{$partnerName}'s birthday"];
+                    }
+                } catch ( Exception $e ) {
+                    // Skip invalid dates
+                }
+            }
+        }
+
         // Personal events
         if ( !empty( $personData['personal_events'] ) ) {
             foreach ( $personData['personal_events'] as $event ) {
@@ -311,6 +405,8 @@ class PeopleFinderCLI {
      * Search through all items
      */
     public function search( string $query ): array {
+        $this->lastSearchQuery = $query; // Store for exact match checking
+        
         if ( empty( trim( $query ) ) ) {
             // Show teams overview by default
             return array_map( fn( $team ) => array_merge( $team, [ 'itemType' => 'team' ] ), $this->teams );
@@ -344,6 +440,27 @@ class PeopleFinderCLI {
     }
 
     /**
+     * Find exact team name match in results
+     */
+    private function findExactTeamMatch( array $results, string $query ): ?array {
+        if ( empty( $query ) ) {
+            return null;
+        }
+        
+        $query = strtolower( trim( $query ) );
+        
+        foreach ( $results as $result ) {
+            if ( $result['itemType'] === 'team' ) {
+                if ( strtolower( $result['name'] ) === $query || strtolower( $result['slug'] ) === $query ) {
+                    return $result;
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    /**
      * Display search results
      */
     public function displayResults( array $results ): void {
@@ -352,6 +469,37 @@ class PeopleFinderCLI {
             return;
         }
 
+        // Add interactive options if base URL is configured
+        $baseUrl = getenv( 'PEOPLE_FINDER_BASE_URL' );
+        if ( $baseUrl && !empty( $results ) ) {
+            // Auto-view details for single results or exact team matches
+            $shouldAutoView = false;
+            $itemToView = null;
+            
+            if ( count( $results ) === 1 ) {
+                $shouldAutoView = true;
+                $itemToView = $results[0];
+            } else {
+                // Check for exact team name match
+                $exactTeamMatch = $this->findExactTeamMatch( $results, trim( $this->lastSearchQuery ?? '' ) );
+                if ( $exactTeamMatch ) {
+                    $shouldAutoView = true;
+                    $itemToView = $exactTeamMatch;
+                }
+            }
+            
+            if ( $shouldAutoView && $itemToView ) {
+                // Go directly to detail view without showing search results
+                if ( $itemToView['itemType'] === 'person' ) {
+                    $this->showPersonDetails( $itemToView );
+                } elseif ( $itemToView['itemType'] === 'team' ) {
+                    $this->showTeamView( $itemToView );
+                }
+                return;
+            }
+        }
+
+        // Only display search results if not auto-viewing
         $teamCount = 0;
         $personCount = 0;
 
@@ -378,9 +526,7 @@ class PeopleFinderCLI {
             echo "Found {$personText}\n";
         }
 
-        // Add interactive options if base URL is configured
-        $baseUrl = getenv( 'PEOPLE_FINDER_BASE_URL' );
-        if ( $baseUrl && !empty( $results ) ) {
+        if ( $baseUrl ) {
             $this->showInteractiveOptions( $results );
         }
     }
@@ -416,8 +562,12 @@ class PeopleFinderCLI {
             if ( isset( $results[$index] ) ) {
                 $item = $results[$index];
                 if ( empty( $action ) ) {
-                    // Just number pressed - show details
-                    $this->showPersonDetails( $item );
+                    // Just number pressed - show details/view
+                    if ( $item['itemType'] === 'person' ) {
+                        $this->showPersonDetails( $item );
+                    } elseif ( $item['itemType'] === 'team' ) {
+                        $this->showTeamView( $item );
+                    }
                 } else {
                     // Number + action (o or e)
                     $this->handleAction( $item, $action );
@@ -493,6 +643,180 @@ class PeopleFinderCLI {
     }
 
     /**
+     * Show team view with members and events
+     */
+    private function showTeamView( array $team ): void {
+        // Load team data from JSON file
+        $filePath = $team['slug'] . '.json';
+        if ( !file_exists( $filePath ) ) {
+            echo "Could not load team information.\n";
+            return;
+        }
+
+        $teamData = json_decode( file_get_contents( $filePath ), true );
+        if ( !$teamData ) {
+            echo "Could not parse team data.\n";
+            return;
+        }
+
+        echo "\n\033[1m═══════════════════════════════════════════════════════════════\033[0m\n";
+        echo "\033[1m🏢 {$team['name']}\033[0m";
+        if ( $team['is_default'] ) {
+            echo " \033[32m[DEFAULT]\033[0m";
+        }
+        echo "\n";
+        echo "\033[1m═══════════════════════════════════════════════════════════════\033[0m\n";
+
+        // Show team members
+        if ( !empty( $teamData['team_members'] ) ) {
+            echo "\n\033[1m👥 Members (" . count( $teamData['team_members'] ) . ")\033[0m\n";
+            $index = 1;
+            foreach ( $teamData['team_members'] as $username => $memberData ) {
+                $this->displayTeamMember( $index, $username, $memberData, $team['slug'] );
+                $index++;
+            }
+        }
+
+        // Show consultants
+        if ( !empty( $teamData['consultants'] ) ) {
+            echo "\n\033[1m🔧 Consultants (" . count( $teamData['consultants'] ) . ")\033[0m\n";
+            foreach ( $teamData['consultants'] as $username => $consultantData ) {
+                $this->displayTeamMember( $index, $username, $consultantData, $team['slug'] );
+                $index++;
+            }
+        }
+
+        // Show upcoming team events
+        $this->showTeamUpcomingEvents( $teamData );
+
+        // Create indexed person list for selection
+        $allMembers = [];
+        $memberIndex = 1;
+        foreach ( $teamData['team_members'] as $username => $memberData ) {
+            $allMembers[$memberIndex] = $this->processPerson( $username, $memberData, 'Team Member', $team['name'], $team['slug'] );
+            $memberIndex++;
+        }
+        foreach ( $teamData['consultants'] ?? [] as $username => $consultantData ) {
+            $allMembers[$memberIndex] = $this->processPerson( $username, $consultantData, 'Consultant', $team['name'], $team['slug'] );
+            $memberIndex++;
+        }
+
+        // Interactive selection
+        if ( !empty( $allMembers ) ) {
+            echo "\n\033[90mPress a number to view person details, 'o' to open team page, 'e' to edit team:\033[0m ";
+            $this->handleTeamInteraction( $allMembers, $team );
+        }
+    }
+
+    /**
+     * Display a team member in the team view (compact one-line format)
+     */
+    private function displayTeamMember( int $index, string $username, array $memberData, string $teamSlug ): void {
+        $name = $memberData['name'] ?? '';
+        $nickname = $memberData['nickname'] ?? '';
+        $role = $memberData['role'] ?? '';
+        $location = $memberData['location'] ?? '';
+        $timezone = $memberData['timezone'] ?? '';
+
+        // Build the one-line display
+        $line = "\033[1m{$index}. 👤 {$name}\033[0m";
+        
+        if ( !empty( $nickname ) ) {
+            $line .= " \"{$nickname}\"";
+        }
+        
+        $line .= " (@{$username})";
+        
+        if ( !empty( $role ) ) {
+            $line .= " • \033[36m{$role}\033[0m";
+        }
+        
+        if ( !empty( $location ) ) {
+            $line .= " • 📍 {$location}";
+            if ( !empty( $timezone ) ) {
+                $currentTime = $this->getCurrentTimeInTimezone( $timezone );
+                $line .= " ({$currentTime})";
+            }
+        }
+        
+        echo "{$line}\n";
+    }
+
+    /**
+     * Show upcoming events for the entire team
+     */
+    private function showTeamUpcomingEvents( array $teamData ): void {
+        $allEvents = [];
+        $currentDate = new DateTime();
+        $cutoffDate = clone $currentDate;
+        $cutoffDate->add( new DateInterval( 'P3M' ) ); // 3 months from now
+
+        // Collect events from all team members and consultants
+        $allPeople = array_merge( $teamData['team_members'] ?? [], $teamData['consultants'] ?? [] );
+        
+        foreach ( $allPeople as $username => $personData ) {
+            $personEvents = $this->getPersonUpcomingEvents( $personData );
+            foreach ( $personEvents as $event ) {
+                if ( $event['date'] <= $cutoffDate ) {
+                    $allEvents[] = [
+                        'date' => $event['date'],
+                        'type' => $event['type'],
+                        'person' => $personData['name'] ?? $username
+                    ];
+                }
+            }
+        }
+
+        // Sort by date
+        usort( $allEvents, fn( $a, $b ) => $a['date'] <=> $b['date'] );
+
+        if ( !empty( $allEvents ) ) {
+            echo "\n\033[1m📅 Upcoming Team Events\033[0m\n";
+            foreach ( array_slice( $allEvents, 0, 10 ) as $event ) { // Show max 10 events
+                $daysUntil = $this->getDaysUntilEvent( $event['date'] );
+                $timeUntilText = $this->getTimeUntilText( $daysUntil );
+                echo "   {$event['date']->format( 'M j' )} • {$event['person']}'s {$event['type']} {$timeUntilText}\n";
+            }
+        }
+    }
+
+    /**
+     * Handle team view interactions
+     */
+    private function handleTeamInteraction( array $members, array $team ): void {
+        $input = trim( strtolower( fgets( STDIN ) ) );
+        
+        if ( empty( $input ) ) {
+            return;
+        }
+        
+        // Handle 'o' and 'e' for web page actions
+        if ( $input === 'o' || $input === 'e' ) {
+            $this->handleAction( $team, $input );
+            echo "\033[90mPress Enter to continue...\033[0m ";
+            fgets( STDIN );
+            return;
+        }
+        
+        // Handle numeric input for person selection
+        if ( is_numeric( $input ) ) {
+            $memberIndex = (int)$input;
+            if ( isset( $members[$memberIndex] ) ) {
+                $this->showPersonDetails( $members[$memberIndex] );
+                return;
+            } else {
+                echo "Invalid selection.\n";
+            }
+        } else {
+            echo "Invalid input.\n";
+        }
+        
+        // Show prompt again
+        echo "\033[90mPress a number to view person details, 'o' to open team page, 'e' to edit team:\033[0m ";
+        $this->handleTeamInteraction( $members, $team );
+    }
+
+    /**
      * Show detailed view of a person
      */
     private function showPersonDetails( array $item ): void {
@@ -544,20 +868,20 @@ class PeopleFinderCLI {
             echo " • {$item['role']}";
         }
         echo "\n";
-        echo "   Team: {$item['team']}\n";
+        echo "   🏢 Team: {$item['team']}\n";
         if ( !empty( $item['location'] ) ) {
-            echo "   Location: {$item['location']}\n";
+            echo "   📍 Location: {$item['location']}\n";
         }
         if ( !empty( $personData['timezone'] ) ) {
             $currentTime = $this->getCurrentTimeInTimezone( $personData['timezone'] );
-            echo "   Timezone: {$personData['timezone']} ({$currentTime})\n";
+            echo "   ⏰ Time: {$currentTime}\n";
         }
 
         // Age and tenure
         if ( !empty( $item['birthday'] ) ) {
             $age = $this->calculateAge( $item['birthday'] );
             if ( $age !== null ) {
-                echo "   Age: {$age} years old\n";
+                echo "   🎂 Age: {$age} years old\n";
             }
         }
 
@@ -572,7 +896,7 @@ class PeopleFinderCLI {
                 } else {
                     $tenureText = "{$tenure['months']} months";
                 }
-                echo "   Company tenure: {$tenureText}\n";
+                echo "   💼 Company tenure: {$tenureText}\n";
             }
         }
 
