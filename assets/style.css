@@ -2482,3 +2482,90 @@ a.calendar-event:hover {
         text-align: center;
     }
 }
+
+/* Edit note functionality */
+.note-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.edit-note-btn {
+    background: none;
+    border: 1px solid light-dark(#ddd, #555);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    color: light-dark(#666, #b0b0b0);
+    transition: all 0.2s;
+}
+
+.edit-note-btn:hover {
+    background: light-dark(#f0f0f0, #3a3a3a);
+    color: light-dark(#333, #e0e0e0);
+}
+
+.edit-note-form {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid light-dark(#e9ecef, #333);
+}
+
+.edit-note-form textarea {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    border: 1px solid light-dark(#ced4da, #555);
+    border-radius: 4px;
+    background: light-dark(#fff, #1e1e1e);
+    color: light-dark(#333, #e0e0e0);
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.4;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.edit-note-form textarea:focus {
+    outline: none;
+    border-color: light-dark(#007cba, #0066cc);
+    box-shadow: 0 0 0 2px light-dark(rgba(0, 124, 186, 0.25), rgba(0, 102, 204, 0.25));
+}
+
+.edit-note-form .form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.edit-note-form .form-actions button[type="submit"] {
+    padding: 6px 12px;
+    background: light-dark(#007cba, #0066cc);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.2s;
+}
+
+.edit-note-form .form-actions button[type="submit"]:hover {
+    background: light-dark(#0056a3, #0052a3);
+}
+
+.edit-note-form .form-actions .cancel-btn {
+    padding: 6px 12px;
+    background: light-dark(#6c757d, #495057);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.2s;
+}
+
+.edit-note-form .form-actions .cancel-btn:hover {
+    background: light-dark(#5a6268, #3d4043);
+}

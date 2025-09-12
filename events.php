@@ -231,7 +231,7 @@ $available_teams = get_available_teams();
                     <?php if ( $all_teams_mode ) : ?>
                         <a href="team-selection.php">← Back to Team Selection</a>
                     <?php else : ?>
-                        <a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to <?php echo ucfirst( $group ); ?> Overview</a>
+                    <a href="<?php echo build_team_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">← Back to <?php echo $team_data['team_name'], ' ', ucfirst( $group ); ?> Overview</a>
                     <?php endif; ?>
                 </div>
             </div>

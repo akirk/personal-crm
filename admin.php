@@ -594,6 +594,50 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			}
 			break;
 			
+		case 'edit_note':
+			$username = sanitize_text_field( $_POST['username'] ?? '' );
+			$note_index = intval( $_POST['note_index'] ?? -1 );
+			$edit_note_text = sanitize_textarea_field( $_POST['edit_note_text'] ?? '' );
+			
+			if ( ! empty( $username ) && $note_index >= 0 && ! empty( $edit_note_text ) ) {
+				// Find the person in any section and edit the note
+				$person_found = false;
+				foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $type ) {
+					if ( isset( $config[$type][$username] ) ) {
+						// Check if notes array exists and has the specified index
+						if ( isset( $config[$type][$username]['notes'] ) && 
+							 is_array( $config[$type][$username]['notes'] ) && 
+							 isset( $config[$type][$username]['notes'][$note_index] ) ) {
+							
+							// Update the note text (keep original date)
+							$config[$type][$username]['notes'][$note_index]['text'] = $edit_note_text;
+							$person_found = true;
+							break;
+						}
+					}
+				}
+				
+				if ( $person_found ) {
+					$json = json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+					if ( file_put_contents( $config_file, $json ) !== false ) {
+						$message = 'Note updated successfully!';
+						// Redirect back to person.php
+						$redirect_params = array( 'person' => $username );
+						if ( isset( $_POST['privacy'] ) ) $redirect_params['privacy'] = '1';
+						if ( isset( $_POST['notes_view'] ) ) $redirect_params['notes_view'] = $_POST['notes_view'];
+						header( 'Location: ' . build_team_url( 'person.php', $redirect_params ) );
+						exit;
+					} else {
+						$error = 'Failed to save note.';
+					}
+				} else {
+					$error = 'Person or note not found.';
+				}
+			} else {
+				$error = 'Username, note index, and note text are required.';
+			}
+			break;
+			
 	}
 }
 
