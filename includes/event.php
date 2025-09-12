@@ -217,6 +217,7 @@ class Event {
 	public function get_color() {
 		$colors = array(
 			'birthday' => '#e74c3c',
+			'partner_birthday' => '#e74c3c',
 			'anniversary' => '#9b59b6',
 			'team' => '#3498db',
 			'company' => '#2ecc71',
@@ -299,6 +300,21 @@ class Event {
 					$description = $person->name . "'s " . $ordinal . " Anniversary 🎉";
 				} else {
 					$description = $person->name . "'s Anniversary 🎉";
+				}
+				break;
+				
+			case 'partner_birthday':
+				if ( ! $privacy_mode && isset( $additional_info['partner_name'] ) ) {
+					$partner_name = $additional_info['partner_name'];
+					if ( isset( $additional_info['age'] ) ) {
+						$age = $additional_info['age'];
+						$ordinal = self::get_ordinal_number( $age );
+						$description = $partner_name . "'s " . $ordinal . " Birthday 🎈 (" . $person->name . "'s partner)";
+					} else {
+						$description = $partner_name . "'s Birthday 🎈 (" . $person->name . "'s partner)";
+					}
+				} else {
+					$description = "Partner's Birthday 🎈";
 				}
 				break;
 				

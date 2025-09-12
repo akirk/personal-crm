@@ -8,7 +8,10 @@
 require_once __DIR__ . '/includes/common.php';
 require_once __DIR__ . '/includes/person.php';
 
-$current_team = $_GET['team'] ?? get_default_team();
+$current_team = get_current_team_from_params();
+if ( ! $current_team ) {
+	$current_team = get_default_team();
+}
 $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 $performance_filter = $_GET['performance'] ?? null;
 $team_data = load_team_config_with_objects( $current_team, $privacy_mode );
@@ -160,7 +163,7 @@ foreach ( $feedback_stats['months_with_data'] as $month ) {
 
         <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
             <div class="stat-card">
-                <h3 style="margin: 0 0 10px 0; color: #333;">Team Members</h3>
+                <h3 style="margin: 0 0 10px 0; color: #333;"><?php echo ucfirst( $group ); ?> Members</h3>
                 <div class="stat-number">
                     <?php echo $feedback_stats['total_people']; ?>
                 </div>

@@ -11,8 +11,8 @@ require_once __DIR__ . '/includes/person.php';
 
 // Team redirection logic - handle cases where no team parameter is provided
 $all_teams_mode = false;
-if ( isset( $_GET['team'] ) ) {
-	$current_team = $_GET['team'];
+$current_team = get_current_team_from_params();
+if ( $current_team ) {
 	$all_teams_mode = $current_team === 'all-teams';
 } else {
 	$current_team = get_default_team();
@@ -231,7 +231,7 @@ $available_teams = get_available_teams();
                     <?php if ( $all_teams_mode ) : ?>
                         <a href="team-selection.php">← Back to Team Selection</a>
                     <?php else : ?>
-                        <a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to Team Overview</a>
+                        <a href="<?php echo build_team_url( 'index.php' ); ?>">← Back to <?php echo ucfirst( $group ); ?> Overview</a>
                     <?php endif; ?>
                 </div>
             </div>

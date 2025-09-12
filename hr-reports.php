@@ -8,7 +8,10 @@
 require_once __DIR__ . '/includes/common.php';
 require_once __DIR__ . '/includes/person.php';
 
-$current_team = $_GET['team'] ?? get_default_team();
+$current_team = get_current_team_from_params();
+if ( ! $current_team ) {
+	$current_team = get_default_team();
+}
 $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 $team_data = load_team_config_with_objects( $current_team, $privacy_mode );
 
@@ -72,30 +75,6 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
     }
 }
 
-function create_backupx( $file_path ) {
-    if ( ! file_exists( $file_path ) ) {
-        return true; // No file to backup
-    }
-
-    // Create backups directory if it doesn't exist
-    $backups_dir = __DIR__ . '/backups';
-    if ( ! file_exists( $backups_dir ) ) {
-        mkdir( $backups_dir, 0755, true );
-    }
-
-    // Generate backup filename in backups directory (minute precision only)
-    $filename = basename( $file_path );
-    $backup_timestamp = date( '-Y-m-d-H-i' ); // No seconds - only minute precision
-    $backup_filename = substr( $filename, 0, -4 ) . 'bak' . $backup_timestamp . '.json';
-    $backup_path = $backups_dir . '/' . $backup_filename;
-    
-    // Only create backup if one doesn't already exist for this minute
-    if ( file_exists( $backup_path ) ) {
-        return true; // Backup for this minute already exists
-    }
-
-    return copy( $file_path, $backup_path );
-}
 
 function save_hr_google_doc_link( $data ) {
     $username = $data['username'] ?? '';
@@ -410,9 +389,9 @@ if ( $selected_person && $selected_month ) {
             <div class="form-row-with-checklist">
                 <div class="form-column">
                     <div class="form-group">
-                        <label for="username">Team Member:</label>
+                        <label for="username"><?php echo ucfirst( $group ); ?> Member:</label>
                         <select name="username" id="username" required onchange="updatePersonHistory()">
-                            <option value="">Select a team member...</option>
+                            <option value="">Select a <?php echo $group; ?> member...</option>
                             <?php foreach ( $team_data['team_members'] as $username => $member ) : ?>
                                 <option value="<?php echo htmlspecialchars( $username ); ?>" <?php echo $selected_person === $username ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars( $member->get_display_name_with_nickname() ); ?> (@<?php echo htmlspecialchars( $member->get_username() ); ?>)

@@ -527,7 +527,8 @@ body {
     margin-top: 4px;
 }
 
-.event-type.birthday {
+.event-type.birthday,
+.event-type.partner_birthday {
     background: light-dark(#ffe6e6, #4d2d39);
     color: light-dark(#d63384, #ff9fc4);
 }

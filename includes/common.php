@@ -3,6 +3,16 @@
  * Common functions shared between admin.php and index.php
  */
 
+/**
+ * Check if a team is configured as a social group
+ */
+function is_social_group( $team_slug ) {
+	if ( empty( $team_slug ) ) {
+		return false;
+	}
+	return get_team_type_from_file( $team_slug ) === 'group';
+}
+
 // Security: Only allow access from localhost
 function only_allow_access_from_localhost() {
 	$remote_addr = $_SERVER['REMOTE_ADDR'] ?? '';
@@ -23,6 +33,7 @@ function only_allow_access_from_localhost() {
 // Apply localhost protection
 only_allow_access_from_localhost();
 
+$group = 'team';
 require_once __DIR__ . '/event.php';
 
 /**
@@ -288,26 +299,25 @@ function get_team_type_from_file( $team_slug ) {
 }
 
 /**
- * Get display word for team type ('team' -> 'Team', 'group' -> 'Group')
+ * Get display word for team type ('team' -> 'team', 'group' -> 'group')
  */
-function get_type_display_word( $team_slug, $capitalize = true ) {
+function get_type_display_word( $team_slug ) {
 	$type = get_team_type_from_file( $team_slug );
-	$word = ( $type === 'group' ) ? 'group' : 'team';
-	return $capitalize ? ucfirst( $word ) : $word;
+	return ( $type === 'group' ) ? 'group' : 'team';
 }
 
 /**
  * Get display title with appropriate type word
  */
 function get_team_display_title( $team_slug, $suffix = '' ) {
+	global $group;
 	$team_name = get_team_name_from_file( $team_slug );
-	$type_word = get_type_display_word( $team_slug );
 	
 	if ( empty( $suffix ) ) {
-		return $team_name . ' ' . $type_word;
+		return $team_name . ' ' . ucfirst( $group );
 	}
 	
-	return $team_name . ' ' . $type_word . ' ' . $suffix;
+	return $team_name . ' ' . ucfirst( $group ) . ' ' . $suffix;
 }
 
 /**
@@ -319,7 +329,24 @@ function get_current_team_from_params() {
 	$group_param = $_POST['group'] ?? $_GET['group'] ?? null;
 	
 	// Return whichever is set (group takes precedence if both are set)
-	return $group_param ?? $team_param ?? null;
+	$current_team = $group_param ?? $team_param ?? null;
+
+	// Auto-initialize globals if we have a team
+	if ( $current_team ) {
+		init_globals( $current_team );
+	}
+
+	return $current_team;
+}
+
+/**
+ * Initialize global variables for current team
+ */
+function init_globals( $team_slug ) {
+	global $team, $group;
+
+	$team = $team_slug;
+	$group = get_type_display_word( $team_slug ); // 'team' or 'group'
 }
 
 /**
@@ -655,7 +682,7 @@ function create_person_from_data( $username, $person_data, $privacy_mode = false
 	);
 
 	// Set properties with empty string defaults
-	$string_properties = array( 'email', 'birthday', 'company_anniversary', 'partner', 'timezone', 'github', 'wordpress', 'linkedin', 'website', 'new_company', 'new_company_website' );
+	$string_properties = array( 'email', 'birthday', 'company_anniversary', 'partner', 'partner_birthday', 'timezone', 'github', 'wordpress', 'linkedin', 'website', 'new_company', 'new_company_website' );
 	foreach ( $string_properties as $property ) {
 		$person->$property = $person_data[$property] ?? '';
 	}
@@ -741,7 +768,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 	return array(
 		'activity_url_prefix' => $config['activity_url_prefix'],
         'team_name' => $config['team_name'],
-        'not_managing_team' => $config['not_managing_team'] ?? false,
+        'not_managing_team' => $config['not_managing_team'] ?? true,
 		'team_links' => $config['team_links'] ?? array(),
 		'team_members' => $team_members,
 		'leadership' => $leadership,
@@ -928,7 +955,7 @@ function render_upcoming_events_sidebar( $upcoming_events_or_person = null, $pri
 					}
 				}
 			?></div>
-			<span class="event-type <?php echo htmlspecialchars( $event->type ); ?>"><?php echo ucfirst( $event->type ); ?></span>
+			<span class="event-type <?php echo htmlspecialchars( $event->type ); ?>"><?php echo $event->type === 'partner_birthday' ? 'Birthday' : ucfirst( $event->type ); ?></span>
 			<?php if ( ! empty( $event->location ) ) : ?>
 				<div class="event-location-small">📍 <a href="https://maps.google.com/maps?q=<?php echo urlencode( $event->location ); ?>" target="_blank" class="location-link"><?php echo htmlspecialchars( $event->location ); ?></a></div>
 			<?php endif; ?>

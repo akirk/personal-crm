@@ -500,7 +500,10 @@ function updatePersonHistory() {
     const month = document.getElementById('month').value;
 
     if (username && month) {
-        window.location.href = '?person=' + encodeURIComponent(username) + '&month=' + encodeURIComponent(month);
+        // Wait a bit for any pending auto-saves to complete
+        setTimeout(() => {
+            window.location.href = '?person=' + encodeURIComponent(username) + '&month=' + encodeURIComponent(month);
+        }, 1500);
     }
 }
 
@@ -707,6 +710,21 @@ function performAutoSave() {
         return;
     }
     
+    // Don't save if required fields are empty
+    const username = document.getElementById('username').value;
+    const month = document.getElementById('month').value;
+    const performance = document.getElementById('performance').value;
+    
+    if (!username || !month || !performance) {
+        const missingFields = [];
+        if (!username) missingFields.push('person');
+        if (!month) missingFields.push('month');
+        if (!performance) missingFields.push('performance');
+        
+        showSaveStatus('incomplete', missingFields);
+        return;
+    }
+    
     isAutoSaving = true;
 
     // Update hidden fields for rich editors
@@ -734,7 +752,7 @@ function performAutoSave() {
         });
 }
 
-function showSaveStatus(status) {
+function showSaveStatus(status, missingFields = []) {
     const saveMessage = document.getElementById('save-message');
     const saveCheckmark = document.getElementById('save-checkmark');
 
@@ -756,6 +774,12 @@ function showSaveStatus(status) {
         setTimeout(() => {
             if (saveCheckmark) saveCheckmark.style.display = 'none';
         }, 1000);
+    } else if (status === 'incomplete') {
+        const fieldText = missingFields.length === 1 ? 'field' : 'fields';
+        saveMessage.textContent = `Missing required ${fieldText}: ${missingFields.join(', ')}`;
+        saveMessage.style.color = '#ffc107';
+        saveMessage.style.opacity = '1';
+        if (saveCheckmark) saveCheckmark.style.display = 'none';
     } else if (status === 'error') {
         saveMessage.textContent = 'Save failed - please refresh';
         saveMessage.style.color = '#dc3545';

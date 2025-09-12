@@ -12,6 +12,7 @@ class Person {
 	public $birthday; // YYYY-MM-DD format, e.g., '1978-03-15' or MM-DD format '03-15' for backward compatibility
 	public $company_anniversary; // YYYY-MM-DD format
 	public $partner; // Partner/spouse name
+	public $partner_birthday; // Partner's birthday YYYY-MM-DD format, or MM-DD format for year-unknown
 	public $kids; // Array of arrays with 'name' and 'birth_year'
 	public $notes; // Additional personal notes
 	public $location; // Location/town
@@ -40,6 +41,7 @@ class Person {
 		$this->birthday = '';
 		$this->company_anniversary = '';
 		$this->partner = '';
+		$this->partner_birthday = '';
 		$this->kids = array();
 		$this->notes = array();
 		$this->location = '';
@@ -193,6 +195,47 @@ class Person {
 							$event_data['age'] = $age;
 						}
 						$events[] = Event::from_person_event( 'birthday', $birthday_next_year, $this, $event_data );
+					}
+				}
+			}
+		}
+
+		// Partner birthday
+		if ( ! empty( $this->partner_birthday ) && ! empty( $this->partner ) ) {
+			$partner_birthday_date = null;
+			$partner_birth_date = null;
+
+			// Check if it's full YYYY-MM-DD format
+			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->partner_birthday ) ) {
+				$partner_birth_date = DateTime::createFromFormat( 'Y-m-d', $this->partner_birthday );
+				if ( $partner_birth_date ) {
+					$partner_birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $partner_birth_date->format( 'm-d' ) );
+				}
+			} elseif ( preg_match( '/^\d{2}-\d{2}$/', $this->partner_birthday ) ) {
+				// Year-unknown MM-DD format
+				$partner_birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->partner_birthday );
+			}
+
+			if ( isset( $partner_birthday_this_year ) && $partner_birthday_this_year ) {
+				if ( $partner_birthday_this_year >= $current_date && $partner_birthday_this_year <= $cutoff_date ) {
+					// Calculate the partner's age on this birthday (only if we have birth year)
+					$event_data = array( 'partner_name' => $this->partner );
+					if ( $partner_birth_date ) {
+						$age = $current_year - (int) $partner_birth_date->format( 'Y' );
+						$event_data['age'] = $age;
+					}
+					$events[] = Event::from_person_event( 'partner_birthday', $partner_birthday_this_year, $this, $event_data );
+				} elseif ( $partner_birthday_this_year < $current_date ) {
+					// Check next year's partner birthday
+					$partner_birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $partner_birthday_this_year->format( 'm-d' ) );
+					if ( $partner_birthday_next_year && $partner_birthday_next_year <= $cutoff_date ) {
+						// Calculate the partner's age on next year's birthday (only if we have birth year)
+						$event_data = array( 'partner_name' => $this->partner );
+						if ( $partner_birth_date ) {
+							$age = ( $current_year + 1 ) - (int) $partner_birth_date->format( 'Y' );
+							$event_data['age'] = $age;
+						}
+						$events[] = Event::from_person_event( 'partner_birthday', $partner_birthday_next_year, $this, $event_data );
 					}
 				}
 			}

@@ -36,8 +36,8 @@ if ( empty( $available_teams ) ) {
 
     <div class="team-selection-container">
         <div class="team-selection-header">
-            <h1>Select a Team</h1>
-            <p>Choose which team you'd like to view:</p>
+            <h1>Select</h1>
+            <p>Choose which one you'd like to view:</p>
         </div>
 
         <div class="team-grid">
@@ -55,7 +55,7 @@ if ( empty( $available_teams ) ) {
         </div>
 
         <div class="admin-link-section">
-            <a href="admin.php?create_team=new">⚙️ Create New Team</a>
+            <a href="admin.php?create_team=new">⚙️ Create New</a>
         </div>
     </div>
     

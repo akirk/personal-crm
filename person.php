@@ -92,7 +92,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					</span>
 				</h1>
 				<div class="back-nav">
-					<a href="<?php echo build_team_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">← Back to Team Overview</a>
+					<a href="<?php echo build_team_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">← Back to <?php echo ucfirst( $group ); ?> Overview</a>
 				</div>
 			</div>
 
@@ -141,7 +141,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 
 		<div class="overview-layout">
 			<div class="people-section">
-				<?php if ( ! empty( $person_data->birthday ) || ! empty( $person_data->company_anniversary ) || ! empty( $kids_with_ages ) || ! empty( $person_data->notes ) || ! empty( $person_data->location ) || ! empty( $person_data->partner ) ) : ?>
+				<?php if ( ! empty( $person_data->birthday ) || ! empty( $person_data->company_anniversary ) || ! empty( $kids_with_ages ) || ! empty( $person_data->notes ) || ! empty( $person_data->location ) || ! empty( $person_data->partner ) || ! empty( $person_data->partner_birthday ) ) : ?>
 					<div class="section section-with-avatar">
 						<?php $gravatar_url = $person_data->get_gravatar_url( 100 ); ?>
 						<?php if ( $gravatar_url ) : ?>
@@ -263,7 +263,31 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						<?php endif; ?>
 
 						<?php if ( ! empty( $person_data->partner ) && ! $privacy_mode ) : ?>
-							<p><strong>💑 Partner:</strong> <?php echo htmlspecialchars( $person_data->partner ); ?></p>
+							<p><strong>💑 Partner:</strong> <?php echo htmlspecialchars( $person_data->partner ); ?>
+							<?php if ( ! empty( $person_data->partner_birthday ) ) : ?>
+								<?php
+								$partner_age_display = '';
+								if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $person_data->partner_birthday ) ) {
+									// Full date format - can calculate age
+									$birth_date = DateTime::createFromFormat( 'Y-m-d', $person_data->partner_birthday );
+									if ( $birth_date ) {
+										$current_date = new DateTime();
+										$age = $current_date->diff( $birth_date )->y;
+										$partner_age_display = $age . ' (born ' . $birth_date->format( 'F j, Y' ) . ')';
+									}
+								} elseif ( preg_match( '/^\d{2}-\d{2}$/', $person_data->partner_birthday ) ) {
+									// Year-unknown format - can't calculate exact age
+									$display_date = DateTime::createFromFormat( 'm-d', $person_data->partner_birthday );
+									if ( $display_date ) {
+										$partner_age_display = 'Birthday ' . $display_date->format( 'F j' );
+									}
+								}
+								?>
+								<?php if ( $partner_age_display ) : ?>
+									(<?php echo $partner_age_display; ?>)
+								<?php endif; ?>
+							<?php endif; ?>
+							</p>
 						<?php endif; ?>
 
 						<?php if ( ! empty( $kids_with_ages ) ) : ?>
@@ -363,7 +387,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						}
 					}
 					$has_other_links = ! empty( $filtered_links );
-					$has_activity_links = $is_team_member && ! empty( $person_data->username ) && isset( $team_data['activity_url_prefix'] );
+					$has_activity_links = $is_team_member && ! empty( $person_data->username ) && isset( $team_data['activity_url_prefix'] ) && $group !== 'group';
 					?>
 
 					<?php if ( $has_other_links || $has_activity_links ) : ?>
@@ -389,7 +413,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 								</a>
 							<?php endif; ?>
 
-							<?php if ( $is_team_member && ! empty( $person_data->username ) && isset( $team_data['activity_url_prefix'] ) ) : ?>
+							<?php if ( $is_team_member && ! empty( $person_data->username ) && isset( $team_data['activity_url_prefix'] ) && $group !== 'group' ) : ?>
 								<?php
 								$last_month = date( 'Y-m', strtotime( 'last month') );
 								$start_date = $last_month . '-01';

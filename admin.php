@@ -1,8 +1,8 @@
 <?php
 /**
- * Team Management Admin Tool
+ * Team/Group Management Admin Tool
  * 
- * A web interface for creating and managing team.json configuration
+ * A web interface for creating and managing team/group JSON configuration
  */
 
 // Include common functions
@@ -13,7 +13,7 @@ ini_set( 'display_errors', 1 );
 error_reporting( E_ALL );
 
 // Get current team from URL parameter or POST (for form submissions)
-$current_team = $_POST['team'] ?? $_GET['team'] ?? null;
+$current_team = get_current_team_from_params();
 if ( ! $current_team && ! ( isset( $_GET['create_team'] ) && $_GET['create_team'] === 'new' ) ) {
 	header( 'Location: team-selection.php' );
 	exit;
@@ -165,14 +165,19 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			}
 			
 			// Handle not managing team setting
-			$not_managing_team = isset( $_POST['not_managing_team'] ) && $_POST['not_managing_team'] === '1';
-
-			if ( $not_managing_team ) {
+			if ( $config['type'] === 'group' ) {
+				// Groups are always not managed (no HR feedback, etc.)
 				$config['not_managing_team'] = true;
 			} else {
-				// Remove not managing team flag if unchecked
-				if ( isset( $config['not_managing_team'] ) ) {
-					unset( $config['not_managing_team'] );
+				$not_managing_team = isset( $_POST['not_managing_team'] ) && $_POST['not_managing_team'] === '1';
+
+				if ( $not_managing_team ) {
+					// Remove not managing team flag if unchecked
+					if ( isset( $config['not_managing_team'] ) ) {
+						unset( $config['not_managing_team'] );
+					}
+				} else {
+					$config['not_managing_team'] = false;
 				}
 			}
 
@@ -198,9 +203,9 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			$config['team_links'] = $team_links;
 
 			if ( save_config( $config, $config_file ) ) {
-				$message = 'Team links saved successfully!';
+				$message = 'Links saved successfully!';
 			} else {
-				$error = 'Failed to save team links.';
+				$error = 'Failed to save links.';
 			}
 			break;
 
@@ -494,20 +499,20 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			$new_team_type = sanitize_text_field( $_POST['new_team_type'] ?? 'team' );
 			
 			if ( empty( $new_team_slug ) || empty( $new_team_name ) ) {
-				$error = 'Team slug and name are required.';
+				$error = 'Slug and name are required.';
 				break;
 			}
 			
 			// Validate slug format
 			if ( ! preg_match( '/^[a-z0-9_-]+$/', $new_team_slug ) ) {
-				$error = 'Team slug can only contain lowercase letters, numbers, hyphens and underscores.';
+				$error = 'Slug can only contain lowercase letters, numbers, hyphens and underscores.';
 				break;
 			}
 			
 			$new_team_file = __DIR__ . '/' . $new_team_slug . '.json';
 			
 			if ( file_exists( $new_team_file ) ) {
-				$error = 'Team with this slug already exists.';
+				$error = 'A ' . $new_team_type . ' with this slug already exists.';
 				break;
 			}
 			
@@ -521,6 +526,11 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				'events' => array()
 			);
 			
+			// Groups are always not managed (no HR feedback, etc.)
+			if ( $new_team_type === 'group' ) {
+				$new_config['not_managing_team'] = true;
+			}
+
 			// If this is the first team being created, make it the default
 			$existing_teams = get_available_teams();
 			if ( empty( $existing_teams ) ) {
@@ -528,7 +538,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			}
 			
 			if ( save_config( $new_config, $new_team_file ) ) {
-				$message = 'Team created successfully!';
+				$message = ucfirst( $new_team_type ) . ' created successfully!';
 				// Redirect to the new team
 				$redirect_url = 'admin.php' . ( $new_team_slug !== 'team' ? '?team=' . urlencode( $new_team_slug ) : '' );
 				header( 'Location: ' . $redirect_url );
@@ -600,9 +610,15 @@ function mask_date_input( $date, $privacy_mode ) {
 }
 
 /**
+ * Check if current team is a social group (vs business team)
+ */
+
+/**
  * Get person type configuration
  */
 function get_person_type_config( $person_type ) {
+	global $group, $current_team;
+
 	$configs = array(
 		'member' => array(
 			'section_key' => 'team_members',
@@ -611,11 +627,11 @@ function get_person_type_config( $person_type ) {
 			'edit_action' => 'edit_member',
 			'add_action' => 'add_member',
 			'delete_action' => 'delete_member',
-			'edit_text' => 'Update Team Member',
-			'add_text' => 'Add Team Member',
-			'display_name' => 'Team Member',
+			'edit_text' => 'Update ' . ucfirst( $group ) . ' Member',
+			'add_text' => 'Add ' . ucfirst( $group ) . ' Member',
+			'display_name' => ucfirst( $group ) . ' Member',
 			'show_hr_feedback' => true,
-			'show_alumni_actions' => true,
+			'show_alumni_actions' => ! is_social_group( $current_team ),
 		),
 		'leader' => array(
 			'section_key' => 'leadership',
@@ -628,7 +644,7 @@ function get_person_type_config( $person_type ) {
 			'add_text' => 'Add Leadership',
 			'display_name' => 'Leadership',
 			'show_hr_feedback' => false,
-			'show_alumni_actions' => true,
+			'show_alumni_actions' => ! is_social_group( $current_team ),
 		),
 		'consultants' => array(
 			'section_key' => 'consultants',
@@ -728,6 +744,9 @@ function handle_person_action( $action, $config, $person_data ) {
  * Create person data array from form input
  */
 function create_person_data_from_form() {
+	global $current_team;
+	$is_social_group = is_social_group( $current_team );
+
 	// Parse links data from form
 	$links = array();
 
@@ -760,10 +779,30 @@ function create_person_data_from_form() {
 		}
 	}
 
-	return array(
+	// Construct partner birthday from dropdowns
+	$partner_birthday = '';
+	$partner_day = sanitize_text_field( $_POST['partner_birthday_day'] ?? '' );
+	$partner_month = sanitize_text_field( $_POST['partner_birthday_month'] ?? '' );
+	$partner_year = sanitize_text_field( $_POST['partner_birthday_year'] ?? '' );
+
+	if ( ! empty( $partner_day ) && ! empty( $partner_month ) ) {
+		if ( ! empty( $partner_year ) ) {
+			$partner_birthday = $partner_year . '-' . $partner_month . '-' . $partner_day;
+		} else {
+			$partner_birthday = $partner_month . '-' . $partner_day; // Legacy format for year-unknown
+		}
+	}
+
+	// Handle username with auto-generation for social groups
+	$username = sanitize_text_field( $_POST['username'] ?? '' );
+	if ( $is_social_group && empty( $username ) && ! empty( $_POST['name'] ) ) {
+		$username = generate_username_from_name( $_POST['name'] );
+	}
+
+	$data = array(
 		'name' => sanitize_text_field( $_POST['name'] ?? '' ),
 		'nickname' => sanitize_text_field( $_POST['nickname'] ?? '' ),
-		'role' => sanitize_text_field( $_POST['role'] ?? '' ),
+		'username' => $username,
 		'github' => sanitize_text_field( $_POST['github'] ?? '' ),
 		'linear' => sanitize_text_field( $_POST['linear'] ?? '' ),
 		'wordpress' => sanitize_text_field( $_POST['wordpress'] ?? '' ),
@@ -774,16 +813,26 @@ function create_person_data_from_form() {
 		'timezone' => sanitize_text_field( $_POST['timezone'] ?? '' ),
 		'links' => $links,
 		'birthday' => $birthday,
-		'company_anniversary' => sanitize_text_field( $_POST['company_anniversary'] ?? '' ),
 		'partner' => sanitize_text_field( $_POST['partner'] ?? '' ),
+		'partner_birthday' => $partner_birthday,
 		'kids' => parse_kids_data( $_POST['kids'] ?? '' ),
 		'notes' => create_notes_from_form(),
-		'github_repos' => isset( $_POST['github_repos'] ) ? array_filter( array_map( 'sanitize_text_field', $_POST['github_repos'] ) ) : array(),
 		'personal_events' => parse_personal_events_data( $_POST['personal_events'] ?? array() ),
-		'left_company' => isset( $_POST['left_company'] ) ? 1 : 0,
-		'new_company' => sanitize_text_field( $_POST['new_company'] ?? '' ),
-		'new_company_website' => sanitize_url( $_POST['new_company_website'] ?? '' )
 	);
+
+	// Only add business-specific fields for teams (not social groups)
+	if ( ! $is_social_group ) {
+		$data['role'] = sanitize_text_field( $_POST['role'] ?? '' );
+		$data['company_anniversary'] = sanitize_text_field( $_POST['company_anniversary'] ?? '' );
+		$data['github_repos'] = isset( $_POST['github_repos'] ) ? array_filter( array_map( 'sanitize_text_field', $_POST['github_repos'] ) ) : array();
+	} else {
+		// For social groups, ensure these fields are empty arrays/strings
+		$data['role'] = '';
+		$data['company_anniversary'] = '';
+		$data['github_repos'] = array();
+	}
+
+	return $data;
 }
 
 /**
@@ -920,14 +969,17 @@ function parse_personal_events_data( $events_data ) {
 /**
  * Check which data points are missing for a person
  */
-function get_missing_data_points( $person, $person_type = 'member' ) {
+function get_missing_data_points( $person, $person_type = 'member', $team_slug = null ) {
 	$missing = array();
+	$is_social_group = is_social_group( $team_slug );
 
 	// Core fields (required)
 	if ( empty( $person['name'] ) ) {
 		$missing[] = array( 'field' => 'Name', 'priority' => 'required' );
 	}
-	if ( empty( $person['role'] ) ) {
+
+	// Role is only required for business teams, not social groups
+	if ( ! $is_social_group && empty( $person['role'] ) ) {
 		$missing[] = array( 'field' => 'Role', 'priority' => 'required' );
 	}
 	if ( empty( $person['location'] ) ) {
@@ -942,14 +994,14 @@ function get_missing_data_points( $person, $person_type = 'member' ) {
 		$missing[] = array( 'field' => 'Birthday', 'priority' => 'required' );
 	}
 
-	// Company anniversary
-	if ( empty( $person['company_anniversary'] ) ) {
+	// Company anniversary is only required for business teams, not social groups
+	if ( ! $is_social_group && empty( $person['company_anniversary'] ) ) {
 		$missing[] = array( 'field' => 'Company Anniversary', 'priority' => 'required' );
 	}
 
-	// Links - check for key links (1:1 doc not required for consultants)
+	// Links - check for key links (1:1 doc not required for consultants or social groups)
 	$expected_links = array();
-	if ( $person_type !== 'consultants' ) {
+	if ( $person_type !== 'consultants' && ! $is_social_group ) {
 		$expected_links[] = '1:1 doc';
 	}
 
@@ -990,9 +1042,15 @@ function get_missing_data_points( $person, $person_type = 'member' ) {
 /**
  * Get completeness score as percentage
  */
-function get_completeness_score( $missing_data, $person_type = 'member' ) {
+function get_completeness_score( $missing_data, $person_type = 'member', $team_slug = null ) {
+	$is_social_group = is_social_group( $team_slug );
+
 	// Count total fields by priority
-	$total_required = 7; // name, role, location, timezone, birthday, company_anniversary, 1:1 doc
+	if ( $is_social_group ) {
+		$total_required = 4; // name, location, timezone, birthday (no role, company_anniversary, 1:1 doc)
+	} else {
+		$total_required = 7; // name, role, location, timezone, birthday, company_anniversary, 1:1 doc
+	}
 	$total_recommended = 3; // wordpress.org, linkedin, partner
 	$total_optional = 2; // kids, notes
 	
@@ -1101,7 +1159,7 @@ function format_kids_for_form( $kids ) {
  * Render a person form (team member, leader, or alumni)
  */
 function render_person_form( $type, $edit_data = null, $is_editing = false ) {
-	global $privacy_mode;
+	global $privacy_mode, $group;
 	
 	$config = get_person_type_config( $type );
 	if ( ! $config ) {
@@ -1244,6 +1302,73 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 				<label for="<?php echo $prefix; ?>partner">Partner</label>
 				<input type="text" id="<?php echo $prefix; ?>partner" name="partner" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['partner'] ?? '' ) : ''; ?>">
 			</div>
+
+			<div class="form-group">
+				<label>Partner Birthday<?php echo $privacy_mode ? ' (Hidden in Privacy Mode)' : ''; ?></label>
+				<?php if ( ! $privacy_mode ) : ?>
+					<?php
+					// Parse existing partner birthday data for editing
+					$partner_day = '';
+					$partner_month = '';
+					$partner_year = '';
+					if ( $is_editing && ! empty( $edit_data['partner_birthday'] ) ) {
+						$partner_birthday_value = $edit_data['partner_birthday'];
+						if ( preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $partner_birthday_value, $matches ) ) {
+							// Full date format: YYYY-MM-DD
+							$partner_year = $matches[1];
+							$partner_month = $matches[2];
+							$partner_day = $matches[3];
+						} elseif ( preg_match( '/^(\d{2})-(\d{2})$/', $partner_birthday_value, $matches ) ) {
+							// Year-unknown format: MM-DD
+							$partner_month = $matches[1];
+							$partner_day = $matches[2];
+						}
+					}
+					?>
+					<div style="display: flex; gap: 10px; align-items: center;">
+						<select name="partner_birthday_day" class="form-select">
+							<option value="">Day</option>
+							<?php for ( $d = 1; $d <= 31; $d++ ) : ?>
+								<option value="<?php echo sprintf( '%02d', $d ); ?>" <?php echo (string) $partner_day === sprintf( '%02d', $d ) ? 'selected' : ''; ?>>
+									<?php echo $d; ?>
+								</option>
+							<?php endfor; ?>
+						</select>
+
+						<select name="partner_birthday_month" class="form-select">
+							<option value="">Month</option>
+							<?php
+							$months = array(
+								'01' => 'January', '02' => 'February', '03' => 'March', '04' => 'April',
+								'05' => 'May', '06' => 'June', '07' => 'July', '08' => 'August',
+								'09' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'
+							);
+							foreach ( $months as $num => $name ) : ?>
+								<option value="<?php echo $num; ?>" <?php echo (string) $partner_month === (string) $num ? 'selected' : ''; ?>>
+									<?php echo $num; ?> - <?php echo $name; ?>
+								</option>
+							<?php endforeach; ?>
+						</select>
+
+						<select name="partner_birthday_year" class="form-select">
+							<option value="">Year (optional)</option>
+							<?php for ( $y = date( 'Y' ) - 80; $y <= date( 'Y' ) - 16; $y++ ) : ?>
+								<option value="<?php echo $y; ?>" <?php echo $partner_year === (string) $y ? 'selected' : ''; ?>>
+									<?php echo $y; ?>
+								</option>
+							<?php endfor; ?>
+						</select>
+					</div>
+					<small class="form-helper-text">
+						Year is optional - leave empty if unknown
+					</small>
+				<?php else : ?>
+					<input type="hidden" name="partner_birthday_day" value="">
+					<input type="hidden" name="partner_birthday_month" value="">
+					<input type="hidden" name="partner_birthday_year" value="">
+					<p class="text-muted italic-text">Hidden in privacy mode</p>
+				<?php endif; ?>
+			</div>
 		</div>
 
 		<div class="form-group">
@@ -1256,19 +1381,26 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<h4 class="section-heading">Company Information</h4>
 	<div class="form-grid">
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>username">Username *</label>
-			<input type="text" id="<?php echo $prefix; ?>username" name="username" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['username'] ?? '' ) : ''; ?>" required>
+			<label for="<?php echo $prefix; ?>username">Username *<?php if ( is_social_group( $current_team ) ) echo ' (auto-generated if empty)'; ?></label>
+			<input type="text" id="<?php echo $prefix; ?>username" name="username" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['username'] ?? '' ) : ''; ?>" <?php echo is_social_group( $current_team ) ? '' : 'required'; ?>>
+			<?php if ( is_social_group( $current_team ) ) : ?>
+				<small style="color: #666;">Leave empty to auto-generate from name (e.g., "John Smith" → "john.smith")</small>
+			<?php endif; ?>
 		</div>
 
+		<?php if ( ! is_social_group( $current_team ) ) : ?>
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>role">Role</label>
-			<input type="text" id="<?php echo $prefix; ?>role" name="role" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['role'] ?? '' ) : ''; ?>" placeholder="e.g., Developer, Team Lead, HR">
+			<input type="text" id="<?php echo $prefix; ?>role" name="role" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['role'] ?? '' ) : ''; ?>" placeholder="e.g., Developer, Lead, HR">
 		</div>
+		<?php endif; ?>
 
+		<?php if ( ! is_social_group( $current_team ) ) : ?>
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>company_anniversary">Company Anniversary<?php echo $privacy_mode ? ' (Hidden in Privacy Mode)' : ''; ?></label>
 			<input type="date" id="<?php echo $prefix; ?>company_anniversary" name="company_anniversary" value="<?php echo $is_editing ? htmlspecialchars( mask_date_input( $edit_data['company_anniversary'] ?? '', $privacy_mode ) ) : ''; ?>"<?php echo $privacy_mode ? ' placeholder="Hidden for privacy"' : ''; ?>>
 		</div>
+		<?php endif; ?>
 
 
 		<!-- Links Section -->
@@ -1282,8 +1414,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 					$current_links = $edit_data['links'];
 				}
 
-				// Ensure 1:1 doc link is always present for all person types
-				if ( ! isset( $current_links['1:1 doc'] ) ) {
+				// Ensure 1:1 doc link is always present for business teams (not social groups)
+				if ( ! is_social_group( $current_team ) && ! isset( $current_links['1:1 doc'] ) ) {
 					$current_links['1:1 doc'] = '';
 				}
 
@@ -1339,6 +1471,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		</div>
 	</div>
 
+	<?php if ( ! is_social_group( $current_team ) ) : ?>
 	<!-- GitHub Repositories -->
 	<div class="form-group">
 		<label>GitHub Repositories</label>
@@ -1412,6 +1545,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			</div>
 		<?php endif; ?>
 	</div>
+	<?php endif; ?>
 
 	<script>
 		function addRepoField(prefix) {
@@ -1578,7 +1712,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		</p>
 	</div>
 
-	<!-- Move to Another Team -->
+	<!-- Move to Another <?php echo ucfirst( $group ); ?> -->
 	<?php if ( $is_editing && ( $type === 'member' || $type === 'leader' ) ) : ?>
 		<?php 
 		$available_teams = get_available_teams();
@@ -1588,16 +1722,16 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		?>
 		<?php if ( ! empty( $other_teams ) ) : ?>
 			<div class="divider-section">
-				<h4 class="text-muted" style="margin-bottom: 10px;">Move to Another Team</h4>
+				<h4 class="text-muted" style="margin-bottom: 10px;">Move to Another <?php echo ucfirst( $group ); ?></h4>
 				<form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to move this person to another team?')">
 					<input type="hidden" name="action" value="move_to_team">
 					<input type="hidden" name="username" value="<?php echo htmlspecialchars( $edit_data['username'] ?? '' ); ?>">
 					<input type="hidden" name="from_section" value="<?php echo $config['section_key']; ?>">
 					
 					<div style="margin-bottom: 10px;">
-						<label for="target_team" style="display: block; margin-bottom: 5px; font-weight: bold;">Target Team:</label>
+						<label for="target_team" style="display: block; margin-bottom: 5px; font-weight: bold;">Target <?php echo ucfirst( $group ); ?>:</label>
 						<select name="target_team" id="target_team" required style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px;">
-							<option value="">Select a team...</option>
+							<option value="">Select a <?php echo $group; ?>...</option>
 							<?php foreach ( $other_teams as $team_slug ) : ?>
 								<?php 
 								$team_name = get_team_name_from_file( $team_slug );
@@ -1649,7 +1783,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 					<?php endif; ?>
 					
 					<button type="submit" class="btn btn-primary">
-						🔄 Move to Team
+						🔄 Move to <?php echo ucfirst( $group ); ?>
 					</button>
 				</form>
 				<p class="text-small-muted" style="margin: 5px 0 0 0;">
@@ -1669,7 +1803,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title>Team Management Admin</title>
+    <title><?php echo ucfirst( $group ?? 'Team' ); ?> Management Admin</title>
     <link rel="stylesheet" href="assets/style.css">
     <link rel="stylesheet" href="assets/cmd-k.css">
 </head>
@@ -1681,7 +1815,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
     <div class="container">
         <div class="header">
             <div class="header-content">
-                <h1><a href="admin.php" style="color: inherit; text-decoration: none;">Team Management Admin</a></h1>
+                <h1><a href="admin.php" style="color: inherit; text-decoration: none;"><?php echo ucfirst( $group ?? 'Team' ); ?> Management Admin</a></h1>
             </div>
             <div class="navigation">
                 <!-- Team Switcher -->
@@ -1715,24 +1849,24 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         <?php endif; ?>
 
         <?php if ( $is_creating_team ) : ?>
-            <!-- Create New Team Page -->
+            <!-- Create New Page -->
             <div style="margin-bottom: 20px;">
                 <a href="<?php echo build_team_url( 'admin.php' ); ?>" class="back-link-admin">← Back to Admin Dashboard</a>
             </div>
             
-            <h2>Create New Team</h2>
+            <h2>Create New</h2>
             <form method="post">
                 <input type="hidden" name="action" value="create_team">
                 <?php if ( $current_team && $current_team !== 'team' ) : ?>
                     <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_team ); ?>">
                 <?php endif; ?>
                 <div class="form-group">
-                    <label for="new_team_name">Team Name *</label>
+                    <label for="new_team_name">Name *</label>
                     <input type="text" id="new_team_name" name="new_team_name" required placeholder="e.g., Marketing Team" autofocus>
                 </div>
                 <div class="form-group">
-                    <label for="new_team_slug">Team Slug *</label>
-                    <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing-team" pattern="[a-z0-9_-]+" value="<?php echo ( $current_team && $current_team !== 'team' ) ? htmlspecialchars( $current_team ) : ''; ?>">
+                    <label for="new_team_slug">Slug *</label>
+                    <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing" pattern="[a-z0-9_-]+" value="<?php echo ( $current_team && $current_team !== 'team' ) ? htmlspecialchars( $current_team ) : ''; ?>">
                     <small class="text-small-muted">Only lowercase letters, numbers, hyphens, and underscores allowed. This will be used as the filename.</small>
                 </div>
                 <div class="form-group">
@@ -1744,7 +1878,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     <small class="text-small-muted">Choose "Group" for personal friends/acquaintances, or "Team" for work/business contexts.</small>
                 </div>
                 <div style="margin-top: 20px;">
-                    <button type="submit" class="btn">Create Team</button>
+                    <button type="submit" class="btn">Create</button>
                     <a href="<?php echo build_team_url( 'admin.php' ); ?>" class="btn btn-secondary" style="margin-left: 10px;">Cancel</a>
                 </div>
             </form>
@@ -1753,6 +1887,9 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         <div class="nav-tabs">
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'general' ) ); ?>" class="nav-tab <?php echo $active_tab === 'general' ? 'active' : ''; ?>">General</a>
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'team_links' ) ); ?>" class="nav-tab <?php echo $active_tab === 'team_links' ? 'active' : ''; ?>">Links</a>
+            <?php if ( $group === 'group' ) : ?>
+                <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'members' ) ); ?>" class="nav-tab <?php echo $active_tab === 'members' ? 'active' : ''; ?>">👥 Members (<?php echo count( $config['team_members'] ); ?>)</a>
+            <?php else : ?>
             <div class="nav-dropdown">
                 <span class="nav-tab nav-dropdown-trigger <?php echo in_array( $active_tab, array( 'members', 'leadership', 'consultants', 'alumni' ) ) ? 'active' : ''; ?>">
                     People (<?php echo count( $config['team_members'] ) + count( $config['leadership'] ) + count( $config['consultants'] ?? array() ) + count( $config['alumni'] ?? array() ); ?>) ▾
@@ -1764,6 +1901,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'alumni' ) ); ?>" class="nav-dropdown-item <?php echo $active_tab === 'alumni' ? 'active' : ''; ?>">🎓 Alumni (<?php echo count( $config['alumni'] ?? array() ); ?>)</a>
                 </div>
             </div>
+            <?php endif; ?>
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-tab <?php echo $active_tab === 'events' ? 'active' : ''; ?>">Events</a>
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'audit' ) ); ?>" class="nav-tab <?php echo $active_tab === 'audit' ? 'active' : ''; ?>">Audit</a>
             <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'json' ) ); ?>" class="nav-tab <?php echo $active_tab === 'json' ? 'active' : ''; ?>">JSON</a>
@@ -1849,7 +1987,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <?php endif; ?>
                 
                 <div class="form-group">
-                    <label for="team_name">Team Name</label>
+                    <label for="team_name">Name</label>
                     <input type="text" id="team_name" name="team_name" value="<?php echo htmlspecialchars( $config['team_name'] ); ?>" required autofocus>
                 </div>
                 
@@ -1877,25 +2015,27 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     </small>
                 </div>
 
+                <?php if ( $group !== 'group' ) : ?>
                 <div class="form-group" style="margin-bottom: 15px;">
                     <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 600;">
                         <input type="checkbox" id="not_managing_team" name="not_managing_team" value="1" <?php echo isset( $config['not_managing_team'] ) && $config['not_managing_team'] ? 'checked' : ''; ?> style="width: auto;">
-                        <span>Not managing this team</span>
+                        <span>Not managing this <?php echo $group; ?></span>
                     </label>
                     <small class="text-small-muted" style="margin-left: 20px;">
-                        Check this if you are not currently responsible for HR feedbacks and team management.
+                        Check this if you are not currently responsible for HR feedbacks and <?php echo $group; ?> management.
                     </small>
                 </div>
+                <?php endif; ?>
 
                 
                 <button type="submit" class="btn">Save General Settings</button>
             </form>
         </div>
 
-        <!-- Team Links Tab -->
+        <!-- Links Tab -->
         <div id="team_links" class="tab-content <?php echo $active_tab === 'team_links' ? 'active' : ''; ?>">
-            <h2>Team Links</h2>
-            <p class="text-muted" style="margin-bottom: 20px;">These links will appear on the front page next to the team headline.</p>
+            <h2>Links</h2>
+            <p class="text-muted" style="margin-bottom: 20px;">These links will appear on the front page next to the headline.</p>
 
             <form method="post">
                 <input type="hidden" name="action" value="save_team_links">
@@ -1929,23 +2069,23 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     <button type="button" id="add-team-link" class="btn btn-add-personal">+ Add Link</button>
                 </div>
 
-                <button type="submit" class="btn">Save Team Links</button>
+                <button type="submit" class="btn">Save Links</button>
             </form>
         </div>
 
-        <!-- Team Members Tab -->
+        <!-- <?php echo ucfirst( $group ); ?> Members Tab -->
         <div id="members" class="tab-content <?php echo $active_tab === 'members' ? 'active' : ''; ?>">
             <?php if ( $is_editing_member ) : ?>
-                <h2>Edit Team Member: <?php echo htmlspecialchars( mask_name( $edit_data['name'] ?? $edit_data['username'], $privacy_mode ) ); ?></h2>
+                <h2>Edit <?php echo ucfirst( $group ); ?> Member: <?php echo htmlspecialchars( mask_name( $edit_data['name'] ?? $edit_data['username'], $privacy_mode ) ); ?></h2>
             <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
             <?php else : ?>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3 style="margin: 0;">Current Team Members</h3>
+                    <h3 style="margin: 0;">Current <?php echo ucfirst( $group ); ?> Members</h3>
                     <?php
                     $add_params = array( 'tab' => 'members', 'add' => 'new' );
                     if ( $privacy_mode ) $add_params['privacy'] = '1';
                     ?>
-                    <a href="<?php echo build_team_url( 'admin.php', $add_params ); ?>" class="btn">+ Add New Team Member</a>
+                    <a href="<?php echo build_team_url( 'admin.php', $add_params ); ?>" class="btn">+ Add New <?php echo ucfirst( $group ); ?> Member</a>
                 </div>
                 <?php if ( ! empty( $config['team_members'] ) ) : ?>
                     <div class="person-list">
@@ -1993,13 +2133,14 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     $back_params = array( 'tab' => 'members' );
                     if ( $privacy_mode ) $back_params['privacy'] = '1';
                     ?>
-                    <a href="<?php echo build_team_url( 'admin.php', $back_params ); ?>" class="back-link-admin">← Back to Team Members</a>
+                    <a href="<?php echo build_team_url( 'admin.php', $back_params ); ?>" class="back-link-admin">← Back to <?php echo ucfirst( $group ); ?> Members</a>
                 </div>
-                <h3>Add New Team Member</h3>
+                <h3>Add New <?php echo ucfirst( $group ); ?> Member</h3>
                 <?php render_person_form( 'member', null, false ); ?>
             <?php endif; ?>
         </div>
 
+        <?php if ( $group !== 'group' ) : ?>
         <!-- Leadership Tab -->
         <div id="leadership" class="tab-content <?php echo $active_tab === 'leadership' ? 'active' : ''; ?>">
             <?php if ( $is_editing_leader ) : ?>
@@ -2167,7 +2308,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                         <?php endif; ?>
                                         <?php
                                         $original_section = $alumni_member['original_section'] ?? 'team_members'; // Default to team_members for legacy data
-                                        $display_name = $original_section === 'leadership' ? 'Leadership' : 'Team Member';
+                                        $display_name = $original_section === 'leadership' ? 'Leadership' : ucfirst( $group ) . ' Member';
                                         ?>
                                         <button type="submit" class="btn" onclick="return confirm('Are you sure you want to restore this person to their original position (<?php echo $display_name; ?>)?')">Restore to <?php echo $display_name; ?></button>
                                     </form>
@@ -2197,6 +2338,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 </p>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
 
         <!-- Events Tab -->
         <div id="events" class="tab-content <?php echo $active_tab === 'events' ? 'active' : ''; ?>">
@@ -2269,7 +2411,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     <div class="form-group">
                         <label for="event-type">Event Type</label>
                         <select id="event-type" name="event_type" class="form-select" style="width: 100%;">
-                            <option value="team" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'team' ? 'selected' : ''; ?>>Team Meetup</option>
+                            <option value="team" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'team' ? 'selected' : ''; ?>>Meetup</option>
                             <option value="company" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'company' ? 'selected' : ''; ?>>Company Meetup</option>
                             <option value="conference" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'conference' ? 'selected' : ''; ?>>Conference</option>
                             <option value="training" <?php echo $is_editing_event && ($edit_data['type'] ?? '') === 'training' ? 'selected' : ''; ?>>Training</option>
@@ -2334,7 +2476,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
             // Process all person types using unified approach
             $person_type_mappings = array(
-                'team_members' => array('type_name' => 'Team Member', 'audit_type' => 'member'),
+                'team_members' => array('type_name' => ucfirst( $group ) . ' Member', 'audit_type' => 'member'),
                 'leadership' => array('type_name' => 'Leadership', 'audit_type' => 'leader'),
                 'consultants' => array('type_name' => 'Consultant', 'audit_type' => 'consultants'),
                 'alumni' => array('type_name' => 'Alumni', 'audit_type' => 'alumni'),
@@ -2342,8 +2484,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             
             foreach ( $person_type_mappings as $section_key => $type_info ) {
                 foreach ( $config[ $section_key ] ?? array() as $username => $person ) {
-                    $missing = get_missing_data_points( $person, $type_info['audit_type'] );
-                    $score = get_completeness_score( $missing, $type_info['audit_type'] );
+                    $missing = get_missing_data_points( $person, $type_info['audit_type'], $current_team );
+                    $score = get_completeness_score( $missing, $type_info['audit_type'], $current_team );
                     $audit_data[] = array(
                         'type' => $type_info['type_name'],
                         'name' => $person['name'],
@@ -2393,7 +2535,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <span style="margin-right: 15px; font-weight: 600;">Filter by:</span>
                 <select class="form-select-small" style="margin-right: 15px;" id="type-filter" onchange="filterAuditTable()">
                     <option value="">All Types</option>
-                    <option value="Team Member">Team Members</option>
+                    <option value="Team Member"><?php echo ucfirst( $group ); ?> Members</option>
                     <option value="Leadership">Leadership</option>
                     <option value="Consultant">Consultants</option>
                     <option value="Alumni">Alumni</option>
@@ -2505,7 +2647,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <pre class="config-preview"><?php echo htmlspecialchars( json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ); ?></pre>
             
             <p style="margin-top: 20px;">
-                <a href="<?php echo build_team_url( 'index.php' ); ?>" class="btn" target="_blank">View Team Dashboard</a>
+                <a href="<?php echo build_team_url( 'index.php' ); ?>" class="btn" target="_blank">View Dashboard</a>
             </p>
         </div>
         
@@ -3055,7 +3197,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             echo '<a href="?' . http_build_query( $current_params ) . '" class="text-muted" style="text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>';
         }
         ?>
-        <a href="<?php echo build_team_url( 'index.php' ); ?>" class="text-muted" style="text-decoration: none;">👥 Team Overview</a>
+        <a href="<?php echo build_team_url( 'index.php' ); ?>" class="text-muted" style="text-decoration: none;">👥 Overview</a>
     </footer>
     
     <script src="assets/cmd-k.js"></script>

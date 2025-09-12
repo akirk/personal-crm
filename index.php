@@ -151,12 +151,60 @@ if ( ! empty( $team_members_needing_hr ) ) {
 				<div class="navigation" style="display: flex; align-items: center; gap: 10px;">
 					<select id="team-selector" onchange="switchTeam()">
 						<?php
+						// Separate teams by type and default status
+						$default_teams = array();
+						$teams = array();
+						$groups = array();
+						
 						foreach ( $available_teams as $team_slug ) {
-							$team_display_name = get_team_name_from_file( $team_slug );
-							$selected = $team_slug === $current_team ? 'selected' : '';
-							echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
+							$team_name = get_team_name_from_file( $team_slug );
+							$team_type = get_team_type_from_file( $team_slug );
+							$is_default = get_default_team() === $team_slug;
+							
+							$item = array(
+								'slug' => $team_slug,
+								'name' => $team_name,
+								'type' => $team_type
+							);
+							
+							if ( $is_default ) {
+								$default_teams[] = $item;
+							} elseif ( $team_type === 'group' ) {
+								$groups[] = $item;
+							} else {
+								$teams[] = $item;
+							}
 						}
+						
+						// Sort each group by name
+						usort( $default_teams, fn($a, $b) => strcasecmp( $a['name'], $b['name'] ) );
+						usort( $teams, fn($a, $b) => strcasecmp( $a['name'], $b['name'] ) );
+						usort( $groups, fn($a, $b) => strcasecmp( $a['name'], $b['name'] ) );
 						?>
+						
+						<?php if ( ! empty( $default_teams ) ) : ?>
+						<optgroup label="Default">
+							<?php foreach ( $default_teams as $item ) : ?>
+								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_team ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+							<?php endforeach; ?>
+						</optgroup>
+						<?php endif; ?>
+						
+						<?php if ( ! empty( $teams ) ) : ?>
+						<optgroup label="Teams">
+							<?php foreach ( $teams as $item ) : ?>
+								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_team ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+							<?php endforeach; ?>
+						</optgroup>
+						<?php endif; ?>
+						
+						<?php if ( ! empty( $groups ) ) : ?>
+						<optgroup label="Groups">
+							<?php foreach ( $groups as $item ) : ?>
+								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_team ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+							<?php endforeach; ?>
+						</optgroup>
+						<?php endif; ?>
 					</select>
 				</div>
 			</div>
@@ -164,7 +212,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 			<div class="overview-layout">
 				<div class="people-section">
 					<div class="section">
-						<h3>Team Members (<?php echo count( $team_data['team_members'] ); ?>)</h3>
+						<h3><?php echo ucfirst( $group ); ?> Members (<?php echo count( $team_data['team_members'] ); ?>)</h3>
 						<?php if ( ! empty( $team_data['team_members'] ) ) : ?>
 							<ul class="people-list">
 								<?php foreach ( $team_data['team_members'] as $username => $member ) : ?>
@@ -174,7 +222,13 @@ if ( ! empty( $team_members_needing_hr ) ) {
 												<div class="person-info">
 													<div class="person-name"><?php echo htmlspecialchars( $member->get_display_name_with_nickname() ); ?></div>
 													<div class="person-username">
-														@<?php echo htmlspecialchars( $member->get_username() ); ?>
+														<?php if ( is_social_group( $current_team ) ) : ?>
+															<?php if ( ! empty( $member->location ) ) : ?>
+																📍 <?php echo htmlspecialchars( $member->location ); ?>
+															<?php endif; ?>
+														<?php else : ?>
+															@<?php echo htmlspecialchars( $member->get_username() ); ?>
+														<?php endif; ?>
 														<?php if ( ! empty( $member->timezone ) || ! empty( $member->location ) ) : ?>
 															<span id="time-<?php echo htmlspecialchars( $username ); ?>" class="timezone-display"></span>
 														<?php endif; ?>
@@ -227,10 +281,11 @@ if ( ! empty( $team_members_needing_hr ) ) {
 								<?php endforeach; ?>
 							</ul>
 						<?php else : ?>
-							<p class="empty-state-message">No team members yet. <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'members', 'add' => 'new' ) ); ?>" class="action-link">Add your first team member →</a></p>
+							<p class="empty-state-message">No <?php echo $group; ?> members yet. <a href="<?php echo build_team_url( 'admin.php', array( 'tab' => 'members', 'add' => 'new' ) ); ?>" class="action-link">Add your first <?php echo $group; ?> member →</a></p>
 						<?php endif; ?>
 					</div>
 
+					<?php if ( $group !== 'group' ) : ?>
 					<div class="section">
 						<h3>Leadership (<?php echo count( $team_data['leadership'] ); ?>)</h3>
 						<?php if ( ! empty( $team_data['leadership'] ) ) : ?>
@@ -330,9 +385,10 @@ if ( ! empty( $team_members_needing_hr ) ) {
 								<?php endforeach; ?>
 							</ul>
 						<?php else : ?>
-							<p class="empty-state-message">No alumni yet. Alumni are created by moving existing team members or leaders.</p>
+							<p class="empty-state-message">No alumni yet. Alumni are created by moving existing <?php echo $group; ?> members or leaders.</p>
 						<?php endif; ?>
 					</div>
+					<?php endif; ?>
 				</div>
 
 				<div class="events-sidebar">
@@ -388,7 +444,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 		<?php else : ?>
 			<div class="header">
 				<h1>Page Not Found</h1>
-				<p><a href="?<?php echo $current_team !== 'team' ? 'team=' . urlencode( $current_team ) : ''; ?>">← Back to Team Overview</a></p>
+				<p><a href="?<?php echo $current_team !== 'team' ? 'team=' . urlencode( $current_team ) : ''; ?>">← Back to <?php echo ucfirst( $group ); ?> Overview</a></p>
 			</div>
 		<?php endif; ?>
 
@@ -425,6 +481,28 @@ if ( ! empty( $team_members_needing_hr ) ) {
 			endforeach; 
 			?>
 		});
+		
+		function switchTeam() {
+			const selector = document.getElementById('team-selector');
+			const selectedTeam = selector.value;
+			const selectedOption = selector.options[selector.selectedIndex];
+			const selectedType = selectedOption.getAttribute('data-type');
+			
+			const currentUrl = new URL(window.location);
+			
+			// Remove both team and group parameters first
+			currentUrl.searchParams.delete('team');
+			currentUrl.searchParams.delete('group');
+			
+			// Add the appropriate parameter based on the type
+			if (selectedType === 'group') {
+				currentUrl.searchParams.set('group', selectedTeam);
+			} else {
+				currentUrl.searchParams.set('team', selectedTeam);
+			}
+			
+			window.location = currentUrl.toString();
+		}
 	</script>
 </body>
 </html>

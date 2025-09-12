@@ -55,6 +55,7 @@ class PeopleFinderCLI {
                 'alumni' => $alumniCount,
                 'total_people' => $totalPeople,
                 'is_default' => $data['default'] ?? false,
+                'type' => $data['type'] ?? 'team',
                 'itemType' => 'team'
             ];
 
@@ -215,7 +216,7 @@ class PeopleFinderCLI {
     /**
      * Get upcoming events for a person (birthday, company anniversary, personal events)
      */
-    private function getPersonUpcomingEvents( array $personData ): array {
+    private function getPersonUpcomingEvents( array $personData, string $personType = '' ): array {
         $events = [];
         $currentDate = new DateTime();
         $cutoffDate = clone $currentDate;
@@ -234,11 +235,13 @@ class PeopleFinderCLI {
                 
                 // Check if this year's birthday hasn't passed yet
                 if ( $thisYearBirthday >= $currentDate && $thisYearBirthday <= $cutoffDate ) {
-                    $events[] = ['date' => $thisYearBirthday, 'type' => 'birthday'];
+                    $age = $thisYearBirthday->diff( $birthDate )->y;
+                    $events[] = ['date' => $thisYearBirthday, 'type' => 'birthday', 'age' => $age];
                 }
                 // Always check next year's birthday if it's within our window
                 if ( $nextYearBirthday <= $cutoffDate ) {
-                    $events[] = ['date' => $nextYearBirthday, 'type' => 'birthday'];
+                    $age = $nextYearBirthday->diff( $birthDate )->y;
+                    $events[] = ['date' => $nextYearBirthday, 'type' => 'birthday', 'age' => $age];
                 }
             } elseif ( preg_match( '/^\d{2}-\d{2}$/', $personData['birthday'] ) ) {
                 // Month-day only
@@ -251,11 +254,11 @@ class PeopleFinderCLI {
                     
                     // Check if this year's birthday hasn't passed yet
                     if ( $thisYearBirthday >= $currentDate && $thisYearBirthday <= $cutoffDate ) {
-                        $events[] = ['date' => $thisYearBirthday, 'type' => 'birthday'];
+                        $events[] = ['date' => $thisYearBirthday, 'type' => 'birthday']; // No age for MM-DD format
                     }
                     // Always check next year's birthday if it's within our window
                     if ( $nextYearBirthday <= $cutoffDate ) {
-                        $events[] = ['date' => $nextYearBirthday, 'type' => 'birthday'];
+                        $events[] = ['date' => $nextYearBirthday, 'type' => 'birthday']; // No age for MM-DD format
                     }
                 } catch ( Exception $e ) {
                     // Skip invalid dates
@@ -263,19 +266,21 @@ class PeopleFinderCLI {
             }
         }
 
-        // Company anniversary
-        if ( !empty( $personData['company_anniversary'] ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $personData['company_anniversary'] ) ) {
+        // Company anniversary (skip for alumni - they no longer work at the company)
+        if ( !empty( $personData['company_anniversary'] ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $personData['company_anniversary'] ) && $personType !== 'Alumni' ) {
             $anniversaryDate = new DateTime( $personData['company_anniversary'] );
             $thisYearAnniversary = new DateTime( $currentDate->format( 'Y' ) . '-' . $anniversaryDate->format( 'm-d' ) );
             $nextYearAnniversary = new DateTime( ( $currentDate->format( 'Y' ) + 1 ) . '-' . $anniversaryDate->format( 'm-d' ) );
             
             // Check if this year's anniversary hasn't passed yet
             if ( $thisYearAnniversary >= $currentDate && $thisYearAnniversary <= $cutoffDate ) {
-                $events[] = ['date' => $thisYearAnniversary, 'type' => 'work anniversary'];
+                $years = $thisYearAnniversary->diff( $anniversaryDate )->y;
+                $events[] = ['date' => $thisYearAnniversary, 'type' => 'work anniversary', 'years' => $years];
             } 
             // Always check next year's anniversary if it's within our window
             if ( $nextYearAnniversary <= $cutoffDate ) {
-                $events[] = ['date' => $nextYearAnniversary, 'type' => 'work anniversary'];
+                $years = $nextYearAnniversary->diff( $anniversaryDate )->y;
+                $events[] = ['date' => $nextYearAnniversary, 'type' => 'work anniversary', 'years' => $years];
             }
         }
 
@@ -291,11 +296,13 @@ class PeopleFinderCLI {
                         
                         // Check if this year's birthday hasn't passed yet
                         if ( $thisYearBirthday >= $currentDate && $thisYearBirthday <= $cutoffDate ) {
-                            $events[] = ['date' => $thisYearBirthday, 'type' => "{$kid['name']}'s birthday"];
+                            $age = $thisYearBirthday->diff( $birthDate )->y;
+                            $events[] = ['date' => $thisYearBirthday, 'type' => "{$kid['name']}'s birthday", 'age' => $age];
                         }
                         // Always check next year's birthday if it's within our window
                         if ( $nextYearBirthday <= $cutoffDate ) {
-                            $events[] = ['date' => $nextYearBirthday, 'type' => "{$kid['name']}'s birthday"];
+                            $age = $nextYearBirthday->diff( $birthDate )->y;
+                            $events[] = ['date' => $nextYearBirthday, 'type' => "{$kid['name']}'s birthday", 'age' => $age];
                         }
                     }
                 }
@@ -313,12 +320,14 @@ class PeopleFinderCLI {
                 // Check if this year's birthday hasn't passed yet
                 if ( $thisYearBirthday >= $currentDate && $thisYearBirthday <= $cutoffDate ) {
                     $partnerName = $personData['partner'] ?? 'Partner';
-                    $events[] = ['date' => $thisYearBirthday, 'type' => "{$partnerName}'s birthday"];
+                    $age = $thisYearBirthday->diff( $birthDate )->y;
+                    $events[] = ['date' => $thisYearBirthday, 'type' => "{$partnerName}'s birthday", 'age' => $age];
                 }
                 // Always check next year's birthday if it's within our window
                 if ( $nextYearBirthday <= $cutoffDate ) {
                     $partnerName = $personData['partner'] ?? 'Partner';
-                    $events[] = ['date' => $nextYearBirthday, 'type' => "{$partnerName}'s birthday"];
+                    $age = $nextYearBirthday->diff( $birthDate )->y;
+                    $events[] = ['date' => $nextYearBirthday, 'type' => "{$partnerName}'s birthday", 'age' => $age];
                 }
             } elseif ( preg_match( '/^\d{2}-\d{2}$/', $personData['partner_birthday'] ) ) {
                 // Month-day only
@@ -332,12 +341,12 @@ class PeopleFinderCLI {
                     // Check if this year's birthday hasn't passed yet
                     if ( $thisYearBirthday >= $currentDate && $thisYearBirthday <= $cutoffDate ) {
                         $partnerName = $personData['partner'] ?? 'Partner';
-                        $events[] = ['date' => $thisYearBirthday, 'type' => "{$partnerName}'s birthday"];
+                        $events[] = ['date' => $thisYearBirthday, 'type' => "{$partnerName}'s birthday"]; // No age for MM-DD format
                     }
                     // Always check next year's birthday if it's within our window
                     if ( $nextYearBirthday <= $cutoffDate ) {
                         $partnerName = $personData['partner'] ?? 'Partner';
-                        $events[] = ['date' => $nextYearBirthday, 'type' => "{$partnerName}'s birthday"];
+                        $events[] = ['date' => $nextYearBirthday, 'type' => "{$partnerName}'s birthday"]; // No age for MM-DD format
                     }
                 } catch ( Exception $e ) {
                     // Skip invalid dates
@@ -751,18 +760,40 @@ class PeopleFinderCLI {
         $cutoffDate = clone $currentDate;
         $cutoffDate->add( new DateInterval( 'P3M' ) ); // 3 months from now
 
-        // Collect events from all team members and consultants
-        $allPeople = array_merge( $teamData['team_members'] ?? [], $teamData['consultants'] ?? [] );
+        // Collect events from all team members, consultants, and alumni
+        $peopleByCategory = [
+            'team_members' => $teamData['team_members'] ?? [],
+            'consultants' => $teamData['consultants'] ?? [],
+            'leadership' => $teamData['leadership'] ?? [],
+            'alumni' => $teamData['alumni'] ?? []
+        ];
         
-        foreach ( $allPeople as $username => $personData ) {
-            $personEvents = $this->getPersonUpcomingEvents( $personData );
-            foreach ( $personEvents as $event ) {
-                if ( $event['date'] <= $cutoffDate ) {
-                    $allEvents[] = [
-                        'date' => $event['date'],
-                        'type' => $event['type'],
-                        'person' => $personData['name'] ?? $username
-                    ];
+        foreach ( $peopleByCategory as $category => $people ) {
+            $personType = match( $category ) {
+                'team_members' => 'Member',
+                'leadership' => 'Leadership',
+                'consultants' => 'Consultant',
+                'alumni' => 'Alumni'
+            };
+            
+            foreach ( $people as $username => $personData ) {
+                $personEvents = $this->getPersonUpcomingEvents( $personData, $personType );
+                foreach ( $personEvents as $event ) {
+                    if ( $event['date'] <= $cutoffDate ) {
+                        $eventData = [
+                            'date' => $event['date'],
+                            'type' => $event['type'],
+                            'person' => $personData['name'] ?? $username
+                        ];
+                        // Copy age/years if present
+                        if ( isset( $event['age'] ) ) {
+                            $eventData['age'] = $event['age'];
+                        }
+                        if ( isset( $event['years'] ) ) {
+                            $eventData['years'] = $event['years'];
+                        }
+                        $allEvents[] = $eventData;
+                    }
                 }
             }
         }
@@ -775,7 +806,19 @@ class PeopleFinderCLI {
             foreach ( array_slice( $allEvents, 0, 10 ) as $event ) { // Show max 10 events
                 $daysUntil = $this->getDaysUntilEvent( $event['date'] );
                 $timeUntilText = $this->getTimeUntilText( $daysUntil );
-                echo "   {$event['date']->format( 'M j' )} • {$event['person']}'s {$event['type']} {$timeUntilText}\n";
+                
+                echo "   {$event['date']->format( 'M j' )} • {$event['person']}'s {$event['type']}";
+                
+                // Add age or years information
+                if ( isset( $event['age'] ) ) {
+                    $ageText = $event['age'] === 1 ? '1 year old' : "{$event['age']} years old";
+                    echo " ({$ageText})";
+                } elseif ( isset( $event['years'] ) ) {
+                    $yearsText = $event['years'] === 1 ? '1 year' : "{$event['years']} years";
+                    echo " ({$yearsText})";
+                }
+                
+                echo " {$timeUntilText}\n";
             }
         }
     }
@@ -920,13 +963,25 @@ class PeopleFinderCLI {
         }
 
         // Upcoming events
-        $upcomingEvents = $this->getPersonUpcomingEvents( $personData );
+        $upcomingEvents = $this->getPersonUpcomingEvents( $personData, $item['type'] ?? '' );
         if ( !empty( $upcomingEvents ) ) {
             echo "\n\033[1m📅 Upcoming Events\033[0m\n";
             foreach ( $upcomingEvents as $event ) {
                 $daysUntil = $this->getDaysUntilEvent( $event['date'] );
                 $timeUntilText = $this->getTimeUntilText( $daysUntil );
-                echo "   {$event['date']->format( 'M j' )} • {$event['type']} {$timeUntilText}\n";
+                
+                echo "   {$event['date']->format( 'M j' )} • {$event['type']}";
+                
+                // Add age or years information
+                if ( isset( $event['age'] ) ) {
+                    $ageText = $event['age'] === 1 ? '1 year old' : "{$event['age']} years old";
+                    echo " ({$ageText})";
+                } elseif ( isset( $event['years'] ) ) {
+                    $yearsText = $event['years'] === 1 ? '1 year' : "{$event['years']} years";
+                    echo " ({$yearsText})";
+                }
+                
+                echo " {$timeUntilText}\n";
             }
         }
 
@@ -1221,18 +1276,288 @@ class PeopleFinderCLI {
         }
         echo "\n";
     }
+
+    /**
+     * Parse time period string into DateInterval
+     */
+    private function parseTimePeriod( string $timePeriod ): DateInterval {
+        // Default fallback
+        $defaultInterval = new DateInterval( 'P1M' ); // 1 month
+        
+        $timePeriod = strtolower( trim( $timePeriod ) );
+        
+        // Handle formats like: 3m, 2w, 7d, 1y
+        if ( preg_match( '/^(\d+)([mwdy])$/', $timePeriod, $matches ) ) {
+            $number = (int)$matches[1];
+            $unit = $matches[2];
+            
+            try {
+                switch ( $unit ) {
+                    case 'd': // days
+                        return new DateInterval( "P{$number}D" );
+                    case 'w': // weeks
+                        return new DateInterval( "P{$number}W" );
+                    case 'm': // months
+                        return new DateInterval( "P{$number}M" );
+                    case 'y': // years
+                        return new DateInterval( "P{$number}Y" );
+                }
+            } catch ( Exception $e ) {
+                // Fall back to default on invalid interval
+                return $defaultInterval;
+            }
+        }
+        
+        // Handle full words: month, months, week, weeks, day, days, year, years
+        if ( preg_match( '/^(\d+)\s*(day|days|week|weeks|month|months|year|years)$/', $timePeriod, $matches ) ) {
+            $number = (int)$matches[1];
+            $unit = $matches[2];
+            
+            try {
+                if ( in_array( $unit, ['day', 'days'] ) ) {
+                    return new DateInterval( "P{$number}D" );
+                } elseif ( in_array( $unit, ['week', 'weeks'] ) ) {
+                    return new DateInterval( "P{$number}W" );
+                } elseif ( in_array( $unit, ['month', 'months'] ) ) {
+                    return new DateInterval( "P{$number}M" );
+                } elseif ( in_array( $unit, ['year', 'years'] ) ) {
+                    return new DateInterval( "P{$number}Y" );
+                }
+            } catch ( Exception $e ) {
+                return $defaultInterval;
+            }
+        }
+        
+        return $defaultInterval;
+    }
+
+    /**
+     * Get human-readable description of time period
+     */
+    private function getTimePeriodDescription( string $timePeriod ): string {
+        $timePeriod = strtolower( trim( $timePeriod ) );
+        
+        if ( preg_match( '/^(\d+)([mwdy])$/', $timePeriod, $matches ) ) {
+            $number = (int)$matches[1];
+            $unit = $matches[2];
+            
+            $unitNames = [
+                'd' => $number === 1 ? 'day' : 'days',
+                'w' => $number === 1 ? 'week' : 'weeks', 
+                'm' => $number === 1 ? 'month' : 'months',
+                'y' => $number === 1 ? 'year' : 'years'
+            ];
+            
+            return "{$number} {$unitNames[$unit]}";
+        }
+        
+        if ( preg_match( '/^(\d+)\s*(day|days|week|weeks|month|months|year|years)$/', $timePeriod, $matches ) ) {
+            return trim( $timePeriod );
+        }
+        
+        return '1 month'; // default description
+    }
+
+    /**
+     * Show upcoming events for all teams/groups
+     */
+    public function showAllUpcomingEvents( bool $teamsOnly = false, bool $groupsOnly = false, string $timePeriod = '1m' ): void {
+        $allEvents = [];
+        $currentDate = new DateTime();
+        $cutoffDate = clone $currentDate;
+        $cutoffDate->add( $this->parseTimePeriod( $timePeriod ) );
+
+        $teamsToProcess = $this->teams;
+        
+        // Apply filtering
+        if ( $teamsOnly && $groupsOnly ) {
+            // Both flags set, show all (ignore contradiction)
+        } elseif ( $teamsOnly ) {
+            // Filter to only teams (exclude groups/projects)
+            $teamsToProcess = array_filter( $this->teams, function( $team ) {
+                // Exclude groups explicitly marked as such
+                if ( isset( $team['type'] ) && $team['type'] === 'group' ) {
+                    return false;
+                }
+                // Consider teams with default=true or traditional team structure as "teams"
+                return $team['is_default'] || 
+                       $team['team_members'] > 0 || 
+                       $team['leadership'] > 0;
+            });
+        } elseif ( $groupsOnly ) {
+            // Filter to only groups/projects (exclude main teams)
+            $teamsToProcess = array_filter( $this->teams, function( $team ) {
+                // Use type field from JSON or fallback to structure-based logic
+                if ( isset( $team['type'] ) && $team['type'] === 'group' ) {
+                    return true;
+                }
+                // Fallback: Consider non-default teams with mainly consultants as "groups"
+                return !$team['is_default'] && 
+                       $team['consultants'] > 0 && 
+                       $team['team_members'] === 0 && 
+                       $team['leadership'] === 0;
+            });
+        }
+
+        // Collect events from all teams/groups
+        foreach ( $teamsToProcess as $team ) {
+            $filePath = $team['slug'] . '.json';
+            if ( !file_exists( $filePath ) || !is_readable( $filePath ) ) {
+                continue;
+            }
+
+            $teamData = json_decode( file_get_contents( $filePath ), true );
+            if ( !$teamData ) {
+                continue;
+            }
+
+            // Collect events from all people in this team
+            $peopleByCategory = [
+                'team_members' => $teamData['team_members'] ?? [],
+                'leadership' => $teamData['leadership'] ?? [],
+                'consultants' => $teamData['consultants'] ?? [],
+                'alumni' => $teamData['alumni'] ?? []
+            ];
+            
+            foreach ( $peopleByCategory as $category => $people ) {
+                $personType = match( $category ) {
+                    'team_members' => 'Member',
+                    'leadership' => 'Leadership',
+                    'consultants' => 'Consultant',
+                    'alumni' => 'Alumni'
+                };
+                
+                foreach ( $people as $username => $personData ) {
+                    $personEvents = $this->getPersonUpcomingEvents( $personData, $personType );
+                    foreach ( $personEvents as $event ) {
+                        if ( $event['date'] <= $cutoffDate ) {
+                            $eventData = [
+                                'date' => $event['date'],
+                                'type' => $event['type'],
+                                'person' => $personData['name'] ?? $username,
+                                'team' => $team['name'],
+                                'team_slug' => $team['slug']
+                            ];
+                            // Copy age/years if present
+                            if ( isset( $event['age'] ) ) {
+                                $eventData['age'] = $event['age'];
+                            }
+                            if ( isset( $event['years'] ) ) {
+                                $eventData['years'] = $event['years'];
+                            }
+                            $allEvents[] = $eventData;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sort by date
+        usort( $allEvents, fn( $a, $b ) => $a['date'] <=> $b['date'] );
+
+        // Display results
+        $filterText = '';
+        if ( $teamsOnly && !$groupsOnly ) {
+            $filterText = ' (Teams Only)';
+        } elseif ( $groupsOnly && !$teamsOnly ) {
+            $filterText = ' (Groups Only)';
+        }
+        
+        $timePeriodDesc = $this->getTimePeriodDescription( $timePeriod );
+
+        echo "\n\033[1m📅 Upcoming Events - Next {$timePeriodDesc}{$filterText}\033[0m\n";
+        echo "\033[1m" . str_repeat( '═', 60 ) . "\033[0m\n";
+
+        if ( empty( $allEvents ) ) {
+            echo "No upcoming events found in the next {$timePeriodDesc}.\n";
+            return;
+        }
+
+        $currentMonth = '';
+        $eventCount = 0;
+        foreach ( $allEvents as $event ) {
+            $eventMonth = $event['date']->format( 'F Y' );
+            
+            // Show month header
+            if ( $eventMonth !== $currentMonth ) {
+                if ( $currentMonth !== '' ) {
+                    echo "\n"; // Add spacing between months
+                }
+                echo "\n\033[1m📅 {$eventMonth}\033[0m\n";
+                $currentMonth = $eventMonth;
+            }
+            
+            $daysUntil = $this->getDaysUntilEvent( $event['date'] );
+            $timeUntilText = $this->getTimeUntilText( $daysUntil );
+            
+            // Color coding based on how soon the event is
+            $dateColor = '';
+            if ( $daysUntil === 0 ) {
+                $dateColor = "\033[91m"; // Red for today
+            } elseif ( $daysUntil <= 7 ) {
+                $dateColor = "\033[93m"; // Yellow for this week
+            } elseif ( $daysUntil <= 30 ) {
+                $dateColor = "\033[92m"; // Green for this month
+            } else {
+                $dateColor = "\033[90m"; // Gray for later
+            }
+            
+            echo "   {$dateColor}{$event['date']->format( 'M j' )}\033[0m • ";
+            echo "\033[1m{$event['person']}\033[0m's {$event['type']}";
+            
+            // Add age or years information
+            if ( isset( $event['age'] ) ) {
+                $ageText = $event['age'] === 1 ? '1 year old' : "{$event['age']} years old";
+                echo " ({$ageText})";
+            } elseif ( isset( $event['years'] ) ) {
+                $yearsText = $event['years'] === 1 ? '1 year' : "{$event['years']} years";
+                echo " ({$yearsText})";
+            }
+            
+            echo " {$timeUntilText} ";
+            echo "• \033[36m{$event['team']}\033[0m\n";
+            
+            $eventCount++;
+        }
+
+        echo "\n\033[90mShowing {$eventCount} events over the next {$timePeriodDesc}\033[0m\n";
+        
+        // Show legend
+        echo "\n\033[90mColor coding: \033[91mToday\033[0m\033[90m • \033[93mThis week\033[0m\033[90m • \033[92mThis month\033[0m\033[90m • \033[90mLater\033[0m\n";
+    }
 }
 
 // Check command line arguments
 $showHelp = in_array( '--help', $argv ) || in_array( '-h', $argv );
 $showStats = in_array( '--stats', $argv ) || in_array( '-s', $argv );
+$filterTeams = in_array( '--teams', $argv );
+$filterGroups = in_array( '--groups', $argv );
+
+// Parse events with optional time parameter
+$showEvents = false;
+$eventsTimePeriod = '1m'; // Default to 1 month
+foreach ( $argv as $index => $arg ) {
+    if ( $arg === '--events' || $arg === '-e' ) {
+        $showEvents = true;
+        // Check if next argument is a time period (not a flag)
+        if ( isset( $argv[$index + 1] ) && !str_starts_with( $argv[$index + 1], '-' ) ) {
+            $eventsTimePeriod = $argv[$index + 1];
+        }
+        break;
+    }
+}
 
 if ( $showHelp ) {
     echo "People Finder CLI - Search for teams and people\n\n";
     echo "Usage: php people-finder.php [OPTIONS] [SEARCH_TERM]\n\n";
     echo "Options:\n";
     echo "  -h, --help       Show this help message\n";
-    echo "  -s, --stats      Show overall statistics\n\n";
+    echo "  -s, --stats      Show overall statistics\n";
+    echo "  -e, --events [TIME]  Show upcoming events (default: 1m)\n";
+    echo "                   TIME format: 3d, 2w, 1m, 6m, 1y\n";
+    echo "                   Or: 7 days, 2 weeks, 3 months, 1 year\n";
+    echo "      --teams      Filter events to teams only (use with --events)\n";
+    echo "      --groups     Filter events to groups only (use with --events)\n\n";
     echo "Environment Variables:\n";
     echo "  PEOPLE_FINDER_BASE_URL   Base URL for web links (optional)\n";
     echo "                           Example: http://localhost/wp/a8c\n\n";
@@ -1246,7 +1571,11 @@ if ( $showHelp ) {
     echo "  php people-finder.php paolo        # Search for 'paolo'\n";
     echo "  php people-finder.php jetpack      # Search for 'jetpack'\n";
     echo "  php people-finder.php leadership   # Search for 'leadership'\n";
-    echo "  php people-finder.php --stats      # Show statistics\n\n";
+    echo "  php people-finder.php --stats      # Show statistics\n";
+    echo "  php people-finder.php --events     # Show events for next month\n";
+    echo "  php people-finder.php --events 2w  # Show events for next 2 weeks\n";
+    echo "  php people-finder.php --events 3m --teams    # Show team events for 3 months\n";
+    echo "  php people-finder.php --events 7d --groups   # Show group events for 7 days\n\n";
     echo "  # With web links and interactivity:\n";
     echo "  export PEOPLE_FINDER_BASE_URL=http://localhost/wp/a8c\n";
     echo "  php people-finder.php paolo        # Shows web link + interactive options\n\n";
@@ -1261,12 +1590,23 @@ if ( $showStats ) {
     exit( 0 );
 }
 
+if ( $showEvents ) {
+    $cli->showAllUpcomingEvents( $filterTeams, $filterGroups, $eventsTimePeriod );
+    exit( 0 );
+}
+
 // Get search term from command line
 $searchTerm = '';
 foreach ( $argv as $index => $arg ) {
     if ( $index === 0 || str_starts_with( $arg, '-' ) ) {
         continue; // Skip script name and options
     }
+    
+    // Skip time parameter that follows --events
+    if ( $index > 0 && ( $argv[$index - 1] === '--events' || $argv[$index - 1] === '-e' ) ) {
+        continue; // Skip time parameter
+    }
+    
     $searchTerm .= ( $searchTerm ? ' ' : '' ) . $arg;
 }
 
