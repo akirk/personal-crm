@@ -222,13 +222,15 @@ function get_hr_feedback_month() {
 }
 
 /**
- * Build URL with team parameter
+ * Build URL with team parameter (uses 'group' parameter for group-type teams)
  */
 function build_team_url( $base_url, $additional_params = array() ) {
 	global $current_team;
 	$params = array();
 	if ( $current_team !== 'team' ) {
-		$params['team'] = $current_team;
+		$team_type = get_team_type_from_file( $current_team );
+		$param_name = ( $team_type === 'group' ) ? 'group' : 'team';
+		$params[ $param_name ] = $current_team;
 	}
 	$params = array_merge( $params, $additional_params );
 	
@@ -269,6 +271,55 @@ function get_team_name_from_file( $team_slug ) {
 		}
 	}
 	return ucfirst( str_replace( '_', ' ', $team_slug ) );
+}
+
+/**
+ * Get team type from config file (defaults to 'team')
+ */
+function get_team_type_from_file( $team_slug ) {
+	$file_path = __DIR__ . '/../' . $team_slug . '.json';
+	if ( file_exists( $file_path ) ) {
+		$config = json_decode( file_get_contents( $file_path ), true );
+		if ( json_last_error() === JSON_ERROR_NONE && isset( $config['type'] ) ) {
+			return $config['type'];
+		}
+	}
+	return 'team'; // Default to 'team' if not specified
+}
+
+/**
+ * Get display word for team type ('team' -> 'Team', 'group' -> 'Group')
+ */
+function get_type_display_word( $team_slug, $capitalize = true ) {
+	$type = get_team_type_from_file( $team_slug );
+	$word = ( $type === 'group' ) ? 'group' : 'team';
+	return $capitalize ? ucfirst( $word ) : $word;
+}
+
+/**
+ * Get display title with appropriate type word
+ */
+function get_team_display_title( $team_slug, $suffix = '' ) {
+	$team_name = get_team_name_from_file( $team_slug );
+	$type_word = get_type_display_word( $team_slug );
+	
+	if ( empty( $suffix ) ) {
+		return $team_name . ' ' . $type_word;
+	}
+	
+	return $team_name . ' ' . $type_word . ' ' . $suffix;
+}
+
+/**
+ * Get current team slug from URL parameters, treating 'group' as synonym for 'team'
+ */
+function get_current_team_from_params() {
+	// Check both 'team' and 'group' parameters as synonyms
+	$team_param = $_POST['team'] ?? $_GET['team'] ?? null;
+	$group_param = $_POST['group'] ?? $_GET['group'] ?? null;
+	
+	// Return whichever is set (group takes precedence if both are set)
+	return $group_param ?? $team_param ?? null;
 }
 
 /**
@@ -515,7 +566,9 @@ function build_team_url_extended( $base_url, $additional_params = array(), $team
 	
 	$params = array();
 	if ( $target_team && $target_team !== 'team' ) {
-		$params['team'] = $target_team;
+		$team_type = get_team_type_from_file( $target_team );
+		$param_name = ( $team_type === 'group' ) ? 'group' : 'team';
+		$params[ $param_name ] = $target_team;
 	}
 	$params = array_merge( $params, $additional_params );
 	
@@ -629,7 +682,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 
 	if ( ! file_exists( $config_file ) ) {
 		// Redirect to team creation page
-		$create_team_url = 'admin.php?create_team=new' . ( $team_slug !== 'team' ? '&team=' . urlencode( $team_slug ) : '' );
+		$create_team_url = 'admin.php?create_team=new';
 		header( 'Location: ' . $create_team_url );
 		exit;
 	}

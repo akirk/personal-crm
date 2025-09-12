@@ -42,8 +42,12 @@ if ( empty( $available_teams ) ) {
 
         <div class="team-grid">
             <?php foreach ( $available_teams as $team_slug ) : ?>
-                <?php $team_name = get_team_name_from_file( $team_slug ); ?>
-                <a href="index.php<?php if ( get_default_team() !== $team_slug ) echo '?team=' . urlencode( $team_slug ); ?>" class="team-card">
+                <?php 
+                $team_name = get_team_name_from_file( $team_slug ); 
+                $team_type = get_team_type_from_file( $team_slug );
+                $param_name = ( $team_type === 'group' ) ? 'group' : 'team';
+                ?>
+                <a href="index.php<?php if ( get_default_team() !== $team_slug ) echo '?' . $param_name . '=' . urlencode( $team_slug ); ?>" class="team-card">
                     <h3><?php echo htmlspecialchars( $team_name ); ?></h3>
                     <p><?php echo htmlspecialchars( $team_slug ); ?>.json</p>
                 </a>

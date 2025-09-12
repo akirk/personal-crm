@@ -29,8 +29,7 @@ $is_creating_team = isset( $_GET['create_team'] ) && $_GET['create_team'] === 'n
 
 // Check if JSON file exists and redirect to team creation if not (unless already creating a team)
 if ( $config_file && ! file_exists( $config_file ) && ! $is_creating_team ) {
-	$create_team_url = build_team_url( 'admin.php', array( 'create_team' => 'new' ) );
-	header( 'Location: ' . $create_team_url );
+	header( 'Location: admin.php?create_team=new' );
 	exit;
 }
 $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
@@ -136,6 +135,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 		case 'save_general':
 			$config['team_name'] = sanitize_text_field( $_POST['team_name'] ?? '' );
 			$config['activity_url_prefix'] = sanitize_url( $_POST['activity_url_prefix'] ?? '' );
+			$config['type'] = sanitize_text_field( $_POST['team_type'] ?? 'team' );
 			
 			// Handle default team setting
 			$is_default = isset( $_POST['is_default'] ) && $_POST['is_default'] === '1';
@@ -491,6 +491,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 		case 'create_team':
 			$new_team_slug = sanitize_text_field( $_POST['new_team_slug'] ?? '' );
 			$new_team_name = sanitize_text_field( $_POST['new_team_name'] ?? '' );
+			$new_team_type = sanitize_text_field( $_POST['new_team_type'] ?? 'team' );
 			
 			if ( empty( $new_team_slug ) || empty( $new_team_name ) ) {
 				$error = 'Team slug and name are required.';
@@ -513,6 +514,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			$new_config = array(
 				'activity_url_prefix' => '',
 				'team_name' => $new_team_name,
+				'type' => $new_team_type,
 				'team_members' => array(),
 				'leadership' => array(),
 				'alumni' => array(),
@@ -1698,7 +1700,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                         ?>
                     </select>
                 <?php endif; ?>
-                    <a href="<?php echo build_team_url( 'admin.php', array( 'create_team' => 'new' ) ); ?>" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Team</a>
+                    <a href="admin.php?create_team=new" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Team</a>
                 </div>
                 
             </div>
@@ -1732,6 +1734,14 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     <label for="new_team_slug">Team Slug *</label>
                     <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing-team" pattern="[a-z0-9_-]+" value="<?php echo ( $current_team && $current_team !== 'team' ) ? htmlspecialchars( $current_team ) : ''; ?>">
                     <small class="text-small-muted">Only lowercase letters, numbers, hyphens, and underscores allowed. This will be used as the filename.</small>
+                </div>
+                <div class="form-group">
+                    <label for="new_team_type">Type</label>
+                    <select id="new_team_type" name="new_team_type">
+                        <option value="team">Team (work/business context)</option>
+                        <option value="group">Group (personal/social context)</option>
+                    </select>
+                    <small class="text-small-muted">Choose "Group" for personal friends/acquaintances, or "Team" for work/business contexts.</small>
                 </div>
                 <div style="margin-top: 20px;">
                     <button type="submit" class="btn">Create Team</button>
@@ -1846,6 +1856,15 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <div class="form-group">
                     <label for="activity_url_prefix">Activity URL Prefix</label>
                     <input type="url" id="activity_url_prefix" name="activity_url_prefix" value="<?php echo htmlspecialchars( $config['activity_url_prefix'] ); ?>">
+                </div>
+                
+                <div class="form-group">
+                    <label for="team_type">Type</label>
+                    <select id="team_type" name="team_type">
+                        <option value="team" <?php echo ( ! isset( $config['type'] ) || $config['type'] === 'team' ) ? 'selected' : ''; ?>>Team (work/business context)</option>
+                        <option value="group" <?php echo ( isset( $config['type'] ) && $config['type'] === 'group' ) ? 'selected' : ''; ?>>Group (personal/social context)</option>
+                    </select>
+                    <small class="text-small-muted">Choose "Group" for personal friends/acquaintances, or "Team" for work/business contexts.</small>
                 </div>
                 
                 <div class="form-group" style="margin-bottom: 15px;">

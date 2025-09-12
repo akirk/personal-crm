@@ -7,8 +7,8 @@
 
 require_once __DIR__ . '/includes/common.php';
 require_once __DIR__ . '/includes/person.php';
-if ( isset( $_GET['team'] ) ) {
-	$current_team = $_GET['team'];
+$current_team = get_current_team_from_params();
+if ( $current_team ) {
 	if ( $current_team === get_default_team() && ! isset( $_GET['person'] ) ) {
 		// Redirect to root if default team is selected
 		header( 'Location: ./' );
@@ -65,7 +65,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="color-scheme" content="light dark">
-	<title><?php echo htmlspecialchars( $person_data->get_display_name_with_nickname() ) . ' - ' . htmlspecialchars( $team_data['team_name'] ) . ' Team'; ?></title>
+	<title><?php echo htmlspecialchars( $person_data->get_display_name_with_nickname() ) . ' - ' . htmlspecialchars( get_team_display_title( $current_team ) ); ?></title>
 	<link rel="stylesheet" href="assets/style.css">
 	<link rel="stylesheet" href="assets/cmd-k.css">
 </head>

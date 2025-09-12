@@ -185,6 +185,129 @@ class PeopleFinderCLI {
     }
 
     /**
+     * Get upcoming events for a person (birthday, company anniversary, personal events)
+     */
+    private function getPersonUpcomingEvents( array $personData ): array {
+        $events = [];
+        $currentDate = new DateTime();
+        $cutoffDate = clone $currentDate;
+        $cutoffDate->add( new DateInterval( 'P1Y' ) ); // 1 year from now
+        
+        // Debug
+        // error_log("Current: " . $currentDate->format('Y-m-d') . ", Cutoff: " . $cutoffDate->format('Y-m-d'));
+
+        // Birthday
+        if ( !empty( $personData['birthday'] ) ) {
+            if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $personData['birthday'] ) ) {
+                // Full date - use this year and next year
+                $birthDate = new DateTime( $personData['birthday'] );
+                $thisYearBirthday = new DateTime( $currentDate->format( 'Y' ) . '-' . $birthDate->format( 'm-d' ) );
+                $nextYearBirthday = new DateTime( ( $currentDate->format( 'Y' ) + 1 ) . '-' . $birthDate->format( 'm-d' ) );
+                
+                // Check if this year's birthday hasn't passed yet
+                if ( $thisYearBirthday >= $currentDate && $thisYearBirthday <= $cutoffDate ) {
+                    $events[] = ['date' => $thisYearBirthday, 'type' => 'birthday'];
+                }
+                // Always check next year's birthday if it's within our window
+                if ( $nextYearBirthday <= $cutoffDate ) {
+                    $events[] = ['date' => $nextYearBirthday, 'type' => 'birthday'];
+                }
+            } elseif ( preg_match( '/^\d{2}-\d{2}$/', $personData['birthday'] ) ) {
+                // Month-day only
+                $thisYear = $currentDate->format( 'Y' );
+                $nextYear = $thisYear + 1;
+                
+                try {
+                    $thisYearBirthday = new DateTime( $thisYear . '-' . $personData['birthday'] );
+                    $nextYearBirthday = new DateTime( $nextYear . '-' . $personData['birthday'] );
+                    
+                    // Check if this year's birthday hasn't passed yet
+                    if ( $thisYearBirthday >= $currentDate && $thisYearBirthday <= $cutoffDate ) {
+                        $events[] = ['date' => $thisYearBirthday, 'type' => 'birthday'];
+                    }
+                    // Always check next year's birthday if it's within our window
+                    if ( $nextYearBirthday <= $cutoffDate ) {
+                        $events[] = ['date' => $nextYearBirthday, 'type' => 'birthday'];
+                    }
+                } catch ( Exception $e ) {
+                    // Skip invalid dates
+                }
+            }
+        }
+
+        // Company anniversary
+        if ( !empty( $personData['company_anniversary'] ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $personData['company_anniversary'] ) ) {
+            $anniversaryDate = new DateTime( $personData['company_anniversary'] );
+            $thisYearAnniversary = new DateTime( $currentDate->format( 'Y' ) . '-' . $anniversaryDate->format( 'm-d' ) );
+            $nextYearAnniversary = new DateTime( ( $currentDate->format( 'Y' ) + 1 ) . '-' . $anniversaryDate->format( 'm-d' ) );
+            
+            // Check if this year's anniversary hasn't passed yet
+            if ( $thisYearAnniversary >= $currentDate && $thisYearAnniversary <= $cutoffDate ) {
+                $events[] = ['date' => $thisYearAnniversary, 'type' => 'work anniversary'];
+            } 
+            // Always check next year's anniversary if it's within our window
+            if ( $nextYearAnniversary <= $cutoffDate ) {
+                $events[] = ['date' => $nextYearAnniversary, 'type' => 'work anniversary'];
+            }
+        }
+
+        // Personal events
+        if ( !empty( $personData['personal_events'] ) ) {
+            foreach ( $personData['personal_events'] as $event ) {
+                if ( !empty( $event['date'] ) ) {
+                    try {
+                        $eventDate = new DateTime( $event['date'] );
+                        if ( $eventDate >= $currentDate && $eventDate <= $cutoffDate ) {
+                            $events[] = [
+                                'date' => $eventDate,
+                                'type' => $event['type'] ?? 'event'
+                            ];
+                        }
+                    } catch ( Exception $e ) {
+                        // Skip invalid dates
+                    }
+                }
+            }
+        }
+
+        // Sort by date
+        usort( $events, fn( $a, $b ) => $a['date'] <=> $b['date'] );
+
+        return $events;
+    }
+
+    /**
+     * Get days until an event
+     */
+    private function getDaysUntilEvent( DateTime $eventDate ): int {
+        $today = new DateTime();
+        $today->setTime( 0, 0, 0 );
+        $event = clone $eventDate;
+        $event->setTime( 0, 0, 0 );
+        
+        return $today->diff( $event )->days;
+    }
+
+    /**
+     * Get human-readable time until text
+     */
+    private function getTimeUntilText( int $daysUntil ): string {
+        if ( $daysUntil === 0 ) {
+            return '(today)';
+        } elseif ( $daysUntil === 1 ) {
+            return '(tomorrow)';
+        } elseif ( $daysUntil <= 7 ) {
+            return "(in {$daysUntil} days)";
+        } elseif ( $daysUntil <= 30 ) {
+            $weeks = round( $daysUntil / 7 );
+            return "(in {$weeks} weeks)";
+        } else {
+            $months = round( $daysUntil / 30 );
+            return "(in {$months} months)";
+        }
+    }
+
+    /**
      * Search through all items
      */
     public function search( string $query ): array {
@@ -469,6 +592,17 @@ class PeopleFinderCLI {
                     }
                     echo "     • {$kid['name']}{$kidAge}\n";
                 }
+            }
+        }
+
+        // Upcoming events
+        $upcomingEvents = $this->getPersonUpcomingEvents( $personData );
+        if ( !empty( $upcomingEvents ) ) {
+            echo "\n\033[1m📅 Upcoming Events\033[0m\n";
+            foreach ( $upcomingEvents as $event ) {
+                $daysUntil = $this->getDaysUntilEvent( $event['date'] );
+                $timeUntilText = $this->getTimeUntilText( $daysUntil );
+                echo "   {$event['date']->format( 'M j' )} • {$event['type']} {$timeUntilText}\n";
             }
         }
 

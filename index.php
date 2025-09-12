@@ -8,8 +8,8 @@
 
 require_once __DIR__ . '/includes/common.php';
 require_once __DIR__ . '/includes/person.php';
-if ( isset( $_GET['team'] ) ) {
-	$current_team = $_GET['team'];
+$current_team = get_current_team_from_params();
+if ( $current_team ) {
 	if ( $current_team === get_default_team() && ! isset( $_GET['person'] ) ) {
 		// Redirect to root if default team is selected, preserve privacy parameter
 		$redirect_params = array();
@@ -123,7 +123,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="color-scheme" content="light dark">
-	<title><?php echo htmlspecialchars( $team_data['team_name'] ) . ' Team Management'; ?></title>
+	<title><?php echo htmlspecialchars( get_team_display_title( $current_team, 'Management' ) ); ?></title>
 	<link rel="stylesheet" href="assets/style.css">
 	<link rel="stylesheet" href="assets/cmd-k.css">
 </head>
@@ -136,7 +136,7 @@ if ( ! empty( $team_members_needing_hr ) ) {
 		<?php if ( $action === 'overview' ) : ?>
 			<div class="header">
 				<div>
-					<h1><a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Overview</a></h1>
+					<h1><a href="<?php echo build_team_url( 'index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( get_team_display_title( $current_team, 'Overview' ) ); ?></a></h1>
 				</div>
 				<?php if ( ! empty( $team_data['team_links'] ) ) : ?>
 					<div class="person-links" style="flex-grow: 1;">
