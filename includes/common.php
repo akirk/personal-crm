@@ -299,6 +299,92 @@ function get_team_type_from_file( $team_slug ) {
 }
 
 /**
+ * Get people count from team config file
+ */
+function get_team_people_count( $team_slug ) {
+	$file_path = __DIR__ . '/../' . $team_slug . '.json';
+	if ( ! file_exists( $file_path ) ) {
+		return 0;
+	}
+	
+	$config = json_decode( file_get_contents( $file_path ), true );
+	if ( json_last_error() !== JSON_ERROR_NONE ) {
+		return 0;
+	}
+	
+	$count = 0;
+	
+	// Count team members
+	if ( isset( $config['team_members'] ) && is_array( $config['team_members'] ) ) {
+		$count += count( $config['team_members'] );
+	}
+	
+	// Count leadership
+	if ( isset( $config['leadership'] ) && is_array( $config['leadership'] ) ) {
+		$count += count( $config['leadership'] );
+	}
+	
+	// Count consultants
+	if ( isset( $config['consultants'] ) && is_array( $config['consultants'] ) ) {
+		$count += count( $config['consultants'] );
+	}
+	
+	// Count alumni (but don't include in main count for most teams)
+	// You can uncomment this if you want to include alumni in the count
+	// if ( isset( $config['alumni'] ) && is_array( $config['alumni'] ) ) {
+	//     $count += count( $config['alumni'] );
+	// }
+	
+	return $count;
+}
+
+/**
+ * Get all people names from team config file for search purposes
+ */
+function get_team_people_names( $team_slug ) {
+	$file_path = __DIR__ . '/../' . $team_slug . '.json';
+	if ( ! file_exists( $file_path ) ) {
+		return array();
+	}
+	
+	$config = json_decode( file_get_contents( $file_path ), true );
+	if ( json_last_error() !== JSON_ERROR_NONE ) {
+		return array();
+	}
+	
+	$names = array();
+	
+	// Get names from team members
+	if ( isset( $config['team_members'] ) && is_array( $config['team_members'] ) ) {
+		foreach ( $config['team_members'] as $person ) {
+			if ( isset( $person['name'] ) ) {
+				$names[] = $person['name'];
+			}
+		}
+	}
+	
+	// Get names from leadership
+	if ( isset( $config['leadership'] ) && is_array( $config['leadership'] ) ) {
+		foreach ( $config['leadership'] as $person ) {
+			if ( isset( $person['name'] ) ) {
+				$names[] = $person['name'];
+			}
+		}
+	}
+	
+	// Get names from consultants
+	if ( isset( $config['consultants'] ) && is_array( $config['consultants'] ) ) {
+		foreach ( $config['consultants'] as $person ) {
+			if ( isset( $person['name'] ) ) {
+				$names[] = $person['name'];
+			}
+		}
+	}
+	
+	return $names;
+}
+
+/**
  * Get display word for team type ('team' -> 'team', 'group' -> 'group')
  */
 function get_type_display_word( $team_slug ) {
