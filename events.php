@@ -18,7 +18,7 @@ if ( $current_team ) {
 	$current_team = get_default_team();
 	$available_teams = get_available_teams();
 	if ( count( $available_teams ) > 1 && ! $current_team ) {
-		header( 'Location: team-selection.php' );
+		header( 'Location: select.php' );
 		exit;
 	}
 }
@@ -222,14 +222,14 @@ $available_teams = get_available_teams();
             <div class="header-container">
                 <h1>
                     <?php if ( $all_teams_mode ) : ?>
-                        <a href="team-selection.php" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
+                        <a href="select.php" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
                     <?php else : ?>
                         <a href="<?php echo build_team_url( 'index.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
                     <?php endif; ?>
                 </h1>
                 <div class="back-nav">
                     <?php if ( $all_teams_mode ) : ?>
-                        <a href="team-selection.php">← Back to Team Selection</a>
+                        <a href="select.php">← Back to Team Selection</a>
                     <?php else : ?>
                     <a href="<?php echo build_team_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">← Back to <?php echo $team_data['team_name'], ' ', ucfirst( $group ); ?> Overview</a>
                     <?php endif; ?>

@@ -24,7 +24,7 @@ if ( $current_team ) {
 	$current_team = get_default_team();
 	$available_teams = get_available_teams();
 	if ( count( $available_teams ) > 1 && ! $current_team ) {
-		header( 'Location: team-selection.php' );
+		header( 'Location: select.php' );
 		exit;
 	}
 }
