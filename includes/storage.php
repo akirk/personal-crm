@@ -31,7 +31,10 @@ class Storage implements StorageInterface {
         
         $this->db = new SQLite3( $this->db_file );
         $this->db->enableExceptions( true );
-        
+
+        // Run schema migrations
+        $this->run_migrations();
+
         // Create teams table
         $this->db->exec( "
             CREATE TABLE IF NOT EXISTS teams (
@@ -39,7 +42,6 @@ class Storage implements StorageInterface {
                 team_name TEXT NOT NULL,
                 activity_url_prefix TEXT DEFAULT '',
                 not_managing_team INTEGER DEFAULT 1,
-                team_links TEXT DEFAULT '{}',
                 type TEXT DEFAULT 'team',
                 is_default INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -65,6 +67,7 @@ class Storage implements StorageInterface {
                 location TEXT DEFAULT '',
                 timezone TEXT DEFAULT '',
                 github TEXT DEFAULT '',
+                linear TEXT DEFAULT '',
                 wordpress TEXT DEFAULT '',
                 linkedin TEXT DEFAULT '',
                 website TEXT DEFAULT '',
@@ -73,7 +76,6 @@ class Storage implements StorageInterface {
                 deceased_date TEXT DEFAULT '',
                 left_company INTEGER DEFAULT 0,
                 deceased INTEGER DEFAULT 0,
-                links TEXT DEFAULT '{}',
                 kids TEXT DEFAULT '[]',
                 github_repos TEXT DEFAULT '[]',
                 personal_events TEXT DEFAULT '[]',
@@ -96,7 +98,6 @@ class Storage implements StorageInterface {
                 start_date TEXT NOT NULL,
                 end_date TEXT DEFAULT '',
                 location TEXT DEFAULT '',
-                links TEXT DEFAULT '{}',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (team_slug) REFERENCES teams(slug) ON DELETE CASCADE
@@ -121,12 +122,100 @@ class Storage implements StorageInterface {
             )
         " );
         
+        // Create team_links table for normalized link storage
+        $this->db->exec( "
+            CREATE TABLE IF NOT EXISTS team_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_slug TEXT NOT NULL,
+                link_name TEXT NOT NULL,
+                link_url TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (team_slug) REFERENCES teams(slug) ON DELETE CASCADE,
+                UNIQUE(team_slug, link_name)
+            )
+        " );
+        
+        // Create people_links table for normalized link storage
+        $this->db->exec( "
+            CREATE TABLE IF NOT EXISTS people_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                person_id INTEGER NOT NULL,
+                link_name TEXT NOT NULL,
+                link_url TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE,
+                UNIQUE(person_id, link_name)
+            )
+        " );
+        
+        // Create event_links table for normalized link storage
+        $this->db->exec( "
+            CREATE TABLE IF NOT EXISTS event_links (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id INTEGER NOT NULL,
+                link_name TEXT NOT NULL,
+                link_url TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+                UNIQUE(event_id, link_name)
+            )
+        " );
+        
         // Create indexes for better performance
         $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_people_team_slug ON people(team_slug)" );
         $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_people_username ON people(username)" );
         $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_events_team_slug ON events(team_slug)" );
+        $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_team_links_team_slug ON team_links(team_slug)" );
+        $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_people_links_person_id ON people_links(person_id)" );
+        $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_event_links_event_id ON event_links(event_id)" );
         $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_hr_feedback_username ON hr_feedback(username)" );
         $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_hr_feedback_month ON hr_feedback(month)" );
+    }
+
+    /**
+     * Run database schema migrations
+     */
+    private function run_migrations() {
+        // Check if migrations table exists, create if not
+        $this->db->exec( "
+            CREATE TABLE IF NOT EXISTS migrations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                migration_name TEXT UNIQUE NOT NULL,
+                applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        " );
+
+        // Migration to add linear column to people table
+        $migration_name = 'add_linear_column_to_people';
+        $stmt = $this->db->prepare( "SELECT COUNT(*) as count FROM migrations WHERE migration_name = ?" );
+        $stmt->bindValue( 1, $migration_name, SQLITE3_TEXT );
+        $result = $stmt->execute();
+        $row = $result->fetchArray( SQLITE3_ASSOC );
+
+        if ( $row['count'] == 0 ) {
+            // Check if linear column already exists
+            $pragma_result = $this->db->query( "PRAGMA table_info(people)" );
+            $has_linear_column = false;
+
+            if ( $pragma_result ) {
+                while ( $column_info = $pragma_result->fetchArray( SQLITE3_ASSOC ) ) {
+                    if ( $column_info['name'] === 'linear' ) {
+                        $has_linear_column = true;
+                        break;
+                    }
+                }
+            }
+
+            if ( ! $has_linear_column ) {
+                // Add linear column to existing people table
+                $this->db->exec( "ALTER TABLE people ADD COLUMN linear TEXT DEFAULT ''" );
+            }
+
+            // Record that migration has been applied
+            $stmt = $this->db->prepare( "INSERT INTO migrations (migration_name) VALUES (?)" );
+            $stmt->bindValue( 1, $migration_name, SQLITE3_TEXT );
+            $stmt->execute();
+        }
     }
     
     /**
@@ -155,7 +244,7 @@ class Storage implements StorageInterface {
             'activity_url_prefix' => $team['activity_url_prefix'],
             'team_name' => $team['team_name'],
             'not_managing_team' => $team['not_managing_team'],
-            'team_links' => json_decode( $team['team_links'], true ) ?: array(),
+            'team_links' => $this->get_team_links( $team_slug ),
             'type' => $team['type'],
             'default' => $team['is_default'],
             'team_members' => $team_members,
@@ -178,10 +267,13 @@ class Storage implements StorageInterface {
         $people = array();
         while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
             $username = $row['username'];
+            $person_id = $row['id'];
             unset( $row['id'], $row['username'], $row['team_slug'], $row['category'], $row['created_at'], $row['updated_at'] );
             
+            // Get normalized links from people_links table
+            $row['links'] = $this->get_person_links( $person_id );
+            
             // Convert JSON fields back to arrays
-            $row['links'] = json_decode( $row['links'], true ) ?: array();
             $row['kids'] = json_decode( $row['kids'], true ) ?: array();
             $row['github_repos'] = json_decode( $row['github_repos'], true ) ?: array();
             $row['personal_events'] = json_decode( $row['personal_events'], true ) ?: array();
@@ -203,8 +295,9 @@ class Storage implements StorageInterface {
         
         $events = array();
         while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
+            $event_id = $row['id'];
             unset( $row['id'], $row['team_slug'], $row['created_at'], $row['updated_at'] );
-            $row['links'] = json_decode( $row['links'], true ) ?: array();
+            $row['links'] = $this->get_event_links( $event_id );
             $events[] = $row;
         }
         
@@ -221,17 +314,19 @@ class Storage implements StorageInterface {
             // Save/update team info
             $stmt = $this->db->prepare( "
                 INSERT OR REPLACE INTO teams 
-                (slug, team_name, activity_url_prefix, not_managing_team, team_links, type, is_default, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                (slug, team_name, activity_url_prefix, not_managing_team, type, is_default, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             " );
             $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
             $stmt->bindValue( 2, $config['team_name'] ?? '', SQLITE3_TEXT );
             $stmt->bindValue( 3, $config['activity_url_prefix'] ?? '', SQLITE3_TEXT );
             $stmt->bindValue( 4, $config['not_managing_team'] ?? 1, SQLITE3_INTEGER );
-            $stmt->bindValue( 5, json_encode( $config['team_links'] ?? array() ), SQLITE3_TEXT );
-            $stmt->bindValue( 6, $config['type'] ?? 'team', SQLITE3_TEXT );
-            $stmt->bindValue( 7, $config['default'] ?? 0, SQLITE3_INTEGER );
+            $stmt->bindValue( 5, $config['type'] ?? 'team', SQLITE3_TEXT );
+            $stmt->bindValue( 6, $config['default'] ?? 0, SQLITE3_INTEGER );
             $stmt->execute();
+            
+            // Save team links using normalized table
+            $this->save_team_links( $team_slug, $config['team_links'] ?? array() );
             
             // Clear existing people for this team
             $stmt = $this->db->prepare( "DELETE FROM people WHERE team_slug = ?" );
@@ -270,11 +365,11 @@ class Storage implements StorageInterface {
      */
     private function save_people( $team_slug, $category, $people ) {
         $stmt = $this->db->prepare( "
-            INSERT INTO people 
-            (username, team_slug, category, name, nickname, role, email, birthday, company_anniversary, 
-             partner, partner_birthday, location, timezone, github, wordpress, linkedin, website, 
-             new_company, new_company_website, deceased_date, left_company, deceased, 
-             links, kids, github_repos, personal_events, notes)
+            INSERT INTO people
+            (username, team_slug, category, name, nickname, role, email, birthday, company_anniversary,
+             partner, partner_birthday, location, timezone, github, linear, wordpress, linkedin, website,
+             new_company, new_company_website, deceased_date, left_company, deceased,
+             kids, github_repos, personal_events, notes)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         " );
         
@@ -293,20 +388,26 @@ class Storage implements StorageInterface {
             $stmt->bindValue( 12, $person['location'] ?? '', SQLITE3_TEXT );
             $stmt->bindValue( 13, $person['timezone'] ?? '', SQLITE3_TEXT );
             $stmt->bindValue( 14, $person['github'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 15, $person['wordpress'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 16, $person['linkedin'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 17, $person['website'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 18, $person['new_company'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 19, $person['new_company_website'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 20, $person['deceased_date'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 21, $person['left_company'] ?? 0, SQLITE3_INTEGER );
-            $stmt->bindValue( 22, $person['deceased'] ?? 0, SQLITE3_INTEGER );
-            $stmt->bindValue( 23, json_encode( $person['links'] ?? array() ), SQLITE3_TEXT );
+            $stmt->bindValue( 15, $person['linear'] ?? '', SQLITE3_TEXT );
+            $stmt->bindValue( 16, $person['wordpress'] ?? '', SQLITE3_TEXT );
+            $stmt->bindValue( 17, $person['linkedin'] ?? '', SQLITE3_TEXT );
+            $stmt->bindValue( 18, $person['website'] ?? '', SQLITE3_TEXT );
+            $stmt->bindValue( 19, $person['new_company'] ?? '', SQLITE3_TEXT );
+            $stmt->bindValue( 20, $person['new_company_website'] ?? '', SQLITE3_TEXT );
+            $stmt->bindValue( 21, $person['deceased_date'] ?? '', SQLITE3_TEXT );
+            $stmt->bindValue( 22, $person['left_company'] ?? 0, SQLITE3_INTEGER );
+            $stmt->bindValue( 23, $person['deceased'] ?? 0, SQLITE3_INTEGER );
             $stmt->bindValue( 24, json_encode( $person['kids'] ?? array() ), SQLITE3_TEXT );
             $stmt->bindValue( 25, json_encode( $person['github_repos'] ?? array() ), SQLITE3_TEXT );
             $stmt->bindValue( 26, json_encode( $person['personal_events'] ?? array() ), SQLITE3_TEXT );
             $stmt->bindValue( 27, json_encode( $person['notes'] ?? array() ), SQLITE3_TEXT );
             $stmt->execute();
+            
+            // Get the person ID and save their links separately
+            $person_id = $this->db->lastInsertRowID();
+            $this->save_person_links( $person_id, $person['links'] ?? array() );
+            
+            $stmt->reset();
         }
     }
     
@@ -316,8 +417,8 @@ class Storage implements StorageInterface {
     private function save_events( $team_slug, $events ) {
         $stmt = $this->db->prepare( "
             INSERT INTO events 
-            (team_slug, type, name, description, start_date, end_date, location, links)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (team_slug, type, name, description, start_date, end_date, location)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         " );
         
         foreach ( $events as $event ) {
@@ -328,8 +429,13 @@ class Storage implements StorageInterface {
             $stmt->bindValue( 5, $event['start_date'] ?? '', SQLITE3_TEXT );
             $stmt->bindValue( 6, $event['end_date'] ?? '', SQLITE3_TEXT );
             $stmt->bindValue( 7, $event['location'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 8, json_encode( $event['links'] ?? array() ), SQLITE3_TEXT );
             $stmt->execute();
+            
+            // Get the event ID and save links separately
+            $event_id = $this->db->lastInsertRowID();
+            $this->save_event_links( $event_id, $event['links'] ?? array() );
+            
+            $stmt->reset();
         }
     }
     
@@ -549,10 +655,11 @@ class Storage implements StorageInterface {
         $people_data = array();
         while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
             $username = $row['username'];
+            $person_id = $row['id'];
             unset( $row['id'], $row['username'], $row['team_slug'], $row['category'], $row['created_at'], $row['updated_at'] );
             
-            // Convert JSON fields back to arrays
-            $row['links'] = json_decode( $row['links'], true ) ?: array();
+            // Convert JSON fields back to arrays and get normalized links
+            $row['links'] = $this->get_person_links( $person_id );
             $row['kids'] = json_decode( $row['kids'], true ) ?: array();
             $row['github_repos'] = json_decode( $row['github_repos'], true ) ?: array();
             $row['personal_events'] = json_decode( $row['personal_events'], true ) ?: array();
@@ -562,6 +669,121 @@ class Storage implements StorageInterface {
         }
         
         return $people_data;
+    }
+
+    
+    /**
+     * Get team links
+     */
+    private function get_team_links( $team_slug ) {
+        $stmt = $this->db->prepare( "SELECT link_name, link_url FROM team_links WHERE team_slug = ? ORDER BY link_name" );
+        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
+        $result = $stmt->execute();
+        
+        $links = array();
+        while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
+            $links[$row['link_name']] = $row['link_url'];
+        }
+        
+        return $links;
+    }
+    
+    /**
+     * Save team links
+     */
+    private function save_team_links( $team_slug, $links ) {
+        // Delete existing links
+        $stmt = $this->db->prepare( "DELETE FROM team_links WHERE team_slug = ?" );
+        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
+        $stmt->execute();
+        
+        // Insert new links
+        if ( is_array( $links ) && ! empty( $links ) ) {
+            $stmt = $this->db->prepare( "INSERT INTO team_links (team_slug, link_name, link_url) VALUES (?, ?, ?)" );
+            foreach ( $links as $link_name => $link_url ) {
+                $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
+                $stmt->bindValue( 2, $link_name, SQLITE3_TEXT );
+                $stmt->bindValue( 3, $link_url, SQLITE3_TEXT );
+                $stmt->execute();
+                $stmt->reset();
+            }
+        }
+    }
+    
+    /**
+     * Get person links
+     */
+    private function get_person_links( $person_id ) {
+        $stmt = $this->db->prepare( "SELECT link_name, link_url FROM people_links WHERE person_id = ? ORDER BY link_name" );
+        $stmt->bindValue( 1, $person_id, SQLITE3_INTEGER );
+        $result = $stmt->execute();
+        
+        $links = array();
+        while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
+            $links[$row['link_name']] = $row['link_url'];
+        }
+        
+        return $links;
+    }
+    
+    /**
+     * Save person links
+     */
+    private function save_person_links( $person_id, $links ) {
+        // Delete existing links
+        $stmt = $this->db->prepare( "DELETE FROM people_links WHERE person_id = ?" );
+        $stmt->bindValue( 1, $person_id, SQLITE3_INTEGER );
+        $stmt->execute();
+        
+        // Insert new links
+        if ( is_array( $links ) && ! empty( $links ) ) {
+            $stmt = $this->db->prepare( "INSERT INTO people_links (person_id, link_name, link_url) VALUES (?, ?, ?)" );
+            foreach ( $links as $link_name => $link_url ) {
+                $stmt->bindValue( 1, $person_id, SQLITE3_INTEGER );
+                $stmt->bindValue( 2, $link_name, SQLITE3_TEXT );
+                $stmt->bindValue( 3, $link_url, SQLITE3_TEXT );
+                $stmt->execute();
+                $stmt->reset();
+            }
+        }
+    }
+    
+    /**
+     * Get event links
+     */
+    private function get_event_links( $event_id ) {
+        $stmt = $this->db->prepare( "SELECT link_name, link_url FROM event_links WHERE event_id = ? ORDER BY link_name" );
+        $stmt->bindValue( 1, $event_id, SQLITE3_INTEGER );
+        $result = $stmt->execute();
+        
+        $links = array();
+        while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
+            $links[$row['link_name']] = $row['link_url'];
+        }
+        
+        return $links;
+    }
+    
+    /**
+     * Save event links
+     */
+    private function save_event_links( $event_id, $links ) {
+        // Delete existing links
+        $stmt = $this->db->prepare( "DELETE FROM event_links WHERE event_id = ?" );
+        $stmt->bindValue( 1, $event_id, SQLITE3_INTEGER );
+        $stmt->execute();
+        
+        // Insert new links
+        if ( is_array( $links ) && ! empty( $links ) ) {
+            $stmt = $this->db->prepare( "INSERT INTO event_links (event_id, link_name, link_url) VALUES (?, ?, ?)" );
+            foreach ( $links as $link_name => $link_url ) {
+                $stmt->bindValue( 1, $event_id, SQLITE3_INTEGER );
+                $stmt->bindValue( 2, $link_name, SQLITE3_TEXT );
+                $stmt->bindValue( 3, $link_url, SQLITE3_TEXT );
+                $stmt->execute();
+                $stmt->reset();
+            }
+        }
     }
 
     /**

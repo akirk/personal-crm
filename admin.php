@@ -725,7 +725,7 @@ function get_person_type_config( $person_type ) {
  * Unified person CRUD operations
  */
 function handle_person_action( $action, $config, $person_data ) {
-	global $config_file;
+	global $config_file, $current_team;
 
 	$main_config = load_or_create_config( $current_team );
 
@@ -745,7 +745,6 @@ function handle_person_action( $action, $config, $person_data ) {
 		$main_config[ $config['section_key'] ][ $username ] = $person_data;
 
 		if ( save_config( $main_config, $current_team ) ) {
-			global $current_team;
 			$redirect_url = build_team_url( 'index.php', array( 'person' => $username ) );
 			header( 'Location: ' . $redirect_url );
 			exit;
@@ -762,7 +761,6 @@ function handle_person_action( $action, $config, $person_data ) {
 		$main_config[ $config['section_key'] ][ $username ] = $person_data;
 
 		if ( save_config( $main_config, $current_team ) ) {
-			global $current_team;
 			$redirect_url = build_team_url( 'index.php', array( 'person' => $username ) );
 			header( 'Location: ' . $redirect_url );
 			exit;
@@ -918,6 +916,7 @@ function create_notes_from_form() {
 	
 	// Get existing notes if we're editing
 	if ( isset( $_POST['action'] ) && in_array( $_POST['action'], array( 'edit_member', 'edit_leadership', 'edit_consultants', 'edit_alumni' ) ) && isset( $_POST['username'] ) ) {
+		global $current_team;
 		$team_data = load_or_create_config( $current_team );
 		$username = sanitize_text_field( $_POST['username'] );
 		
