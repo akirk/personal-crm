@@ -4,13 +4,14 @@
  * 
  * Creates appropriate storage instances based on configuration
  */
+namespace PersonalCRM;
 
 require_once __DIR__ . '/storage-interface.php';
 require_once __DIR__ . '/storage.php';
 require_once __DIR__ . '/json-storage.php';
 require_once __DIR__ . '/wpdb-storage.php';
 
-if ( class_exists( 'StorageFactory' ) ) {
+if ( class_exists( '\PersonalCRM\StorageFactory' ) ) {
     return;
 }
 

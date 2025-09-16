@@ -5,9 +5,11 @@
  * WordPress database storage using wpdb for compatibility with WordPress infrastructure.
  */
 
+namespace PersonalCRM;
+
 require_once __DIR__ . '/storage-interface.php';
 
-if ( class_exists( 'WpdbStorage' ) ) {
+if ( class_exists( '\PersonalCRM\WpdbStorage' ) ) {
     return;
 }
 

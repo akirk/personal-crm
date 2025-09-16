@@ -5,9 +5,10 @@
  * SQLite database storage for better performance, concurrent access, and data integrity.
  */
 
+namespace PersonalCRM;
 require_once __DIR__ . '/storage-interface.php';
 
-if ( class_exists( 'Storage' ) ) {
+if ( class_exists( '\PersonalCRM\Storage' ) ) {
     return;
 }
 

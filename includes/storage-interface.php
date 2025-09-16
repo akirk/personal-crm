@@ -5,7 +5,9 @@
  * Defines the contract for storage backends (JSON, SQLite, etc.)
  */
 
-if ( interface_exists( 'StorageInterface' ) ) {
+namespace PersonalCRM;
+
+if ( interface_exists( '\PersonalCRM\StorageInterface' ) ) {
     return;
 }
 

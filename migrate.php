@@ -14,6 +14,7 @@
  *   php migrate.php wpdb-to-sqlite [--dry-run]    # Migrate from WordPress DB to SQLite
  *   php migrate.php --help                        # Show help
  */
+namespace PersonalCRM;
 
 // Include required files
 require_once __DIR__ . '/includes/storage-factory.php';
@@ -61,7 +62,7 @@ function get_storage_statistics() {
     try {
         // Check JSON files
         require_once __DIR__ . '/includes/json-storage.php';
-        $json_storage = new JsonStorage();
+        $json_storage = new \PersonalCRM\JsonStorage();
         $json_teams = $json_storage->get_available_teams();
         $stats['json']['teams'] = count($json_teams);
         
@@ -83,7 +84,7 @@ function get_storage_statistics() {
     try {
         // Check SQLite database
         require_once __DIR__ . '/includes/storage.php';
-        $sqlite_storage = new Storage();
+        $sqlite_storage = new \PersonalCRM\Storage();
         $sqlite_teams = $sqlite_storage->get_available_teams();
         $stats['sqlite']['teams'] = count($sqlite_teams);
         $stats['sqlite']['database_exists'] = true;
@@ -106,7 +107,7 @@ function get_storage_statistics() {
         // Check WpDB storage (requires WordPress environment)
         if (function_exists('get_option')) {
             require_once __DIR__ . '/includes/wpdb-storage.php';
-            $wpdb_storage = new WpdbStorage();
+            $wpdb_storage = new \PersonalCRM\WpdbStorage();
             $wpdb_teams = $wpdb_storage->get_available_teams();
             $stats['wpdb']['teams'] = count($wpdb_teams);
             $stats['wpdb']['database_exists'] = true;
@@ -184,13 +185,13 @@ function show_migration_preview($from_format, $to_format, $dry_run = true) {
         require_once __DIR__ . '/includes/json-storage.php';
         
         if ($from_format === 'json') {
-            $source = new JsonStorage();
-            $target = new Storage();
+            $source = new \PersonalCRM\JsonStorage();
+            $target = new \PersonalCRM\Storage();
             $source_teams = $source->get_available_teams();
             $target_teams = $target->get_available_teams();
         } else {
-            $source = new Storage();
-            $target = new JsonStorage();
+            $source = new \PersonalCRM\Storage();
+            $target = new \PersonalCRM\JsonStorage();
             $source_teams = $source->get_available_teams();
             $target_teams = $target->get_available_teams();
         }
@@ -261,7 +262,7 @@ function migrate_json_to_sqlite($dry_run = false) {
     try {
         // Create SQLite storage instance directly
         require_once __DIR__ . '/includes/storage.php';
-        $sqlite_storage = new Storage();
+        $sqlite_storage = new \PersonalCRM\Storage();
         
         // Use built-in migration method
         $migrated_teams = $sqlite_storage->migrate_from_json();
@@ -313,9 +314,9 @@ function migrate_sqlite_to_json($dry_run = false) {
         // Create both storage instances
         require_once __DIR__ . '/includes/storage.php';
         require_once __DIR__ . '/includes/json-storage.php';
-        
-        $sqlite_storage = new Storage();
-        $json_storage = new JsonStorage();
+
+        $sqlite_storage = new \PersonalCRM\Storage();
+        $json_storage = new \PersonalCRM\JsonStorage();
         
         // Get all teams from SQLite
         $teams = $sqlite_storage->get_available_teams();
@@ -396,7 +397,7 @@ function migrate_json_to_wpdb($dry_run = false) {
 
     try {
         require_once __DIR__ . '/includes/wpdb-storage.php';
-        $wpdb_storage = new WpdbStorage();
+        $wpdb_storage = new \PersonalCRM\WpdbStorage();
 
         $migrated_teams = $wpdb_storage->migrate_from_json();
 
@@ -452,8 +453,8 @@ function migrate_wpdb_to_json($dry_run = false) {
         require_once __DIR__ . '/includes/wpdb-storage.php';
         require_once __DIR__ . '/includes/json-storage.php';
 
-        $wpdb_storage = new WpdbStorage();
-        $json_storage = new JsonStorage();
+        $wpdb_storage = new \PersonalCRM\WpdbStorage();
+        $json_storage = new \PersonalCRM\JsonStorage();
 
         $teams = $wpdb_storage->get_available_teams();
 
@@ -533,8 +534,8 @@ function migrate_sqlite_to_wpdb($dry_run = false) {
         require_once __DIR__ . '/includes/storage.php';
         require_once __DIR__ . '/includes/wpdb-storage.php';
 
-        $sqlite_storage = new Storage();
-        $wpdb_storage = new WpdbStorage();
+        $sqlite_storage = new \PersonalCRM\Storage();
+        $wpdb_storage = new \PersonalCRM\WpdbStorage();
 
         $teams = $sqlite_storage->get_available_teams();
 
@@ -614,8 +615,8 @@ function migrate_wpdb_to_sqlite($dry_run = false) {
         require_once __DIR__ . '/includes/wpdb-storage.php';
         require_once __DIR__ . '/includes/storage.php';
 
-        $wpdb_storage = new WpdbStorage();
-        $sqlite_storage = new Storage();
+        $wpdb_storage = new \PersonalCRM\WpdbStorage();
+        $sqlite_storage = new \PersonalCRM\Storage();
 
         $teams = $wpdb_storage->get_available_teams();
 

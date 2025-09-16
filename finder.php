@@ -4,6 +4,7 @@
  * People Finder CLI
  * Search tool for teams and people
  */
+namespace PersonalCRM;
 
 class PeopleFinderCLI {
     private array $teams = [];
@@ -21,8 +22,9 @@ class PeopleFinderCLI {
     private function loadData(): void {
         // Include common functions to get storage access
         require_once __DIR__ . '/includes/common.php';
-        
-        $storage = get_storage();
+
+        $common = Common::get_instance();
+        $storage = $common->get_storage();
         $available_teams = $storage->get_available_teams();
         
         foreach ( $available_teams as $teamSlug ) {

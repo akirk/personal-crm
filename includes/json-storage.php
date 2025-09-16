@@ -5,9 +5,11 @@
  * Original JSON-based storage implementation restored and refactored into a class
  */
 
+namespace PersonalCRM;
+
 require_once __DIR__ . '/storage-interface.php';
 
-if ( class_exists( 'JsonStorage' ) ) {
+if ( class_exists( '\PersonalCRM\JsonStorage' ) ) {
     return;
 }
 

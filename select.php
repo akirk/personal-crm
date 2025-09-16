@@ -1,14 +1,16 @@
 <?php
 /**
  * Team Selection Screen
- * 
+ *
  * Allows users to select which team they want to view when multiple teams exist
  */
+namespace PersonalCRM;
 
-// Include common functions
 require_once __DIR__ . '/includes/common.php';
+require_once __DIR__ . '/includes/person.php';
 
-$available_teams = get_available_teams();
+$common = Common::get_instance();
+$available_teams = $common->get_available_teams();
 
 // Check for type filter parameter
 $type_filter = isset( $_GET['type'] ) ? sanitize_text_field( $_GET['type'] ) : null;
@@ -20,7 +22,7 @@ if ( $type_filter && !in_array( $type_filter, array( 'team', 'group' ) ) ) {
 if ( $type_filter ) {
 	$filtered_teams = array();
 	foreach ( $available_teams as $team_slug ) {
-		$team_type = get_team_type_from_file( $team_slug );
+		$team_type = $common->get_team_type_from_file( $team_slug );
 		if ( $team_type === $type_filter ) {
 			$filtered_teams[] = $team_slug;
 		}
@@ -30,10 +32,10 @@ if ( $type_filter ) {
 
 // If there's only one team or no teams, redirect appropriately
 if ( empty( $available_teams ) ) {
-	header( 'Location: ' . build_team_url( 'admin.php', array( 'create_team' => 'new' ) ) );
+	header( 'Location: ' . $common->build_url( 'admin.php', array( 'create_team' => 'new' ) ) );
 	exit;
 } elseif ( count( $available_teams ) === 1 ) {
-	header( 'Location: ' . build_team_url( 'index.php' ) );
+	header( 'Location: ' . $common->build_url( 'index.php' ) );
 	exit;
 }
 
@@ -47,19 +49,18 @@ if ( empty( $available_teams ) ) {
     <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( 'Team Selection - Orbit Team Management' ) : 'Team Selection - Orbit Team Management'; ?></title>
     <?php
     if ( function_exists( 'wp_app_enqueue_style' ) ) {
-        wp_app_enqueue_style( 'a8c-hr-style', 'assets/style.css' );
-        wp_app_enqueue_style( 'a8c-hr-cmd-k', 'assets/cmd-k.css' );
+        wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
+        wp_app_enqueue_style( 'a8c-hr-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css' );
     } else {
-        echo '<link rel="stylesheet" href="assets/style.css">';
-        echo '<link rel="stylesheet" href="assets/cmd-k.css">';
+        echo '<link rel="stylesheet" href="' . plugin_dir_url( __FILE__ ) . 'assets/style.css">';
+        echo '<link rel="stylesheet" href="' . plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css">';
     }
     ?>
     <?php if ( function_exists( 'wp_app_head' ) ) wp_app_head(); ?>
 </head>
 <body class="wp-app-body">
     <?php if ( function_exists( 'wp_app_body_open' ) ) wp_app_body_open(); ?>
-    <?php render_cmd_k_panel(); ?>
-    <?php render_dark_mode_toggle(); ?>
+    <?php $common->render_cmd_k_panel(); ?>
 
     <div class="team-selection-container">
         <div class="team-selection-header">
@@ -72,27 +73,27 @@ if ( empty( $available_teams ) ) {
             </div>
             
             <div class="type-filter-buttons">
-                <a href="<?php echo build_team_url( 'select.php' ); ?>" class="filter-btn<?php echo !$type_filter ? ' active' : ''; ?>">All</a>
-                <a href="<?php echo build_team_url( 'select.php', array( 'type' => 'team' ) ); ?>" class="filter-btn<?php echo $type_filter === 'team' ? ' active' : ''; ?>">Teams</a>
-                <a href="<?php echo build_team_url( 'select.php', array( 'type' => 'group' ) ); ?>" class="filter-btn<?php echo $type_filter === 'group' ? ' active' : ''; ?>">Groups</a>
+                <a href="<?php echo $common->build_url( 'select.php' ); ?>" class="filter-btn<?php echo !$type_filter ? ' active' : ''; ?>">All</a>
+                <a href="<?php echo $common->build_url( 'select.php', array( 'type' => 'team' ) ); ?>" class="filter-btn<?php echo $type_filter === 'team' ? ' active' : ''; ?>">Teams</a>
+                <a href="<?php echo $common->build_url( 'select.php', array( 'type' => 'group' ) ); ?>" class="filter-btn<?php echo $type_filter === 'group' ? ' active' : ''; ?>">Groups</a>
             </div>
         </div>
 
         <div class="team-grid" id="team-grid">
             <?php foreach ( $available_teams as $team_slug ) : ?>
-                <?php 
-                $team_name = get_team_name_from_file( $team_slug ); 
-                $team_type = get_team_type_from_file( $team_slug );
-                $people_count = get_team_people_count( $team_slug );
-                $people_data = get_team_people_data( $team_slug );
+                <?php
+                $team_name = $common->get_team_name_from_file( $team_slug );
+                $team_type = $common->get_team_type_from_file( $team_slug );
+                $people_count = $common->get_team_people_count( $team_slug );
+                $people_data = $common->get_team_people_data( $team_slug );
                 $param_name = ( $team_type === 'group' ) ? 'group' : 'team';
                 ?>
                 <a href="<?php
                     $params = array();
-                    if ( get_default_team() !== $team_slug ) {
+                    if ( $common->get_default_team() !== $team_slug ) {
                         $params[$param_name] = $team_slug;
                     }
-                    echo build_team_url( 'index.php', $params );
+                    echo $common->build_url( 'index.php', $params );
                 ?>" 
                    class="team-card" 
                    data-team-name="<?php echo htmlspecialchars( $team_name ); ?>"
@@ -117,13 +118,13 @@ if ( empty( $available_teams ) ) {
         </div>
 
         <div class="admin-link-section">
-            <a href="<?php echo build_team_url( 'admin.php', array( 'create_team' => 'new' ) ); ?>">⚙️ Create New</a>
+            <a href="<?php echo $common->build_url( 'admin.php', array( 'create_team' => 'new' ) ); ?>">⚙️ Create New</a>
         </div>
     </div>
     
-    <script src="assets/cmd-k.js"></script>
-    <script src="assets/script.js"></script>
-    <?php init_cmd_k_js(); ?>
+    <script src="<?php echo plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js'; ?>"></script>
+    <script src="<?php echo plugin_dir_url( __FILE__ ) . 'assets/script.js'; ?>"></script>
+    <?php $common->init_cmd_k_js(); ?>
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -186,7 +187,7 @@ if ( empty( $available_teams ) ) {
                             matchNameElement.onclick = function(e) {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                window.location.href = `<?php echo build_team_url( 'person.php' ); ?>?team=${encodeURIComponent(teamSlug)}&person=${encodeURIComponent(matchedUsername)}`;
+                                window.location.href = `<?php echo $common->build_url( 'person.php' ); ?>?team=${encodeURIComponent(teamSlug)}&person=${encodeURIComponent(matchedUsername)}`;
                                 return false;
                             };
                         } else if (matchedPersonElement) {
