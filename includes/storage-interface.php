@@ -1,9 +1,13 @@
 <?php
 /**
  * Storage Interface
- * 
+ *
  * Defines the contract for storage backends (JSON, SQLite, etc.)
  */
+
+if ( interface_exists( 'StorageInterface' ) ) {
+    return;
+}
 
 interface StorageInterface {
     /**

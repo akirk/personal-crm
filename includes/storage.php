@@ -7,6 +7,10 @@
 
 require_once __DIR__ . '/storage-interface.php';
 
+if ( class_exists( 'Storage' ) ) {
+    return;
+}
+
 class Storage implements StorageInterface {
     private $db;
     private $db_file;

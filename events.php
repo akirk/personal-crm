@@ -18,7 +18,7 @@ if ( $current_team ) {
 	$current_team = get_default_team();
 	$available_teams = get_available_teams();
 	if ( count( $available_teams ) > 1 && ! $current_team ) {
-		header( 'Location: select.php' );
+		header( 'Location: ' . build_team_url( 'select.php' ) );
 		exit;
 	}
 }
@@ -203,16 +203,25 @@ $available_teams = get_available_teams();
 
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php echo function_exists( 'wp_app_language_attributes' ) ? wp_app_language_attributes() : 'lang="en"'; ?>>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</title>
-    <link rel="stylesheet" href="assets/style.css">
-    <link rel="stylesheet" href="assets/cmd-k.css">
+    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $team_data['team_name'] ) . ' Events' ) : htmlspecialchars( $team_data['team_name'] ) . ' Events'; ?></title>
+    <?php
+    if ( function_exists( 'wp_app_enqueue_style' ) ) {
+        wp_app_enqueue_style( 'a8c-hr-style', 'assets/style.css' );
+        wp_app_enqueue_style( 'a8c-hr-cmd-k', 'assets/cmd-k.css' );
+    } else {
+        echo '<link rel="stylesheet" href="assets/style.css">';
+        echo '<link rel="stylesheet" href="assets/cmd-k.css">';
+    }
+    ?>
+    <?php if ( function_exists( 'wp_app_head' ) ) wp_app_head(); ?>
 </head>
-<body>
+<body class="wp-app-body">
+    <?php if ( function_exists( 'wp_app_body_open' ) ) wp_app_body_open(); ?>
     <?php render_dark_mode_toggle(); ?>
 
     <?php render_cmd_k_panel(); ?>
@@ -222,14 +231,14 @@ $available_teams = get_available_teams();
             <div class="header-container">
                 <h1>
                     <?php if ( $all_teams_mode ) : ?>
-                        <a href="select.php" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
+                        <a href="<?php echo build_team_url( 'select.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
                     <?php else : ?>
                         <a href="<?php echo build_team_url( 'index.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
                     <?php endif; ?>
                 </h1>
                 <div class="back-nav">
                     <?php if ( $all_teams_mode ) : ?>
-                        <a href="select.php">← Back to Team Selection</a>
+                        <a href="<?php echo build_team_url( 'select.php' ); ?>">← Back to Team Selection</a>
                     <?php else : ?>
                     <a href="<?php echo build_team_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">← Back to <?php echo $team_data['team_name'], ' ', ucfirst( $group ); ?> Overview</a>
                     <?php endif; ?>

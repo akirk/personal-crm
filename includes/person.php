@@ -3,6 +3,11 @@
  * Person class to represent team members and leadership
  */
 require_once __DIR__ . '/event.php';
+
+if ( class_exists( 'Person' ) ) {
+    return;
+}
+
 class Person {
 	public $name;
 	public $nickname; // Preferred nickname or short name
@@ -121,17 +126,17 @@ class Person {
 	public function get_profile_url( $additional_params = array() ) {
 		global $current_team;
 		$params = array( 'person' => $this->original_username );
-		
+
 		if ( $current_team !== 'team' ) {
 			$params['team'] = $current_team;
 		}
-		
+
 		if ( $this->privacy_mode ) {
 			$params['privacy'] = '1';
 		}
-		
+
 		$params = array_merge( $params, $additional_params );
-		return 'index.php?' . http_build_query( $params );
+		return build_team_url( 'index.php', $params );
 	}
 
 	/**

@@ -30,25 +30,34 @@ if ( $type_filter ) {
 
 // If there's only one team or no teams, redirect appropriately
 if ( empty( $available_teams ) ) {
-	header( 'Location: admin.php?create_team=new' );
+	header( 'Location: ' . build_team_url( 'admin.php', array( 'create_team' => 'new' ) ) );
 	exit;
 } elseif ( count( $available_teams ) === 1 ) {
-	header( 'Location: ./' );
+	header( 'Location: ' . build_team_url( 'index.php' ) );
 	exit;
 }
 
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php echo function_exists( 'wp_app_language_attributes' ) ? wp_app_language_attributes() : 'lang="en"'; ?>>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title>Team Selection - Orbit Team Management</title>
-    <link rel="stylesheet" href="assets/style.css">
-    <link rel="stylesheet" href="assets/cmd-k.css">
+    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( 'Team Selection - Orbit Team Management' ) : 'Team Selection - Orbit Team Management'; ?></title>
+    <?php
+    if ( function_exists( 'wp_app_enqueue_style' ) ) {
+        wp_app_enqueue_style( 'a8c-hr-style', 'assets/style.css' );
+        wp_app_enqueue_style( 'a8c-hr-cmd-k', 'assets/cmd-k.css' );
+    } else {
+        echo '<link rel="stylesheet" href="assets/style.css">';
+        echo '<link rel="stylesheet" href="assets/cmd-k.css">';
+    }
+    ?>
+    <?php if ( function_exists( 'wp_app_head' ) ) wp_app_head(); ?>
 </head>
-<body>
+<body class="wp-app-body">
+    <?php if ( function_exists( 'wp_app_body_open' ) ) wp_app_body_open(); ?>
     <?php render_cmd_k_panel(); ?>
     <?php render_dark_mode_toggle(); ?>
 
@@ -63,9 +72,9 @@ if ( empty( $available_teams ) ) {
             </div>
             
             <div class="type-filter-buttons">
-                <a href="team-selection.php" class="filter-btn<?php echo !$type_filter ? ' active' : ''; ?>">All</a>
-                <a href="team-selection.php?type=team" class="filter-btn<?php echo $type_filter === 'team' ? ' active' : ''; ?>">Teams</a>
-                <a href="team-selection.php?type=group" class="filter-btn<?php echo $type_filter === 'group' ? ' active' : ''; ?>">Groups</a>
+                <a href="<?php echo build_team_url( 'select.php' ); ?>" class="filter-btn<?php echo !$type_filter ? ' active' : ''; ?>">All</a>
+                <a href="<?php echo build_team_url( 'select.php', array( 'type' => 'team' ) ); ?>" class="filter-btn<?php echo $type_filter === 'team' ? ' active' : ''; ?>">Teams</a>
+                <a href="<?php echo build_team_url( 'select.php', array( 'type' => 'group' ) ); ?>" class="filter-btn<?php echo $type_filter === 'group' ? ' active' : ''; ?>">Groups</a>
             </div>
         </div>
 
@@ -78,7 +87,13 @@ if ( empty( $available_teams ) ) {
                 $people_data = get_team_people_data( $team_slug );
                 $param_name = ( $team_type === 'group' ) ? 'group' : 'team';
                 ?>
-                <a href="index.php<?php if ( get_default_team() !== $team_slug ) echo '?' . $param_name . '=' . urlencode( $team_slug ); ?>" 
+                <a href="<?php
+                    $params = array();
+                    if ( get_default_team() !== $team_slug ) {
+                        $params[$param_name] = $team_slug;
+                    }
+                    echo build_team_url( 'index.php', $params );
+                ?>" 
                    class="team-card" 
                    data-team-name="<?php echo htmlspecialchars( $team_name ); ?>"
                    data-team-slug="<?php echo htmlspecialchars( $team_slug ); ?>"
@@ -102,7 +117,7 @@ if ( empty( $available_teams ) ) {
         </div>
 
         <div class="admin-link-section">
-            <a href="admin.php?create_team=new">⚙️ Create New</a>
+            <a href="<?php echo build_team_url( 'admin.php', array( 'create_team' => 'new' ) ); ?>">⚙️ Create New</a>
         </div>
     </div>
     
@@ -171,7 +186,7 @@ if ( empty( $available_teams ) ) {
                             matchNameElement.onclick = function(e) {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                window.location.href = `person.php?team=${encodeURIComponent(teamSlug)}&person=${encodeURIComponent(matchedUsername)}`;
+                                window.location.href = `<?php echo build_team_url( 'person.php' ); ?>?team=${encodeURIComponent(teamSlug)}&person=${encodeURIComponent(matchedUsername)}`;
                                 return false;
                             };
                         } else if (matchedPersonElement) {

@@ -15,10 +15,49 @@ require_once __DIR__ . '/storage-factory.php';
 $storage = null;
 
 /**
+ * WordPress-compatible home_url() function
+ */
+if ( ! function_exists( 'home_url' ) ) {
+    function home_url( $path = '', $scheme = null ) {
+        global $a8c_hr_plugin_storage;
+
+        // If running as WordPress plugin, this shouldn't be called
+        // but if it is, use the plugin URL builder
+        if ( $a8c_hr_plugin_storage !== null && function_exists( 'build_wp_plugin_url' ) ) {
+            return build_wp_plugin_url( $path );
+        }
+
+        // For standalone mode, build URL from current request
+        $protocol = ( ! empty( $_SERVER['HTTPS'] ) && $_SERVER['HTTPS'] !== 'off' ) || $_SERVER['SERVER_PORT'] == 443 ? 'https://' : 'http://';
+        $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'];
+        $base_path = dirname( $_SERVER['SCRIPT_NAME'] );
+
+        // Clean up the base path
+        $base_path = rtrim( $base_path, '/' );
+
+        // Clean up the path parameter
+        $path = ltrim( $path, '/' );
+
+        if ( empty( $path ) ) {
+            return $protocol . $host . $base_path;
+        }
+
+        return $protocol . $host . $base_path . '/' . $path;
+    }
+}
+
+/**
  * Get storage instance
  */
 function get_storage() {
-    global $storage;
+    global $storage, $a8c_hr_plugin_storage;
+
+    // Use WordPress plugin storage if available
+    if ( $a8c_hr_plugin_storage !== null ) {
+        return $a8c_hr_plugin_storage;
+    }
+
+    // Fallback to standalone storage
     if ( $storage === null ) {
         // Check for storage type preference
         $storage_type = defined( 'STORAGE_TYPE' ) ? STORAGE_TYPE : 'sqlite';
@@ -265,7 +304,28 @@ function get_hr_feedback_month() {
  * Build URL with team parameter (uses 'group' parameter for group-type teams)
  */
 function build_team_url( $base_url, $additional_params = array() ) {
-	global $current_team;
+	global $current_team, $a8c_hr_plugin_storage;
+
+	// If running as WordPress plugin, use WordPress URL structure
+	if ( $a8c_hr_plugin_storage !== null ) {
+		// Convert .php file references to plugin routes
+		$route = str_replace( '.php', '', $base_url );
+
+		// Handle special cases
+		if ( $route === 'index' || $route === '' || $route === './' ) {
+			$route = '';
+		}
+
+		$url = home_url( '/hr/' . ltrim( $route, '/' ) );
+
+		if ( ! empty( $additional_params ) ) {
+			$url .= '?' . http_build_query( $additional_params );
+		}
+
+		return $url;
+	}
+
+	// Original standalone functionality
 	$params = array();
 	if ( $current_team !== 'team' ) {
 		$team_type = get_team_type_from_file( $current_team );
@@ -273,7 +333,7 @@ function build_team_url( $base_url, $additional_params = array() ) {
 		$params[ $param_name ] = $current_team;
 	}
 	$params = array_merge( $params, $additional_params );
-	
+
 	if ( ! empty( $params ) ) {
 		return $base_url . '?' . http_build_query( $params );
 	}
@@ -613,8 +673,30 @@ function get_all_people_from_all_teams( $privacy_mode = false ) {
  * Helper function to build URL with different team (extended version)
  */
 function build_team_url_extended( $base_url, $additional_params = array(), $team_slug = null ) {
+	global $a8c_hr_plugin_storage;
+
+	// If running as WordPress plugin, use WordPress URL structure
+	if ( $a8c_hr_plugin_storage !== null ) {
+		// Convert .php file references to plugin routes
+		$route = str_replace( '.php', '', $base_url );
+
+		// Handle special cases
+		if ( $route === 'index' || $route === '' || $route === './' ) {
+			$route = '';
+		}
+
+		$url = home_url( '/hr/' . ltrim( $route, '/' ) );
+
+		if ( ! empty( $additional_params ) ) {
+			$url .= '?' . http_build_query( $additional_params );
+		}
+
+		return $url;
+	}
+
+	// Original standalone functionality
 	$target_team = $team_slug;
-	
+
 	$params = array();
 	if ( $target_team && $target_team !== 'team' ) {
 		$team_type = get_team_type_from_file( $target_team );
@@ -622,7 +704,7 @@ function build_team_url_extended( $base_url, $additional_params = array(), $team
 		$params[ $param_name ] = $target_team;
 	}
 	$params = array_merge( $params, $additional_params );
-	
+
 	if ( ! empty( $params ) ) {
 		return $base_url . '?' . http_build_query( $params );
 	}
@@ -734,7 +816,7 @@ function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = fal
 	
 	if ( ! $storage->team_exists( $team_slug ) ) {
 		// Redirect to team creation page
-		$create_team_url = 'admin.php?create_team=new';
+		$create_team_url = build_team_url( 'admin.php', array( 'create_team' => 'new' ) );
 		header( 'Location: ' . $create_team_url );
 		exit;
 	}
@@ -825,13 +907,23 @@ function get_upcoming_events_for_display( $team_data ) {
 	$cutoff_date = clone $current_date;
 	$cutoff_date->add( new DateInterval( 'P3M' ) ); // 3 months from now
 
+	// Early return if no team data
+	if ( ! $team_data || ! is_array( $team_data ) ) {
+		return $all_events;
+	}
+
 	// Check if alumni events should be included (undocumented parameter)
 	$include_alumni = isset( $_GET['alumni'] ) && $_GET['alumni'] === '1';
 
-	// Check if we have Person objects or raw arrays
-	$all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['consultants'] ?? array() );
+	// Check if we have Person objects or raw arrays - with null safety
+	$team_members = $team_data['team_members'] ?? array();
+	$leadership = $team_data['leadership'] ?? array();
+	$consultants = $team_data['consultants'] ?? array();
+
+	$all_people = array_merge( $team_members, $leadership, $consultants );
 	if ( $include_alumni ) {
-		$all_people = array_merge( $all_people, $team_data['alumni'] );
+		$alumni = $team_data['alumni'] ?? array();
+		$all_people = array_merge( $all_people, $alumni );
 	}
 
 	// Only process personal events if we have Person objects (not raw arrays)
@@ -887,13 +979,13 @@ function render_upcoming_events_sidebar( $upcoming_events_or_person = null, $pri
 			// Get events for specific person
 			global $team_data;
 			$person_data = null;
-			if ( isset( $team_data['team_members'][ $current_person ] ) ) {
+			if ( $team_data && isset( $team_data['team_members'][ $current_person ] ) ) {
 				$person_data = $team_data['team_members'][ $current_person ];
-			} elseif ( isset( $team_data['leadership'][ $current_person ] ) ) {
+			} elseif ( $team_data && isset( $team_data['leadership'][ $current_person ] ) ) {
 				$person_data = $team_data['leadership'][ $current_person ];
-			} elseif ( isset( $team_data['consultants'][ $current_person ] ) ) {
+			} elseif ( $team_data && isset( $team_data['consultants'][ $current_person ] ) ) {
 				$person_data = $team_data['consultants'][ $current_person ];
-			} elseif ( isset( $team_data['alumni'][ $current_person ] ) ) {
+			} elseif ( $team_data && isset( $team_data['alumni'][ $current_person ] ) ) {
 				$person_data = $team_data['alumni'][ $current_person ];
 			}
 			
@@ -1016,36 +1108,44 @@ function get_person_feedback_history( $username ) {
 /**
  * Sanitize text field by removing tags and trimming
  */
-function sanitize_text_field( $str ) {
-	return trim( strip_tags( $str ) );
+if ( ! function_exists( 'sanitize_text_field' ) ) {
+	function sanitize_text_field( $str ) {
+		return trim( strip_tags( $str ) );
+	}
 }
 
 /**
  * Sanitize URL
  */
-function sanitize_url( $url ) {
-	return filter_var( trim( $url ), FILTER_SANITIZE_URL );
+if ( ! function_exists( 'sanitize_url' ) ) {
+	function sanitize_url( $url ) {
+		return filter_var( trim( $url ), FILTER_SANITIZE_URL );
+	}
 }
 
 /**
  * Sanitize textarea field by removing tags and trimming
  */
-function sanitize_textarea_field( $str ) {
-	return trim( strip_tags( $str ) );
+if ( ! function_exists( 'sanitize_textarea_field' ) ) {
+	function sanitize_textarea_field( $str ) {
+		return trim( strip_tags( $str ) );
+	}
 }
 
 /**
  * Simple HTML sanitizer - only allows links
  */
-function sanitize_html( $html ) {
-    // Allow only <a> tags with href and target attributes
-    $allowed_tags = '<a>';
-    $clean_html = strip_tags( $html, $allowed_tags );
+if ( ! function_exists( 'sanitize_html' ) ) {
+	function sanitize_html( $html ) {
+		// Allow only <a> tags with href and target attributes
+		$allowed_tags = '<a>';
+		$clean_html = strip_tags( $html, $allowed_tags );
 
-    // Additional security: ensure href attributes don't contain javascript
-    $clean_html = preg_replace('/javascript:/i', '', $clean_html);
+		// Additional security: ensure href attributes don't contain javascript
+		$clean_html = preg_replace('/javascript:/i', '', $clean_html);
 
-    return $clean_html;
+		return $clean_html;
+	}
 }
 
 /**

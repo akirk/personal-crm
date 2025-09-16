@@ -157,12 +157,20 @@ $available_teams = get_available_teams();
 
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php echo function_exists( 'wp_app_language_attributes' ) ? wp_app_language_attributes() : 'lang="en"'; ?>>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Audit</title>
-    <link rel="stylesheet" href="assets/cmd-k.css">
+    <meta name="color-scheme" content="light dark">
+    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $team_data['team_name'] ) . ' Team Audit' ) : htmlspecialchars( $team_data['team_name'] ) . ' Team Audit'; ?></title>
+    <?php
+    if ( function_exists( 'wp_app_enqueue_style' ) ) {
+        wp_app_enqueue_style( 'a8c-hr-cmd-k', 'assets/cmd-k.css' );
+    } else {
+        echo '<link rel="stylesheet" href="assets/cmd-k.css">';
+    }
+    ?>
+    <?php if ( function_exists( 'wp_app_head' ) ) wp_app_head(); ?>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -306,7 +314,8 @@ $available_teams = get_available_teams();
         }
     </style>
 </head>
-<body>
+<body class="wp-app-body">
+    <?php if ( function_exists( 'wp_app_body_open' ) ) wp_app_body_open(); ?>
     <?php render_cmd_k_panel(); ?>
     <div class="container">
         <div class="header">

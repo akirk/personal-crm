@@ -7,6 +7,10 @@
 
 require_once __DIR__ . '/storage-interface.php';
 
+if ( class_exists( 'JsonStorage' ) ) {
+    return;
+}
+
 class JsonStorage implements StorageInterface {
     private $json_dir;
     

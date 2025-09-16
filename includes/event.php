@@ -2,6 +2,10 @@
 /**
  * Event class to represent team events, personal events, etc.
  */
+if ( class_exists( 'Event' ) ) {
+    return;
+}
+
 class Event {
 	public $type;
 	public $description;

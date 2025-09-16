@@ -15,7 +15,7 @@ error_reporting( E_ALL );
 // Get current team from URL parameter or POST (for form submissions)
 $current_team = get_current_team_from_params();
 if ( ! $current_team && ! ( isset( $_GET['create_team'] ) && $_GET['create_team'] === 'new' ) ) {
-	header( 'Location: team-selection.php' );
+	header( 'Location: ' . build_team_url( 'select.php' ) );
 	exit;
 }
 
@@ -29,7 +29,7 @@ $is_creating_team = isset( $_GET['create_team'] ) && $_GET['create_team'] === 'n
 
 // Check if JSON file exists and redirect to team creation if not (unless already creating a team)
 if ( $config_file && ! file_exists( $config_file ) && ! $is_creating_team ) {
-	header( 'Location: admin.php?create_team=new' );
+	header( 'Location: ' . build_team_url( 'admin.php', array( 'create_team' => 'new' ) ) );
 	exit;
 }
 $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
@@ -1954,16 +1954,25 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php echo function_exists( 'wp_app_language_attributes' ) ? wp_app_language_attributes() : 'lang="en"'; ?>>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title><?php echo ucfirst( $group ?? 'Team' ); ?> Management Admin</title>
-    <link rel="stylesheet" href="assets/style.css">
-    <link rel="stylesheet" href="assets/cmd-k.css">
+    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( ucfirst( $group ?? 'Team' ) . ' Management Admin' ) : ucfirst( $group ?? 'Team' ) . ' Management Admin'; ?></title>
+    <?php
+    if ( function_exists( 'wp_app_enqueue_style' ) ) {
+        wp_app_enqueue_style( 'a8c-hr-style', 'assets/style.css' );
+        wp_app_enqueue_style( 'a8c-hr-cmd-k', 'assets/cmd-k.css' );
+    } else {
+        echo '<link rel="stylesheet" href="assets/style.css">';
+        echo '<link rel="stylesheet" href="assets/cmd-k.css">';
+    }
+    ?>
+    <?php if ( function_exists( 'wp_app_head' ) ) wp_app_head(); ?>
 </head>
-<body>
+<body class="wp-app-body">
+    <?php if ( function_exists( 'wp_app_body_open' ) ) wp_app_body_open(); ?>
     <?php render_cmd_k_panel(); ?>
     <!-- Dark Mode Toggle -->
     <?php render_dark_mode_toggle(); ?>
@@ -1971,7 +1980,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
     <div class="container">
         <div class="header">
             <div class="header-content">
-                <h1><a href="admin.php" style="color: inherit; text-decoration: none;"><?php echo ucfirst( $group ?? 'Team' ); ?> Management Admin</a></h1>
+                <h1><a href="<?php echo build_team_url( 'admin.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo ucfirst( $group ?? 'Team' ); ?> Management Admin</a></h1>
             </div>
             <div class="navigation">
                 <!-- Team Switcher -->
@@ -1990,7 +1999,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                         ?>
                     </select>
                 <?php endif; ?>
-                    <a href="admin.php?create_team=new" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Team</a>
+                    <a href="<?php echo build_team_url( 'admin.php', array( 'create_team' => 'new' ) ); ?>" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Team</a>
                 </div>
                 
             </div>
