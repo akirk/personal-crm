@@ -1,66 +1,271 @@
 <?php
-/**
- * Core CRM functionality class - refactored from common.php
- */
 
 namespace PersonalCRM;
 
-if ( class_exists( '\PersonalCRM\Common' ) ) {
-    return;
-}
+class PersonalCrm {
+    private static $instance = null;
+    private static $storage_type = null;
+    private $app;
+    private $storage;
 
-class Common {
-	private static $instance = null;
-
-    private $storage = null;
-    private $group = 'team';
-    public $current_team = null;
-
-    public static function get_instance( $storage = null ) {
-		if ( self::$instance === null ) {
-			self::$instance = new self( $storage );
-		}
-		return self::$instance;
-	}
-
-    public function __construct( $storage = null ) {
-        if ( $storage ) {
-            $this->storage = $storage;
-        } else {
-            // Include storage factory
-            require_once __DIR__ . '/storage-factory.php';
-            $this->storage = $this->get_storage();
-        }
-
-        // Include configuration
-        if ( file_exists( __DIR__ . '/../config.php' ) ) {
-            require_once __DIR__ . '/../config.php';
-        }
-
-        // Apply localhost protection
-        $this->only_allow_access_from_localhost();
+    public static function set_storage_type( $storage_type ) {
+        self::$storage_type = $storage_type;
     }
 
-    /**
-     * Get storage instance
-     */
-    public function get_storage() {
-        global $a8c_hr_plugin_storage;
-
-        // Use WordPress plugin storage if available
-        if ( $a8c_hr_plugin_storage !== null ) {
-            return $a8c_hr_plugin_storage;
+    public static function get_instance() {
+        if ( self::$instance === null ) {
+            if ( ! self::$storage_type ) {
+                throw new \Exception( 'Please set a storage before initializing' );
+            }
+            self::$instance = new self();
         }
-
-        // Fallback to standalone storage
-        if ( $this->storage === null ) {
-            // Check for storage type preference
-            $storage_type = defined( 'STORAGE_TYPE' ) ? STORAGE_TYPE : 'sqlite';
-            $this->storage = StorageFactory::create( $storage_type );
-        }
-        return $this->storage;
+        return self::$instance;
     }
 
+
+
+    public function __construct() {
+        register_activation_hook( PERSONAL_CRM_PLUGIN_FILE, [ $this, 'activate' ] );
+        register_deactivation_hook( PERSONAL_CRM_PLUGIN_FILE, [ $this, 'deactivate' ] );
+
+        $this->storage = StorageFactory::create( self::$storage_type );
+
+        if ( class_exists( '\WP_CLI' ) ) {
+            require_once __DIR__ . '/wp-cli-commands.php';
+            \WP_CLI::add_command( 'crm migrate', 'Personal_CRM_Migrate_Command' );
+        }
+
+        $this->app = new \WpApp\WpApp(
+            __DIR__ . '/../',
+            'crm',
+            [
+                'show_masterbar_for_anonymous' => false,
+                'show_wp_logo' => true,
+                'show_site_name' => true,
+                'require_capability' => 'read',  // Require login
+                'clear_admin_bar' => false
+            ]
+        );
+
+        $this->setup_routes();
+        $this->setup_menu();
+
+        $this->app->init();
+
+        wp_app_enqueue_style( 'personal-crm-style', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/style.css' );
+        wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.css' );
+        wp_app_enqueue_script( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.js', [ 'jquery' ], '1.0', true );
+        wp_app_enqueue_script( 'personal-crm-script', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/script.js', [ 'jquery' ], '1.0', true );
+
+        // Fire action to allow other plugins to register routes and extend functionality
+        do_action( 'personal_crm_loaded', $this );
+
+        // Add admin settings page
+        add_action( 'admin_menu', [ $this, 'admin_menu' ] );
+
+        // Register settings
+        add_action( 'admin_init', [ $this, 'admin_settings' ] );
+    }
+
+    private function setup_routes() {
+        // Main dashboard (index.php)
+        // Default route handled automatically by wp-app
+
+        // Admin interface (admin.php)
+        $this->app->route( 'admin', 'admin.php' );
+        $this->app->route( 'admin/{team}', 'admin.php' );
+        $this->app->route( 'admin/{team}/links', 'admin.php' );
+        $this->app->route( 'admin/{team}/members', 'admin.php' );
+        $this->app->route( 'admin/{team}/leadership', 'admin.php' );
+        $this->app->route( 'admin/{team}/consultants', 'admin.php' );
+        $this->app->route( 'admin/{team}/alumni', 'admin.php' );
+        $this->app->route( 'admin/{team}/events', 'admin.php' );
+        $this->app->route( 'admin/{team}/audit', 'admin.php' );
+        $this->app->route( 'admin/{team}/json', 'admin.php' );
+        $this->app->route( 'admin/{team}/person/{person}', 'admin.php' );
+
+        // Finder/Search (finder.php)
+        $this->app->route( 'finder', 'finder.php' );
+        $this->app->route( 'search', 'finder.php' );
+
+        // Person management (person.php)
+        $this->app->route( 'person', 'person.php' );
+        $this->app->route( '{team}/{person}', 'person.php' );
+
+        // Events (events.php)
+        $this->app->route( 'events', 'events.php' );
+
+        // Audit reports (audit.php)
+        $this->app->route( 'audit', 'audit.php' );
+
+        // HR Routes (if HR addon is active)
+        if ( is_plugin_active( 'a8c-hr/a8c-hr-addon.php' ) ) {
+            $this->app->route( 'hr-stats', '../a8c-hr/hr-stats.php' );
+            $this->app->route( 'hr-reports', '../a8c-hr/hr-reports.php' );
+            $this->app->route( 'hr-config', '../a8c-hr/hr-config.php' );
+        }
+
+        // Import person (import-person.php)
+        $this->app->route( 'import-person', 'import-person.php' );
+
+        // Select interface (select.php)
+        $this->app->route( 'select', 'select.php' );
+    }
+
+    private function setup_menu() {
+        // Main navigation - Personal CRM focused
+        $this->app->add_menu_item( 'dashboard', 'Dashboard', home_url( '/crm/' ) );
+        $this->app->add_menu_item( 'finder', 'Find People', home_url( '/crm/finder' ) );
+        $this->app->add_menu_item( 'person', 'People', home_url( '/crm/person' ) );
+        $this->app->add_menu_item( 'events', 'Events', home_url( '/crm/events' ) );
+
+        // Admin menu items (only for administrators)
+        if ( current_user_can( 'manage_options' ) ) {
+            $this->app->add_menu_item( 'admin', 'Admin', home_url( '/crm/admin' ) );
+            $this->app->add_menu_item( 'audit', 'Audit', home_url( '/crm/audit' ) );
+            $this->app->add_menu_item( 'import-person', 'Import Person', home_url( '/crm/import-person' ) );
+            $this->app->add_menu_item( 'select', 'Select Tool', home_url( '/crm/select' ) );
+            $this->app->add_menu_item( 'settings', 'Plugin Settings', admin_url( 'options-general.php?page=personal-crm-settings' ) );
+        }
+
+        // User-specific items
+        if ( is_user_logged_in() ) {
+            $current_user = wp_get_current_user();
+            $this->app->add_user_menu_item(
+                'my-profile',
+                'My Profile',
+                home_url( '/crm/person/' . $current_user->user_login )
+            );
+        }
+    }
+
+    public function activate() {
+        // Create/update database tables if using WpDB storage
+        $storage_type = get_option( 'personal_crm_storage_type', 'wpdb' );
+        if ( $storage_type === 'wpdb' ) {
+            // WpDB storage will create tables automatically
+            $storage = StorageFactory::create( 'wpdb' );
+        }
+
+        // Flush rewrite rules
+        flush_rewrite_rules();
+
+        // Set default options
+        add_option( 'personal_crm_storage_type', 'wpdb' );
+        add_option( 'personal_crm_default_team', '' );
+        add_option( 'personal_crm_version', PERSONAL_CRM_PLUGIN_VERSION );
+    }
+
+    public function deactivate() {
+        // Flush rewrite rules
+        flush_rewrite_rules();
+    }
+
+    public function admin_menu() {
+        add_options_page(
+            'Personal CRM Settings',
+            'Personal CRM',
+            'manage_options',
+            'personal-crm-settings',
+            [ $this, 'admin_page' ]
+        );
+    }
+
+    public function admin_settings() {
+        register_setting( 'personal_crm_settings', 'personal_crm_storage_type' );
+        register_setting( 'personal_crm_settings', 'personal_crm_default_team' );
+
+        add_settings_section(
+            'personal_crm_general',
+            'General Settings',
+            [ $this, 'settings_section_callback' ],
+            'personal_crm_settings'
+        );
+
+        add_settings_field(
+            'storage_type',
+            'Storage Type',
+            [ $this, 'storage_type_callback' ],
+            'personal_crm_settings',
+            'personal_crm_general'
+        );
+
+        add_settings_field(
+            'default_team',
+            'Default Team',
+            [ $this, 'default_team_callback' ],
+            'personal_crm_settings',
+            'personal_crm_general'
+        );
+    }
+
+    public function admin_page() {
+        ?>
+        <div class="wrap">
+            <h1>Personal CRM Settings</h1>
+            <form method="post" action="options.php">
+                <?php
+                settings_fields( 'personal_crm_settings' );
+                do_settings_sections( 'personal_crm_settings' );
+                submit_button();
+                ?>
+            </form>
+
+            <hr>
+
+            <h2>Migration Tools</h2>
+            <p>Need to migrate data between storage systems? Access the migration script directly via command line:</p>
+            <p><code>php <?php echo PERSONAL_CRM_PLUGIN_DIR; ?>migrate.php --help</code></p>
+        </div>
+        <?php
+    }
+
+    public function settings_section_callback() {
+        echo '<p>Configure the basic settings for the Personal CRM.</p>';
+    }
+
+    public static function get_globals() {
+        $crm = self::get_instance();
+        $current_team = $crm->get_current_team_from_params();
+
+        if ( ! $current_team ) {
+            $current_team = $crm->use_default_team();
+            $available_teams = $crm->get_available_teams();
+            if ( count( $available_teams ) > 1 && ! $current_team ) {
+                header( 'Location: ' . $crm->build_url( 'select.php' ) );
+                exit;
+            }
+        }
+
+        $group = $crm->is_social_group( $current_team ) ? 'group' : 'team';
+        $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
+
+        // Load team configuration with Person objects
+        $team_data = $crm->load_team_config_with_objects( $current_team );
+
+        // Ensure all expected sections exist as arrays
+        $expected_sections = array( 'team_members', 'leadership', 'consultants', 'alumni' );
+        foreach ( $expected_sections as $section ) {
+            if ( ! isset( $team_data[$section] ) || ! is_array( $team_data[$section] ) ) {
+                $team_data[$section] = array();
+            }
+        }
+
+        // Separate deceased people from their original sections
+        $deceased_people = array();
+        foreach ( $expected_sections as $section ) {
+            foreach ( $team_data[$section] as $username => $person ) {
+                if ( ! empty( $person->deceased ) ) {
+                    $deceased_people[$username] = $person;
+                    unset( $team_data[$section][$username] );
+                }
+            }
+        }
+        $team_data['deceased'] = $deceased_people;
+        $available_teams = $crm->get_available_teams();
+
+        return compact( 'crm', 'common', 'current_team', 'group', 'privacy_mode', 'team_data', 'available_teams' );
+    }
 
     /**
      * Check if a team is configured as a social group
@@ -145,14 +350,14 @@ class Common {
      * Get all available teams
      */
     public function get_available_teams() {
-        return $this->get_storage()->get_available_teams();
+        return $this->storage->get_available_teams();
     }
 
     /**
      * Get team name from storage
      */
     public function get_team_name_from_file( $team_slug ) {
-        $name = $this->get_storage()->get_team_name( $team_slug );
+        $name = $this->storage->get_team_name( $team_slug );
         return $name ?: ucfirst( str_replace( '_', ' ', $team_slug ) );
     }
 
@@ -167,7 +372,7 @@ class Common {
      * Get team type from storage (defaults to 'team')
      */
     public function get_team_type_from_file( $team_slug ) {
-        return $this->get_storage()->get_team_type( $team_slug );
+        return $this->storage->get_team_type( $team_slug );
     }
 
     /**
@@ -181,21 +386,21 @@ class Common {
      * Get people count from team config file
      */
     public function get_team_people_count( $team_slug ) {
-        return $this->get_storage()->get_team_people_count( $team_slug );
+        return $this->storage->get_team_people_count( $team_slug );
     }
 
     /**
      * Get all people names from team config file for search purposes
      */
     public function get_team_people_names( $team_slug ) {
-        return $this->get_storage()->get_team_people_names( $team_slug );
+        return $this->storage->get_team_people_names( $team_slug );
     }
 
     /**
      * Get all people data (username => person data) from team config file for search purposes
      */
     public function get_team_people_data( $team_slug ) {
-        return $this->get_storage()->get_team_people_data( $team_slug );
+        return $this->storage->get_team_people_data( $team_slug );
     }
 
     /**
@@ -230,7 +435,6 @@ class Common {
         // Check wp-app route parameters using WordPress query vars
         if ( empty( $team_param ) && function_exists( '\get_query_var' ) ) {
             $team_param = \get_query_var( 'team' );
-            var_dump( 1,$team_param );
         }
 
         $this->current_team = $group_param ?? $team_param ?? null;
@@ -289,12 +493,12 @@ class Common {
      * Get the default team slug (team marked with default: true)
      */
     public function get_default_team() {
-        return $this->get_storage()->get_default_team();
+        return $this->storage->get_default_team();
     }
 
     public function use_default_team() {
-    	$this->current_team = $this->get_default_team();
-    	return $this->current_team;
+        $this->current_team = $this->get_default_team();
+        return $this->current_team;
     }
 
     /**
@@ -327,16 +531,14 @@ class Common {
      * Load team configuration from storage and convert to Person objects
      */
     public function load_team_config_with_objects( $team_slug = 'team' ) {
-        $storage = $this->get_storage();
-
-        if ( ! $storage->team_exists( $team_slug ) ) {
+        if ( ! $this->storage->team_exists( $team_slug ) ) {
             // Redirect to team creation page
             $create_team_url = $this->$crm->build_url( 'admin.php', array( 'create_team' => 'new' ) );
             header( 'Location: ' . $create_team_url );
             exit;
         }
 
-        $config = $storage->get_team_config( $team_slug );
+        $config = $this->storage->get_team_config( $team_slug );
 
         if ( ! $config ) {
             die( 'Error: Unable to load team configuration' );
@@ -640,29 +842,29 @@ class Common {
 
             // Special handling for person URLs - use {team}/{person} format
             if ( $route === 'person' && isset( $additional_params['person'] ) ) {
-            	$username = $additional_params['person'];
-            	unset( $additional_params['person'] ); // Remove from query params
+                $username = $additional_params['person'];
+                unset( $additional_params['person'] ); // Remove from query params
 
                 if ( isset( $additional_params['team'] ) ) {
-                	$team = $additional_params['team'];
-					unset( $additional_params['team'] ); // Remove team param if present
-				} else {
-	                $team = $this->current_team;
-	            }
+                    $team = $additional_params['team'];
+                    unset( $additional_params['team'] ); // Remove team param if present
+                } else {
+                    $team = $this->current_team;
+                }
 
                 $url = home_url( '/crm/' . $team . '/' . $username );
             } elseif ( $route === 'admin' ) {
-            	$username = '';
-            	if ( isset( $additional_params['person'] ) ) {
-                	$username = $additional_params['person'];
-                	unset( $additional_params['person'] ); // Remove from query params
+                $username = '';
+                if ( isset( $additional_params['person'] ) ) {
+                    $username = $additional_params['person'];
+                    unset( $additional_params['person'] ); // Remove from query params
                 }
                 if ( isset( $additional_params['team'] ) ) {
-                	$team = $additional_params['team'];
-					unset( $additional_params['team'] ); // Remove team param if present
-				} else {
-	                $team = $this->current_team;
-	            }
+                    $team = $additional_params['team'];
+                    unset( $additional_params['team'] ); // Remove team param if present
+                } else {
+                    $team = $this->current_team;
+                }
 
                 $url = home_url( '/crm/admin/' . $team . '/' . $username );
             } else {
@@ -693,96 +895,96 @@ class Common {
 
 
 
-	// Keep remaining essential functions that exist in the original file
-	public function render_cmd_k_panel() {
-		?>
-		<div id="cmd-k-overlay" class="cmd-k-overlay">
-			<div class="cmd-k-panel">
-				<div class="cmd-k-search-container">
-					<input type="text" id="cmd-k-search" class="cmd-k-search" placeholder="Search teams and people..." autocomplete="off" spellcheck="false">
-				</div>
-				<div id="cmd-k-results" class="cmd-k-results">
-				</div>
-				<div class="cmd-k-instructions">
-					<span class="cmd-k-kbd">↑↓</span> to navigate • <span class="cmd-k-kbd">Enter</span> to open • <span class="cmd-k-kbd">→</span> to select link • <span class="cmd-k-kbd">Esc</span> to close
-				</div>
-			</div>
-		</div>
-		<?php
-	}
+    // Keep remaining essential functions that exist in the original file
+    public function render_cmd_k_panel() {
+        ?>
+        <div id="cmd-k-overlay" class="cmd-k-overlay">
+            <div class="cmd-k-panel">
+                <div class="cmd-k-search-container">
+                    <input type="text" id="cmd-k-search" class="cmd-k-search" placeholder="Search teams and people..." autocomplete="off" spellcheck="false">
+                </div>
+                <div id="cmd-k-results" class="cmd-k-results">
+                </div>
+                <div class="cmd-k-instructions">
+                    <span class="cmd-k-kbd">↑↓</span> to navigate • <span class="cmd-k-kbd">Enter</span> to open • <span class="cmd-k-kbd">→</span> to select link • <span class="cmd-k-kbd">Esc</span> to close
+                </div>
+            </div>
+        </div>
+        <?php
+    }
 
-	public function init_cmd_k_js( $privacy_mode = false ) {
-		$available_teams = $this->get_available_teams();
-		$json_files = array();
+    public function init_cmd_k_js( $privacy_mode = false ) {
+        $available_teams = $this->get_available_teams();
+        $json_files = array();
 
-		foreach ( $available_teams as $team_slug ) {
-			$json_files[] = array(
-				'slug' => $team_slug,
-				'name' => $this->get_team_name_from_file( $team_slug )
-			);
-		}
-		?>
-		<script>
-			// Initialize Command-K with list of JSON files
-			document.addEventListener('DOMContentLoaded', () => {
-				if (typeof CmdK !== 'undefined') {
-					const jsonFiles = <?php echo json_encode( $json_files ); ?>;
-					const privacyMode = <?php echo $privacy_mode ? 'true' : 'false'; ?>;
-					CmdK.init(jsonFiles, privacyMode);
-				}
-			});
-		</script>
-		<?php
-	}
+        foreach ( $available_teams as $team_slug ) {
+            $json_files[] = array(
+                'slug' => $team_slug,
+                'name' => $this->get_team_name_from_file( $team_slug )
+            );
+        }
+        ?>
+        <script>
+            // Initialize Command-K with list of JSON files
+            document.addEventListener('DOMContentLoaded', () => {
+                if (typeof CmdK !== 'undefined') {
+                    const jsonFiles = <?php echo json_encode( $json_files ); ?>;
+                    const privacyMode = <?php echo $privacy_mode ? 'true' : 'false'; ?>;
+                    CmdK.init(jsonFiles, privacyMode);
+                }
+            });
+        </script>
+        <?php
+    }
 
-	// Include all the remaining essential functions from the original common.php that are used throughout the system
-	// These include event handling, privacy mode functions, etc.
+    // Include all the remaining essential functions from the original common.php that are used throughout the system
+    // These include event handling, privacy mode functions, etc.
 
-	public function get_all_upcoming_events( $team_data ) {
-		$all_events = array();
-		$current_date = new DateTime();
-		$cutoff_date = clone $current_date;
-		$cutoff_date->add( new DateInterval( 'P3M' ) ); // 3 months from now
+    public function get_all_upcoming_events( $team_data ) {
+        $all_events = array();
+        $current_date = new \DateTime();
+        $cutoff_date = clone $current_date;
+        $cutoff_date->add( new \DateInterval( 'P3M' ) ); // 3 months from now
 
-		// Check if alumni events should be included (undocumented parameter)
-		$include_alumni = isset( $_GET['alumni'] ) && $_GET['alumni'] === '1';
+        // Check if alumni events should be included (undocumented parameter)
+        $include_alumni = isset( $_GET['alumni'] ) && $_GET['alumni'] === '1';
 
-		// Get personal events from team members, leadership, consultants, and optionally alumni
-		$all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['consultants'] ?? array() );
-		if ( $include_alumni ) {
-			$all_people = array_merge( $all_people, $team_data['alumni'] );
-		}
-		foreach ( $all_people as $person ) {
-			$personal_events = $person->get_upcoming_events();
-			$all_events = array_merge( $all_events, $personal_events );
-		}
+        // Get personal events from team members, leadership, consultants, and optionally alumni
+        $all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['consultants'] ?? array() );
+        if ( $include_alumni ) {
+            $all_people = array_merge( $all_people, $team_data['alumni'] );
+        }
+        foreach ( $all_people as $person ) {
+            $personal_events = $person->get_upcoming_events();
+            $all_events = array_merge( $all_events, $personal_events );
+        }
 
-		// Add team and company events (within 3 months)
-		foreach ( $team_data['events'] as $event ) {
-			$start_date = DateTime::createFromFormat( 'Y-m-d', $event->start_date );
-			if ( $start_date && $start_date >= $current_date && $start_date <= $cutoff_date ) {
-				$end_date = DateTime::createFromFormat( 'Y-m-d', $event->end_date );
-				$duration = '';
-				if ( $end_date && $start_date->format( 'Y-m-d' ) !== $end_date->format( 'Y-m-d' ) ) {
-					$duration = ' - ' . $end_date->format( 'M j' );
-				}
+        // Add team and company events (within 3 months)
+        foreach ( $team_data['events'] as $event ) {
+            $start_date = \DateTime::createFromFormat( 'Y-m-d', $event->start_date );
+            if ( $start_date && $start_date >= $current_date && $start_date <= $cutoff_date ) {
+                $end_date = \DateTime::createFromFormat( 'Y-m-d', $event->end_date );
+                $duration = '';
+                if ( $end_date && $start_date->format( 'Y-m-d' ) !== $end_date->format( 'Y-m-d' ) ) {
+                    $duration = ' - ' . $end_date->format( 'M j' );
+                }
 
-				$all_events[] = array(
-					'type' => $event->type,
-					'date' => $start_date,
-					'description' => $event->name . $duration,
-					'location' => $event->location ?? '',
-					'details' => $event->description ?? '',
-				);
-			}
-		}
+                $all_events[] = array(
+                    'type' => $event->type,
+                    'date' => $start_date,
+                    'description' => $event->name . $duration,
+                    'location' => $event->location ?? '',
+                    'details' => $event->description ?? '',
+                );
+            }
+        }
 
-		// Sort all events by date
-		usort( $all_events, function( $a, $b ) {
-			return $a['date'] <=> $b['date'];
-		} );
+        // Sort all events by date
+        usort( $all_events, function( $a, $b ) {
+            return $a['date'] <=> $b['date'];
+        } );
 
-		return $all_events;
-	}
+        return $all_events;
+    }
+
 }
-

@@ -6,27 +6,13 @@
  */
 namespace PersonalCRM;
 
-require_once __DIR__ . '/includes/common.php';
-require_once __DIR__ . '/includes/person.php';
+require_once __DIR__ . '/personal-crm.php';
 
-$common = Common::get_instance();
+// Initialize common variables
+extract( init_common_vars() );
 
-// Team redirection logic - handle cases where no team parameter is provided
-$all_teams_mode = false;
-$current_team = $common->get_current_team_from_params();
-if ( $current_team ) {
-	$all_teams_mode = $current_team === 'all-teams';
-} else {
-	$current_team = $common->get_default_team();
-	$available_teams = $common->get_available_teams();
-	if ( count( $available_teams ) > 1 && ! $current_team ) {
-		header( 'Location: ' . $common->build_url( 'select.php' ) );
-		exit;
-	}
-}
-
-// Get privacy mode
-$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
+// Events-specific logic
+$all_teams_mode = $current_team === 'all-teams';
 
 // Get calendar view parameters
 $view_mode = isset( $_GET['view'] ) ? $_GET['view'] : 'list';
@@ -50,9 +36,9 @@ if ( $calendar_year < 2000 || $calendar_year > 2100 ) {
 if ( $all_teams_mode ) {
 	// Load events from all teams
 	$all_teams_data = array();
-	$available_teams = $common->get_available_teams();
+	$available_teams = $crm->get_available_teams();
 	foreach ( $available_teams as $team_slug ) {
-		$all_teams_data[$team_slug] = $common->load_team_config_with_objects( $team_slug, $privacy_mode );
+		$all_teams_data[$team_slug] = $crm->load_team_config_with_objects( $team_slug, $privacy_mode );
 	}
 	// Create a combined team_data structure
 	$team_data = array(
@@ -73,7 +59,7 @@ if ( $all_teams_mode ) {
 		$team_data['alumni'] = array_merge( $team_data['alumni'], $data['alumni'] ?? array() );
 	}
 } else {
-	$team_data = $common->load_team_config_with_objects( $current_team, $privacy_mode );
+	$team_data = $crm->load_team_config_with_objects( $current_team, $privacy_mode );
 }
 
 // Process team events only (for past events section)
@@ -89,7 +75,7 @@ usort( $past_team_events, function( $a, $b ) {
 });
 
 // Get all upcoming events (personal + team) using shared function
-$all_upcoming_events = $common->get_upcoming_events_for_display( $team_data );
+$all_upcoming_events = $crm->get_upcoming_events_for_display( $team_data );
 
 // Calendar helper functions
 function build_calendar_url( $params = array() ) {
@@ -201,7 +187,7 @@ foreach ( $past_team_events as $event ) {
 
 
 // Get available teams for switcher
-$available_teams = $common->get_available_teams();
+$available_teams = $crm->get_available_teams();
 
 ?>
 <!DOCTYPE html>
@@ -224,23 +210,23 @@ $available_teams = $common->get_available_teams();
 </head>
 <body class="wp-app-body">
     <?php if ( function_exists( 'wp_app_body_open' ) ) wp_app_body_open(); ?>
-    <?php $common->render_cmd_k_panel(); ?>
+    <?php $crm->render_cmd_k_panel(); ?>
 
     <div class="container">
         <div class="header">
             <div class="header-container">
                 <h1>
                     <?php if ( $all_teams_mode ) : ?>
-                        <a href="<?php echo $common->build_url( 'select.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
+                        <a href="<?php echo $crm->build_url( 'select.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
                     <?php else : ?>
-                        <a href="<?php echo $common->build_url( 'index.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
+                        <a href="<?php echo $crm->build_url( 'index.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
                     <?php endif; ?>
                 </h1>
                 <div class="back-nav">
                     <?php if ( $all_teams_mode ) : ?>
-                        <a href="<?php echo $common->build_url( 'select.php' ); ?>">← Back to Team Selection</a>
+                        <a href="<?php echo $crm->build_url( 'select.php' ); ?>">← Back to Team Selection</a>
                     <?php else : ?>
-                    <a href="<?php echo $common->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">← Back to <?php echo $team_data['team_name'], ' ', ucfirst( $group ); ?> Overview</a>
+                    <a href="<?php echo $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">← Back to <?php echo $team_data['team_name'], ' ', ucfirst( $group ); ?> Overview</a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -253,7 +239,7 @@ $available_teams = $common->get_available_teams();
                     echo '<option value="all-teams" ' . $selected_all . '>All Teams</option>';
                     
                     foreach ( $available_teams as $team_slug ) {
-                        $team_display_name = $common->get_team_name_from_file( $team_slug );
+                        $team_display_name = $crm->get_team_name_from_file( $team_slug );
                         $selected = ! $all_teams_mode && $team_slug === $current_team ? 'selected' : '';
                         echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
                     }
@@ -261,7 +247,7 @@ $available_teams = $common->get_available_teams();
                 </select>
                 
                 <?php if ( ! $all_teams_mode ) : ?>
-                    <a href="<?php echo $common->build_url( 'admin.php', array( 'tab' => 'events', 'add' => 'new' ) ); ?>" class="nav-link green">+ Add Event</a>
+                    <a href="<?php echo $crm->build_url( 'admin.php', array( 'tab' => 'events', 'add' => 'new' ) ); ?>" class="nav-link green">+ Add Event</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -322,7 +308,7 @@ $available_teams = $common->get_available_teams();
                                                 <?php 
                                                 // For events with a person, link to the person
                                                 if ( $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary', 'sabbatical', 'other' ) ) ) {
-                                                	echo '<a href="' . $common->build_url( 'index.php', array( 'person' => $event->person->username ) ) . '" class="event-person-link">' . htmlspecialchars( $event->get_title() ) . '</a>';
+                                                	echo '<a href="' . $crm->build_url( 'index.php', array( 'person' => $event->person->username ) ) . '" class="event-person-link">' . htmlspecialchars( $event->get_title() ) . '</a>';
                                                 } else {
                                             		echo htmlspecialchars( $event->get_title() );
                                                 }
@@ -358,7 +344,7 @@ $available_teams = $common->get_available_teams();
                                                 }
                                                 if ( $event_index !== null ) : ?>
                                                     <div class="event-edit-container">
-                                                        <a href="<?php echo $common->build_url( 'admin.php', array( 'tab' => 'events', 'edit_event' => $event_index ) ); ?>"
+                                                        <a href="<?php echo $crm->build_url( 'admin.php', array( 'tab' => 'events', 'edit_event' => $event_index ) ); ?>"
                                                            class="event-edit-link">
                                                             ✏️ Edit
                                                         </a>
@@ -380,7 +366,7 @@ $available_teams = $common->get_available_teams();
                         <p>There are no scheduled events across all teams.</p>
                     <?php else : ?>
                         <p>There are no scheduled events for this team.</p>
-                        <a href="<?php echo $common->build_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-link inline">
+                        <a href="<?php echo $crm->build_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-link inline">
                             Add an Event →
                         </a>
                     <?php endif; ?>
@@ -461,7 +447,7 @@ $available_teams = $common->get_available_teams();
                                         $tooltip = $original_title . ( ! empty( $event->location ) ? ' - ' . $event->location : '' );
                                     ?>
                                         <?php if ( $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary', 'sabbatical', 'other' ) ) ) : ?>
-                                            <a href="<?php echo $common->build_url( 'index.php', array( 'person' => $event->person->username ) ); ?>"
+                                            <a href="<?php echo $crm->build_url( 'index.php', array( 'person' => $event->person->username ) ); ?>"
                                                class="calendar-event <?php echo $event->type; ?>"
                                                title="<?php echo htmlspecialchars( $tooltip ); ?>"
                                                style="text-decoration: none; display: block;">
@@ -581,7 +567,7 @@ $available_teams = $common->get_available_teams();
                                             }
                                             if ( $event_index !== null ) : ?>
                                                 <div style="font-size: 12px; margin-top: 4px;">
-                                                    <a href="<?php echo $common->build_url( 'admin.php', array( 'tab' => 'events', 'edit_event' => $event_index ) ); ?>"
+                                                    <a href="<?php echo $crm->build_url( 'admin.php', array( 'tab' => 'events', 'edit_event' => $event_index ) ); ?>"
                                                        style="color: #666; text-decoration: none; font-size: 11px;">
                                                         ✏️ Edit
                                                     </a>
@@ -604,7 +590,7 @@ $available_teams = $common->get_available_teams();
             <?php else : ?>
                 <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>">🔓 Privacy Mode OFF</a>
             <?php endif; ?>
-            <a href="<?php echo $common->build_url( 'admin.php' ); ?>">⚙️ Admin Panel</a>
+            <a href="<?php echo $crm->build_url( 'admin.php' ); ?>">⚙️ Admin Panel</a>
         </footer>
     </div>
     
@@ -617,7 +603,7 @@ $available_teams = $common->get_available_teams();
         echo '<script src="' . plugin_dir_url( __FILE__ ) . 'assets/script.js"></script>';
     }
     ?>
-    <?php $common->init_cmd_k_js( $privacy_mode ); ?>
+    <?php $crm->init_cmd_k_js( $privacy_mode ); ?>
     <script>
         
         // Team switching functionality

@@ -21,10 +21,10 @@ class PeopleFinderCLI {
      */
     private function loadData(): void {
         // Include common functions to get storage access
-        require_once __DIR__ . '/includes/common.php';
+        require_once __DIR__ . '/personal-crm.php';
 
-        $common = Common::get_instance();
-        $storage = $common->get_storage();
+        $crm = Common::get_instance();
+        $storage = $crm->get_storage();
         $available_teams = $storage->get_available_teams();
         
         foreach ( $available_teams as $teamSlug ) {

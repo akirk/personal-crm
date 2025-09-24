@@ -34,7 +34,7 @@ class Storage implements StorageInterface {
             mkdir( $data_dir, 0755, true );
         }
         
-        $this->db = new SQLite3( $this->db_file );
+        $this->db = new \SQLite3( $this->db_file );
         $this->db->enableExceptions( true );
 
         // Run schema migrations

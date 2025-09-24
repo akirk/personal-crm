@@ -56,3 +56,241 @@ if ( ! function_exists( 'sanitize_html' ) ) {
 		return $clean_html;
 	}
 }
+
+// WordPress plugin system polyfills for standalone mode
+if ( ! function_exists( 'add_action' ) ) {
+	global $wp_actions;
+	if ( ! isset( $wp_actions ) ) {
+		$wp_actions = array();
+	}
+
+	function add_action( $hook_name, $callback, $priority = 10, $accepted_args = 1 ) {
+		global $wp_actions;
+		if ( ! isset( $wp_actions[ $hook_name ] ) ) {
+			$wp_actions[ $hook_name ] = array();
+		}
+		if ( ! isset( $wp_actions[ $hook_name ][ $priority ] ) ) {
+			$wp_actions[ $hook_name ][ $priority ] = array();
+		}
+		$wp_actions[ $hook_name ][ $priority ][] = array(
+			'callback' => $callback,
+			'accepted_args' => $accepted_args
+		);
+		// Sort by priority
+		ksort( $wp_actions[ $hook_name ] );
+	}
+}
+
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( $hook_name, ...$args ) {
+		global $wp_actions;
+		if ( isset( $wp_actions[ $hook_name ] ) ) {
+			foreach ( $wp_actions[ $hook_name ] as $priority => $callbacks ) {
+				foreach ( $callbacks as $callback_info ) {
+					$callback = $callback_info['callback'];
+					$accepted_args = $callback_info['accepted_args'];
+					$callback_args = array_slice( $args, 0, $accepted_args );
+					if ( is_callable( $callback ) ) {
+						call_user_func_array( $callback, $callback_args );
+					}
+				}
+			}
+		}
+	}
+}
+
+if ( ! function_exists( 'add_filter' ) ) {
+	global $wp_filters;
+	if ( ! isset( $wp_filters ) ) {
+		$wp_filters = array();
+	}
+
+	function add_filter( $hook_name, $callback, $priority = 10, $accepted_args = 1 ) {
+		global $wp_filters;
+		if ( ! isset( $wp_filters[ $hook_name ] ) ) {
+			$wp_filters[ $hook_name ] = array();
+		}
+		if ( ! isset( $wp_filters[ $hook_name ][ $priority ] ) ) {
+			$wp_filters[ $hook_name ][ $priority ] = array();
+		}
+		$wp_filters[ $hook_name ][ $priority ][] = array(
+			'callback' => $callback,
+			'accepted_args' => $accepted_args
+		);
+		// Sort by priority
+		ksort( $wp_filters[ $hook_name ] );
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( $hook_name, $value, ...$args ) {
+		global $wp_filters;
+		if ( isset( $wp_filters[ $hook_name ] ) ) {
+			foreach ( $wp_filters[ $hook_name ] as $priority => $callbacks ) {
+				foreach ( $callbacks as $callback_info ) {
+					$callback = $callback_info['callback'];
+					$accepted_args = $callback_info['accepted_args'];
+					$callback_args = array_merge( array( $value ), array_slice( $args, 0, $accepted_args - 1 ) );
+					if ( is_callable( $callback ) ) {
+						$value = call_user_func_array( $callback, $callback_args );
+					}
+				}
+			}
+		}
+		return $value;
+	}
+}
+
+// WordPress activation/deactivation hooks polyfills
+if ( ! function_exists( 'register_activation_hook' ) ) {
+	function register_activation_hook( $file, $callback ) {
+		// In standalone mode, just call the callback immediately
+		if ( is_callable( $callback ) ) {
+			call_user_func( $callback );
+		}
+	}
+}
+
+if ( ! function_exists( 'register_deactivation_hook' ) ) {
+	function register_deactivation_hook( $file, $callback ) {
+		// In standalone mode, store for potential cleanup (not implemented)
+		// Could be extended to register shutdown functions if needed
+	}
+}
+
+// WordPress options API polyfills
+if ( ! function_exists( 'get_option' ) ) {
+	global $wp_options;
+	if ( ! isset( $wp_options ) ) {
+		$wp_options = array();
+	}
+
+	function get_option( $option_name, $default = false ) {
+		global $wp_options;
+		return isset( $wp_options[ $option_name ] ) ? $wp_options[ $option_name ] : $default;
+	}
+}
+
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( $option_name, $value ) {
+		global $wp_options;
+		if ( ! isset( $wp_options[ $option_name ] ) ) {
+			$wp_options[ $option_name ] = $value;
+		}
+	}
+}
+
+if ( ! function_exists( 'update_option' ) ) {
+	function update_option( $option_name, $value ) {
+		global $wp_options;
+		$wp_options[ $option_name ] = $value;
+	}
+}
+
+// WordPress URL functions polyfills
+if ( ! function_exists( 'home_url' ) ) {
+	function home_url( $path = '' ) {
+		// Simple implementation for standalone mode
+		$protocol = isset( $_SERVER['HTTPS'] ) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http';
+		$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+		return $protocol . '://' . $host . rtrim( $path, '/' );
+	}
+}
+
+if ( ! function_exists( 'admin_url' ) ) {
+	function admin_url( $path = '' ) {
+		return home_url( '/admin/' . ltrim( $path, '/' ) );
+	}
+}
+
+// WordPress plugin functions
+if ( ! function_exists( 'plugin_dir_path' ) ) {
+	function plugin_dir_path( $file ) {
+		return dirname( $file ) . '/';
+	}
+}
+
+if ( ! function_exists( 'plugin_dir_url' ) ) {
+	function plugin_dir_url( $file ) {
+		// Return base URL with trailing slash for standalone mode
+		return home_url() . '/';
+	}
+}
+
+if ( ! function_exists( 'is_plugin_active' ) ) {
+	function is_plugin_active( $plugin ) {
+		// In standalone mode, assume plugins are not active
+		return false;
+	}
+}
+
+// WordPress user functions
+if ( ! function_exists( 'current_user_can' ) ) {
+	function current_user_can( $capability ) {
+		// In standalone mode, assume user has all capabilities
+		return true;
+	}
+}
+
+if ( ! function_exists( 'is_user_logged_in' ) ) {
+	function is_user_logged_in() {
+		// In standalone mode, assume user is always logged in
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_get_current_user' ) ) {
+	function wp_get_current_user() {
+		// Return a simple user object for standalone mode
+		return (object) array(
+			'ID' => 1,
+			'user_login' => 'admin',
+			'display_name' => 'Administrator'
+		);
+	}
+}
+
+// WordPress rewrite functions
+if ( ! function_exists( 'flush_rewrite_rules' ) ) {
+	function flush_rewrite_rules() {
+		// No-op in standalone mode
+	}
+}
+
+// WordPress site info functions
+if ( ! function_exists( 'get_bloginfo' ) ) {
+	function get_bloginfo( $show = '' ) {
+		switch ( $show ) {
+			case 'name':
+				return 'Personal CRM';
+			case 'description':
+				return 'Personal CRM Tool';
+			case 'url':
+			case 'home':
+				return home_url();
+			default:
+				return 'Personal CRM';
+		}
+	}
+}
+
+// Additional WordPress functions needed for wp-app
+if ( ! function_exists( 'wp_create_nonce' ) ) {
+	function wp_create_nonce( $action = -1 ) {
+		// Simple nonce for standalone mode
+		return md5( $action . time() );
+	}
+}
+
+if ( ! function_exists( 'is_admin_bar_showing' ) ) {
+	function is_admin_bar_showing() {
+		// In standalone mode, don't show admin bar
+		return false;
+	}
+}
+
+if ( ! function_exists( 'get_language_attributes' ) ) {
+	function get_language_attributes() {
+		return 'en';
+	}
+}

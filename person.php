@@ -7,30 +7,29 @@
 
 namespace PersonalCRM;
 
-require_once __DIR__ . '/includes/common.php';
-require_once __DIR__ . '/includes/person.php';
+require_once __DIR__ . '/personal-crm.php';
 
 // Debug: Log entry to person.php
 error_log( 'DEBUG: person.php - Starting, REQUEST_URI: ' . $_SERVER['REQUEST_URI'] );
 
-$common = Common::get_instance();
-$current_team = $common->get_current_team_from_params();
+$crm = Common::get_instance();
+$current_team = $crm->get_current_team_from_params();
 if ( $current_team ) {
 	// Check if person parameter exists in either $_GET or route parameters
 	$has_person_param = isset( $_GET['person'] ) ||
 	                   ( function_exists( 'get_query_var' ) && get_query_var( 'person' ) );
 
-	if ( $current_team === $common->get_default_team() && ! $has_person_param ) {
+	if ( $current_team === $crm->get_default_team() && ! $has_person_param ) {
 		// Redirect to root if default team is selected and no person specified
 		error_log( 'DEBUG: person.php - REDIRECTING because current_team === get_default_team() && no person param' );
-		header( 'Location: ' . $common->build_url( 'index.php' ) );
+		header( 'Location: ' . $crm->build_url( 'index.php' ) );
 		exit;
 	}
 } else {
-	$current_team = $common->use_default_team();
-	$available_teams = $common->get_available_teams();
+	$current_team = $crm->use_default_team();
+	$available_teams = $crm->get_available_teams();
 	if ( count( $available_teams ) > 1 && ! $current_team ) {
-		header( 'Location: ' . $common->build_url( 'select.php' ) );
+		header( 'Location: ' . $crm->build_url( 'select.php' ) );
 		exit;
 	}
 }
@@ -58,11 +57,11 @@ if ( ! empty( $route_team ) ) {
 	$current_team = $route_team;
 } else if ( ! $current_team ) {
 	// Fallback if no current team is set
-	$current_team = $common->get_default_team();
+	$current_team = $crm->get_default_team();
 }
 
 // Load team configuration with Person objects
-$team_data = $common->load_team_config_with_objects( $current_team );
+$team_data = $crm->load_team_config_with_objects( $current_team );
 
 if ( empty( $person ) ) {
 	// Debug: Check what parameters are available
@@ -73,7 +72,7 @@ if ( empty( $person ) ) {
 		error_log( 'DEBUG: wp_app_get_route_param(team) = ' . wp_app_get_route_param( 'team' ) );
 	}
 
-	header( 'Location: ' . $common->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
+	header( 'Location: ' . $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
 	exit;
 }
 
@@ -90,7 +89,7 @@ if ( isset( $team_data['team_members'][ $person ] ) ) {
 }
 
 if ( ! $person_data ) {
-	$original_team_data = $common->load_team_config_with_objects( $current_team );
+	$original_team_data = $crm->load_team_config_with_objects( $current_team );
 	foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $section ) {
 		if ( isset( $original_team_data[$section][ $person ] ) && ! empty( $original_team_data[$section][ $person ]->deceased ) ) {
 			$person_data = $original_team_data[$section][ $person ];
@@ -100,7 +99,7 @@ if ( ! $person_data ) {
 }
 
 if ( ! $person_data ) {
-	header( 'Location: ' . $common->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
+	header( 'Location: ' . $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
 	exit;
 }
 
@@ -117,7 +116,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="color-scheme" content="light dark">
 	<title><?php
-	$page_title = esc_html( $person_data->get_display_name_with_nickname() ) . ' - ' . esc_html( $common->get_team_display_title( $current_team ) );
+	$page_title = esc_html( $person_data->get_display_name_with_nickname() ) . ' - ' . esc_html( $crm->get_team_display_title( $current_team ) );
 	echo function_exists( 'wp_app_title' ) ? wp_app_title( $page_title ) : $page_title;
 	?></title>
 	<?php
@@ -133,7 +132,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 </head>
 <body class="wp-app-body">
 	<?php if ( function_exists( 'wp_app_body_open' ) ) wp_app_body_open(); ?>
-	<?php $common->render_cmd_k_panel(); ?>
+	<?php $crm->render_cmd_k_panel(); ?>
 
 	<div class="container">
 		<div class="person-header">
@@ -158,13 +157,13 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					</span>
 				</h1>
 				<div class="back-nav">
-					<a href="<?php echo $common->build_url( 'index.php', $privacy_mode ? array( 'privacy' => '1' ) : array() ); ?>">← Back to <?php echo $team_data['team_name'], ' ', ucfirst( $group ); ?> Overview</a>
+					<a href="<?php echo $crm->build_url( 'index.php', $privacy_mode ? array( 'privacy' => '1' ) : array() ); ?>">← Back to <?php echo $team_data['team_name'], ' ', ucfirst( $group ); ?> Overview</a>
 				</div>
 			</div>
 
 			<?php if ( $is_team_member && ! ( isset( $team_data['not_managing_team'] ) && $team_data['not_managing_team'] ) ) : ?>
 				<div class="person-tabs">
-					<a href="<?php echo $common->build_url( 'person.php', array( 'person' => $person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
+					<a href="<?php echo $crm->build_url( 'person.php', array( 'person' => $person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
 					   class="tab-link active">👤 Member Overview</a>
 						<?php do_action( 'personal_crm_person_tabs', $person_data ); ?>
 				</div>
@@ -449,7 +448,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						}
 					}
 					$has_other_links = ! empty( $filtered_links );
-					$has_activity_links = $is_team_member && ! empty( $person_data->username ) && isset( $team_data['activity_url_prefix'] ) && ! $common->is_social_group( $current_team );
+					$has_activity_links = $is_team_member && ! empty( $person_data->username ) && isset( $team_data['activity_url_prefix'] ) && ! $crm->is_social_group( $current_team );
 					$has_add_note_link = ! $privacy_mode && ! $has_notes;
 					?>
 
@@ -462,7 +461,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 									<?php foreach ( $filtered_links as $link_text => $link_url ) : ?>
 										<?php if ( ! empty( $link_url ) ) : ?>
 											<a href="<?php echo esc_url( str_replace( '$username', $person, $link_url ) ); ?>" target="_blank" class="quick-link">
-												<?php echo $common->get_link_icon( $link_text, $link_url, 18); ?>
+												<?php echo $crm->get_link_icon( $link_text, $link_url, 18); ?>
 												<?php echo esc_html( $link_text ); ?>
 											</a>
 										<?php endif; ?>
@@ -505,10 +504,10 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 									<strong>📝 Notes:</strong>
 									<div class="notes-controls">
 										<?php if ( $view_mode === 'chronological' ) : ?>
-											<a href="<?php echo $common->build_url( 'person.php', array( 'person' => $person, 'notes_view' => 'compiled', 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
+											<a href="<?php echo $crm->build_url( 'person.php', array( 'person' => $person, 'notes_view' => 'compiled', 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
 											   class="timeline-toggle">← Compiled view</a>
 										<?php else : ?>
-											<a href="<?php echo $common->build_url( 'person.php', array( 'person' => $person, 'notes_view' => 'chronological', 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
+											<a href="<?php echo $crm->build_url( 'person.php', array( 'person' => $person, 'notes_view' => 'chronological', 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
 											   class="timeline-toggle">Timeline view →</a>
 										<?php endif; ?>
 										<button type="button" onclick="toggleAddNoteForm()" class="add-note-btn">Add note</button>
@@ -526,7 +525,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 												<div class="note-display" id="note-display-<?php echo $note_index; ?>">
 													<p class="note-text"><?php echo nl2br( esc_html( $note['text'] ) ); ?></p>
 												</div>
-												<form method="post" action="<?php echo $common->build_url( 'admin.php' ); ?>" class="edit-note-form" id="edit-note-form-<?php echo $note_index; ?>" style="display: none;">
+												<form method="post" action="<?php echo $crm->build_url( 'admin.php' ); ?>" class="edit-note-form" id="edit-note-form-<?php echo $note_index; ?>" style="display: none;">
 													<input type="hidden" name="action" value="edit_note">
 													<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
 													<input type="hidden" name="note_index" value="<?php echo $note_index; ?>">
@@ -558,7 +557,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 									</div>
 								<?php endif; ?>
 								
-								<form method="post" action="<?php echo $common->build_url( 'admin.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
+								<form method="post" action="<?php echo $crm->build_url( 'admin.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
 									<input type="hidden" name="action" value="add_note">
 									<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
 									<input type="hidden" name="return_to_person" value="1">
@@ -579,7 +578,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						
 						<?php if ( ! $privacy_mode && ! $has_notes ) : ?>
 							<!-- Hidden form for adding notes when no notes exist -->
-							<form method="post" action="<?php echo $common->build_url( 'admin.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
+							<form method="post" action="<?php echo $crm->build_url( 'admin.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
 								<input type="hidden" name="action" value="add_note">
 								<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
 								<input type="hidden" name="return_to_person" value="1">
@@ -606,21 +605,21 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 							<div class="external-account-links">
 								<?php if ( $has_github ) : ?>
 									<a href="https://github.com/<?php echo esc_attr( $person_data->github ); ?>" target="_blank" class="external-link github">
-										<?php echo $common->get_link_icon('GitHub', 'https://github.com/' . $person_data->github, 16); ?>
+										<?php echo $crm->get_link_icon('GitHub', 'https://github.com/' . $person_data->github, 16); ?>
 										GitHub
 									</a>
 								<?php endif; ?>
 
 								<?php if ( $has_linkedin ) : ?>
 									<a href="https://linkedin.com/in/<?php echo esc_attr( $person_data->linkedin ); ?>" target="_blank" class="external-link linkedin">
-										<?php echo $common->get_link_icon('LinkedIn', 'https://linkedin.com/in/' . $person_data->linkedin, 16); ?>
+										<?php echo $crm->get_link_icon('LinkedIn', 'https://linkedin.com/in/' . $person_data->linkedin, 16); ?>
 										LinkedIn
 									</a>
 								<?php endif; ?>
 
 								<?php if ( $has_website ) : ?>
 									<a href="<?php echo esc_url( $person_data->website ); ?>" target="_blank" class="external-link website">
-										<?php echo $common->get_link_icon('Website', $person_data->website, 16); ?>
+										<?php echo $crm->get_link_icon('Website', $person_data->website, 16); ?>
 										Website
 									</a>
 								<?php endif; ?>
@@ -628,14 +627,14 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 
 								<?php if ( $has_wordpress ) : ?>
 									<a href="https://profiles.wordpress.org/<?php echo esc_attr( $person_data->wordpress ); ?>" target="_blank" class="external-link wordpress">
-										<?php echo $common->get_link_icon('WordPress.org', 'https://profiles.wordpress.org/' . $person_data->wordpress, 16); ?>
+										<?php echo $crm->get_link_icon('WordPress.org', 'https://profiles.wordpress.org/' . $person_data->wordpress, 16); ?>
 										WordPress.org
 									</a>
 								<?php endif; ?>
 
 								<?php if ( $has_linear ) : ?>
 									<a href="<?php echo esc_url( $person_data->links['Linear'] ); ?>" target="_blank" class="external-link linear">
-										<?php echo $common->get_link_icon('Linear', $person_data->links['Linear'], 16); ?>
+										<?php echo $crm->get_link_icon('Linear', $person_data->links['Linear'], 16); ?>
 										Linear
 									</a>
 								<?php endif; ?>
@@ -647,11 +646,11 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 			</div>
 
 			<div class="events-sidebar">
-				<a href="<?php echo $common->build_url( 'events.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="sidebar-section-link">
+				<a href="<?php echo $crm->build_url( 'events.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="sidebar-section-link">
 					<h3 class="sidebar-section-heading">🗓️ Upcoming Events</h3>
 				</a>
 				<?php
-				$common->render_upcoming_events_sidebar( $team_data, 365, $person, false );
+				$crm->render_upcoming_events_sidebar( $team_data, 365, $person, false );
 				?>
 
 				<?php
@@ -668,7 +667,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 			<?php else : ?>
 				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>">🔓 Privacy Mode OFF</a>
 			<?php endif; ?>
-			<a href="<?php echo $common->build_url( 'admin.php' ); ?>">⚙️ Admin Panel</a>
+			<a href="<?php echo $crm->build_url( 'admin.php' ); ?>">⚙️ Admin Panel</a>
 			<a href="/crm/admin/<?php echo $current_team; ?>/person/<?php echo $person; ?>/">✏️ Edit Person</a>
 		</footer>
 	</div>
@@ -682,7 +681,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 		echo '<script src="assets/script.js"></script>';
 	}
 	?>
-	<?php $common->init_cmd_k_js( $privacy_mode ); ?>
+	<?php $crm->init_cmd_k_js( $privacy_mode ); ?>
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
 			<?php if ( ! empty( $person_data ) && ( ! empty( $person_data->location ) || ! empty( $person_data->timezone ) ) && empty( $person_data->deceased ) ) : ?>

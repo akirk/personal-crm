@@ -6,18 +6,10 @@
  */
 namespace PersonalCRM;
 
-require_once __DIR__ . '/includes/common.php';
-require_once __DIR__ . '/includes/person.php';
+require_once __DIR__ . '/personal-crm.php';
 
-$common = Common::get_instance();
-$current_team = $common->get_current_team_from_params();
-if ( ! $current_team ) {
-	$current_team = $common->get_default_team();
-}
-$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
-
-// Load team configuration
-$team_data = $common->load_team_config_with_objects( $current_team );
+// Initialize common variables
+extract( init_common_vars() );
 
 /**
  * Check which data points are missing for a person
@@ -157,7 +149,7 @@ usort( $audit_data, function( $a, $b ) {
 } );
 
 // Get available teams for switcher
-$available_teams = $common->get_available_teams();
+$available_teams = $crm->get_available_teams();
 
 ?>
 <!DOCTYPE html>
@@ -322,11 +314,11 @@ $available_teams = $common->get_available_teams();
 </head>
 <body class="wp-app-body">
     <?php if ( function_exists( 'wp_app_body_open' ) ) wp_app_body_open(); ?>
-    <?php $common->render_cmd_k_panel(); ?>
+    <?php $crm->render_cmd_k_panel(); ?>
     <div class="container">
         <div class="header">
             <div style="flex-grow: 1;">
-                <h1><a href="<?php echo $common->build_url( 'audit.php' ); ?>" style="color: inherit; text-decoration: none;">📊 <?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Audit</a></h1>
+                <h1><a href="<?php echo $crm->build_url( 'audit.php' ); ?>" style="color: inherit; text-decoration: none;">📊 <?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Audit</a></h1>
                 <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Identify missing data points and improve team profiles</p>
             </div>
             <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
@@ -334,7 +326,7 @@ $available_teams = $common->get_available_teams();
                 <select id="team-selector" onchange="switchTeam()">
                     <?php
                     foreach ( $available_teams as $team_slug ) {
-                        $team_display_name = $common->get_team_name_from_file( $team_slug );
+                        $team_display_name = $crm->get_team_name_from_file( $team_slug );
                         $selected = $team_slug === $current_team ? 'selected' : '';
                         echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
                     }
@@ -346,8 +338,8 @@ $available_teams = $common->get_available_teams();
                 <?php else : ?>
                     <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
                 <?php endif; ?>
-                <a href="<?php echo $common->build_url( 'index.php' ); ?>" class="nav-link">👥 Team Overview</a>
-                <a href="<?php echo $common->build_url( 'admin.php' ); ?>" class="nav-link">⚙️ Admin Panel</a>
+                <a href="<?php echo $crm->build_url( 'index.php' ); ?>" class="nav-link">👥 Team Overview</a>
+                <a href="<?php echo $crm->build_url( 'admin.php' ); ?>" class="nav-link">⚙️ Admin Panel</a>
             </div>
         </div>
 
@@ -410,10 +402,10 @@ $available_teams = $common->get_available_teams();
                     <tr data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" data-score="<?php echo $item['score']; ?>">
                         <td>
                             <div class="person-name">
-                                <?php echo htmlspecialchars( $common->mask_name( $item['name'], $privacy_mode ) ); ?>
+                                <?php echo htmlspecialchars( $crm->mask_name( $item['name'], $privacy_mode ) ); ?>
                             </div>
                             <div style="font-size: 12px; color: #666;">
-                                @<?php echo htmlspecialchars( $common->mask_username( $item['username'], $privacy_mode ) ); ?>
+                                @<?php echo htmlspecialchars( $crm->mask_username( $item['username'], $privacy_mode ) ); ?>
                             </div>
                         </td>
                         <td><?php echo htmlspecialchars( $item['type'] ); ?></td>
@@ -437,8 +429,8 @@ $available_teams = $common->get_available_teams();
                             <?php endif; ?>
                         </td>
                         <td>
-                            <a href="<?php echo $common->build_url( 'admin.php', array( 'edit_member' => $item['username'] ) ); ?>" class="edit-link">✏️ Edit</a>
-                            <a href="<?php echo $common->build_url( 'index.php', array( 'person' => $item['username'] ) ); ?>" class="edit-link" style="margin-left: 8px;">👁️ View</a>
+                            <a href="<?php echo $crm->build_url( 'admin.php', array( 'edit_member' => $item['username'] ) ); ?>" class="edit-link">✏️ Edit</a>
+                            <a href="<?php echo $crm->build_url( 'index.php', array( 'person' => $item['username'] ) ); ?>" class="edit-link" style="margin-left: 8px;">👁️ View</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -489,6 +481,6 @@ $available_teams = $common->get_available_teams();
     </script>
     <script src="<?php echo plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js'; ?>"></script>
     <script src="<?php echo plugin_dir_url( __FILE__ ) . 'assets/script.js'; ?>"></script>
-    <?php $common->init_cmd_k_js( $privacy_mode ); ?>
+    <?php $crm->init_cmd_k_js( $privacy_mode ); ?>
 </body>
 </html>
