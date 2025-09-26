@@ -32,11 +32,22 @@ if ( ! defined( 'WPINC' ) ) {
     // Only load polyfills in standalone mode
     require_once __DIR__ . '/includes/polyfills.php';
 }
-require_once __DIR__ . '/includes/storage-factory.php';
 require_once __DIR__ . '/includes/personal-crm.php';
 
-PersonalCrm::set_storage_type( defined( 'WPINC' ) ? 'wpdb' : 'sqlite' );
+// Initialize storage and set up PersonalCrm
 if ( defined( 'WPINC' ) ) {
-    add_action( 'plugins_loaded', [ PersonalCrm::class, 'get_instance' ] );
+    // WordPress context - use WordPress wpdb
+    add_action( 'plugins_loaded', function() {
+        global $wpdb;
+        $storage = new Storage( $wpdb );
+        PersonalCrm::set_storage( $storage );
+        PersonalCrm::get_instance();
+    } );
+} else {
+    // Standalone mode - use SQLite by default
+    $sqlite_file = __DIR__ . '/data/a8c.db';
+    $sqlite_wpdb = new \sqlite_wpdb( $sqlite_file, '' );
+    $storage = new Storage( $sqlite_wpdb );
+    PersonalCrm::set_storage( $storage );
 }
 

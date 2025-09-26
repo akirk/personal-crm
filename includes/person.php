@@ -143,7 +143,7 @@ class Person {
 		}
 
 		$params = array_merge( $params, $additional_params );
-		return Common::get_instance()->build_url( 'person.php', $params );
+		return PersonalCrm::get_instance()->build_url( 'person.php', $params );
 	}
 
 	/**

@@ -144,10 +144,10 @@ if ( ! function_exists( 'apply_filters' ) ) {
 // WordPress activation/deactivation hooks polyfills
 if ( ! function_exists( 'register_activation_hook' ) ) {
 	function register_activation_hook( $file, $callback ) {
-		// In standalone mode, just call the callback immediately
-		if ( is_callable( $callback ) ) {
-			call_user_func( $callback );
-		}
+		// In standalone mode, store the callback but don't call it
+		// (activation hooks are WordPress-specific)
+		// The callback should handle standalone mode gracefully if called
+		return true;
 	}
 }
 
@@ -292,5 +292,59 @@ if ( ! function_exists( 'is_admin_bar_showing' ) ) {
 if ( ! function_exists( 'get_language_attributes' ) ) {
 	function get_language_attributes() {
 		return 'en';
+	}
+}
+
+if ( ! function_exists( 'get_avatar' ) ) {
+	function get_avatar( $id_or_email, $size = 96, $default = '', $alt = '', $args = null ) {
+		// Simple avatar for standalone mode
+		$email = is_email( $id_or_email ) ? $id_or_email : 'admin@example.com';
+		$hash = md5( strtolower( trim( $email ) ) );
+		$url = "https://www.gravatar.com/avatar/{$hash}?s={$size}&d=mp";
+		$alt = $alt ?: 'Avatar';
+		return "<img alt='{$alt}' src='{$url}' class='avatar avatar-{$size} photo' height='{$size}' width='{$size}' />";
+	}
+}
+
+if ( ! function_exists( 'is_email' ) ) {
+	function is_email( $email ) {
+		return filter_var( $email, FILTER_VALIDATE_EMAIL ) !== false;
+	}
+}
+
+// Translation functions
+if ( ! function_exists( '__' ) ) {
+	function __( $text, $domain = 'default' ) {
+		return $text;
+	}
+}
+
+if ( ! function_exists( '_e' ) ) {
+	function _e( $text, $domain = 'default' ) {
+		echo __( $text, $domain );
+	}
+}
+
+if ( ! function_exists( 'esc_attr__' ) ) {
+	function esc_attr__( $text, $domain = 'default' ) {
+		return esc_attr( __( $text, $domain ) );
+	}
+}
+
+if ( ! function_exists( 'esc_html__' ) ) {
+	function esc_html__( $text, $domain = 'default' ) {
+		return esc_html( __( $text, $domain ) );
+	}
+}
+
+// WordPress URL functions
+if ( ! function_exists( 'wp_logout_url' ) ) {
+	function wp_logout_url( $redirect = '' ) {
+		// Simple logout URL for standalone mode
+		$logout_url = home_url( '/logout' );
+		if ( $redirect ) {
+			$logout_url .= '?redirect_to=' . urlencode( $redirect );
+		}
+		return $logout_url;
 	}
 }

@@ -8,8 +8,7 @@ namespace PersonalCRM;
 
 require_once __DIR__ . '/personal-crm.php';
 
-// Initialize common variables
-extract( init_common_vars() );
+extract( PersonalCrm::get_globals() );
 
 /**
  * Check which data points are missing for a person
@@ -149,7 +148,7 @@ usort( $audit_data, function( $a, $b ) {
 } );
 
 // Get available teams for switcher
-$available_teams = $crm->get_available_teams();
+$available_teams = $crm->storage->get_available_teams();
 
 ?>
 <!DOCTYPE html>
@@ -326,7 +325,7 @@ $available_teams = $crm->get_available_teams();
                 <select id="team-selector" onchange="switchTeam()">
                     <?php
                     foreach ( $available_teams as $team_slug ) {
-                        $team_display_name = $crm->get_team_name_from_file( $team_slug );
+                        $team_display_name = $crm->storage->get_team_name( $team_slug );
                         $selected = $team_slug === $current_team ? 'selected' : '';
                         echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
                     }

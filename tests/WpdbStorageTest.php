@@ -35,7 +35,7 @@ if ( ! function_exists( 'dbDelta' ) ) {
     }
 }
 
-require_once __DIR__ . '/../includes/wpdb-storage.php';
+require_once __DIR__ . '/../includes/storage.php';
 
 class WpdbStorageTest {
     private $storage;
@@ -43,7 +43,7 @@ class WpdbStorageTest {
 
     public function __construct() {
         $this->mock_wpdb = $this->create_mock_wpdb();
-        $this->storage = new WpdbStorage( $this->mock_wpdb );
+        $this->storage = new PersonalCRM\Storage( $this->mock_wpdb );
     }
 
     /**

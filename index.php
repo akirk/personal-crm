@@ -10,9 +10,7 @@ namespace PersonalCRM;
 require_once __DIR__ . '/personal-crm.php';
 
 extract( PersonalCrm::get_globals() );
-
-$current_team = $crm->get_current_team_from_params();
-if ( $current_team && $current_team === $crm->get_default_team() && ! isset( $_GET['person'] ) ) {
+if ( $current_team && $current_team === $crm->get_default_team() && ! isset( $_GET['person'] ) && isset( $_GET['team'] ) ) {
     // Redirect to root if default team is selected, preserve privacy parameter
     $redirect_params = array();
     if ( isset( $_GET['privacy'] ) && $_GET['privacy'] === '1' ) {
@@ -34,9 +32,6 @@ if ( isset( $_GET['person'] ) && ! empty( $_GET['person'] ) ) {
 
 // Only overview action is handled by index.php now
 $action = 'overview';
-
-// Get available teams for switcher
-$available_teams = $crm->get_available_teams();
 do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 
 ?>
@@ -87,8 +82,8 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 						$groups = array();
 
 						foreach ( $available_teams as $team_slug ) {
-							$team_name = $crm->get_team_name_from_file( $team_slug );
-							$team_type = $crm->get_team_type_from_file( $team_slug );
+							$team_name = $crm->storage->get_team_name( $team_slug );
+							$team_type = $crm->storage->get_team_type( $team_slug );
 							$is_default = $crm->get_default_team() === $team_slug;
 
 							$item = array(

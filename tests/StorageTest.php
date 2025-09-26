@@ -3,6 +3,7 @@
  * Simple test for SQLite Storage implementation
  */
 
+require_once __DIR__ . '/../includes/sqlite-wpdb.php';
 require_once __DIR__ . '/../includes/storage.php';
 
 class StorageTest {
@@ -15,7 +16,8 @@ class StorageTest {
         if ( file_exists( $this->test_db_file ) ) {
             unlink( $this->test_db_file );
         }
-        $this->storage = new Storage( $this->test_db_file );
+        $sqlite_wpdb = new sqlite_wpdb( $this->test_db_file, 'wp_' );
+        $this->storage = new PersonalCRM\Storage( $sqlite_wpdb );
     }
     
     public function run() {

@@ -8,28 +8,19 @@ namespace PersonalCRM;
 
 require_once __DIR__ . '/personal-crm.php';
 
-$crm = Common::get_instance();
-
 // Error handling
 ini_set( 'display_errors', 1 );
 error_reporting( E_ALL );
 
-// Get current team from URL parameter or POST (for form submissions)
+// Special admin.php logic - check for team creation before main initialization
+$crm = PersonalCrm::get_instance();
 $current_team = $crm->get_current_team_from_params();
 if ( ! $current_team && ! ( isset( $_GET['create_team'] ) && $_GET['create_team'] === 'new' ) ) {
 	header( 'Location: ' . $crm->build_url( 'select.php' ) );
 	exit;
 }
 
-// Set global group variable based on team type
-global $group;
-$group = 'team'; // default
-if ( $current_team && $current_team !== 'team' ) {
-	$team_type = $crm->get_team_type_from_file( $current_team );
-	if ( $team_type === 'group' ) {
-		$group = 'group';
-	}
-}
+extract( PersonalCrm::get_globals() );
 
 $config_file = $current_team ? __DIR__ . '/' . $current_team . '.json' : null;
 $action = $_POST['action'] ?? $_GET['action'] ?? 'dashboard';
@@ -178,7 +169,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			
 			if ( $is_default ) {
 				// If this team is being set as default, clear default from all other teams
-				$available_teams = $crm->get_available_teams();
+				$available_teams = $crm->storage->get_available_teams();
 				foreach ( $available_teams as $team_slug ) {
 					if ( $team_slug !== $current_team ) {
 						$other_team_file = __DIR__ . '/' . $team_slug . '.json';
@@ -567,7 +558,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			}
 
 			// If this is the first team being created, make it the default
-			$existing_teams = $crm->get_available_teams();
+			$existing_teams = $crm->storage->get_available_teams();
 			if ( empty( $existing_teams ) ) {
 				$new_config['default'] = true;
 			}
@@ -1924,7 +1915,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<!-- Move to Another <?php echo ucfirst( $group ); ?> -->
 	<?php if ( $is_editing && ( $type === 'member' || $type === 'leader' ) ) : ?>
 		<?php 
-		$available_teams = $crm->get_available_teams();
+		$available_teams = $crm->storage->get_available_teams();
 		$other_teams = array_filter( $available_teams, function( $team ) use ( $current_team ) {
 			return $team !== $current_team;
 		});
@@ -1943,7 +1934,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 							<option value="">Select a <?php echo $group; ?>...</option>
 							<?php foreach ( $other_teams as $team_slug ) : ?>
 								<?php 
-								$team_name = $crm->get_team_name_from_file( $team_slug );
+								$team_name = $crm->storage->get_team_name( $team_slug );
 								
 								// Load target team config to get member count
 								$target_team_config = load_or_create_config( $team_slug );
@@ -2033,13 +2024,13 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <!-- Team Switcher -->
                 <div class="team-switcher" style="display: inline-block; margin-right: 10px;">
                     <?php
-                    $available_teams = $crm->get_available_teams();
+                    $available_teams = $crm->storage->get_available_teams();
                     if ( $available_teams ) :
                     	?>
                     <select id="team-selector" onchange="switchTeam()">
                         <?php
                         foreach ( $available_teams as $team_slug ) {
-                            $team_display_name = $crm->get_team_name_from_file( $team_slug );
+                            $team_display_name = $crm->storage->get_team_name( $team_slug );
                             $selected = $team_slug === $current_team ? 'selected' : '';
                             echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
                         }
@@ -3095,7 +3086,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             // Build the proper team URL using PHP routing
             const teamUrls = {
                 <?php
-                foreach ( $crm->get_available_teams() as $team_slug ) {
+                foreach ( $crm->storage->get_available_teams() as $team_slug ) {
                     $params = array();
                     if ( get_default_team() !== $team_slug ) {
                         $params['team'] = $team_slug;

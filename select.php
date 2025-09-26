@@ -8,8 +8,7 @@ namespace PersonalCRM;
 
 require_once __DIR__ . '/personal-crm.php';
 
-$crm = Common::get_instance();
-$available_teams = $crm->get_available_teams();
+extract( PersonalCrm::get_globals() );
 
 // Check for type filter parameter
 $type_filter = isset( $_GET['type'] ) ? sanitize_text_field( $_GET['type'] ) : null;
@@ -21,7 +20,7 @@ if ( $type_filter && !in_array( $type_filter, array( 'team', 'group' ) ) ) {
 if ( $type_filter ) {
 	$filtered_teams = array();
 	foreach ( $available_teams as $team_slug ) {
-		$team_type = $crm->get_team_type_from_file( $team_slug );
+		$team_type = $crm->storage->get_team_type( $team_slug );
 		if ( $team_type === $type_filter ) {
 			$filtered_teams[] = $team_slug;
 		}
@@ -81,10 +80,10 @@ if ( empty( $available_teams ) ) {
         <div class="team-grid" id="team-grid">
             <?php foreach ( $available_teams as $team_slug ) : ?>
                 <?php
-                $team_name = $crm->get_team_name_from_file( $team_slug );
-                $team_type = $crm->get_team_type_from_file( $team_slug );
+                $team_name = $crm->storage->get_team_name( $team_slug );
+                $team_type = $crm->storage->get_team_type( $team_slug );
                 $people_count = $crm->get_team_people_count( $team_slug );
-                $people_data = $crm->get_team_people_data( $team_slug );
+                $people_data = $crm->storage->get_team_people_data( $team_slug );
                 $param_name = ( $team_type === 'group' ) ? 'group' : 'team';
                 ?>
                 <a href="<?php

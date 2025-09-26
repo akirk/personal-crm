@@ -12,7 +12,8 @@ require_once __DIR__ . '/personal-crm.php';
 // Debug: Log entry to person.php
 error_log( 'DEBUG: person.php - Starting, REQUEST_URI: ' . $_SERVER['REQUEST_URI'] );
 
-$crm = Common::get_instance();
+// Special redirect logic for person.php - needs to happen before main initialization
+$crm = PersonalCrm::get_instance();
 $current_team = $crm->get_current_team_from_params();
 if ( $current_team ) {
 	// Check if person parameter exists in either $_GET or route parameters
@@ -25,16 +26,9 @@ if ( $current_team ) {
 		header( 'Location: ' . $crm->build_url( 'index.php' ) );
 		exit;
 	}
-} else {
-	$current_team = $crm->use_default_team();
-	$available_teams = $crm->get_available_teams();
-	if ( count( $available_teams ) > 1 && ! $current_team ) {
-		header( 'Location: ' . $crm->build_url( 'select.php' ) );
-		exit;
-	}
 }
 
-$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
+extract( PersonalCrm::get_globals() );
 
 // Get current person and team from route parameters or query parameters first
 // Check $_GET first for backward compatibility
@@ -654,7 +648,6 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 				?>
 
 				<?php
-				// HR plugin can hook into this action to provide feedback history
 				do_action( 'personal_crm_person_sidebar', $person_data, $is_team_member );
 				?>
 				</div>

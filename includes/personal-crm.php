@@ -2,33 +2,35 @@
 
 namespace PersonalCRM;
 
+require_once __DIR__ . '/storage.php';
+
 class PersonalCrm {
     private static $instance = null;
-    private static $storage_type = null;
+    private static $storage_instance = null;
+    public $storage;
     private $app;
-    private $storage;
+    private $current_team;
+    private $group;
 
-    public static function set_storage_type( $storage_type ) {
-        self::$storage_type = $storage_type;
+    public static function set_storage( $storage ) {
+        self::$storage_instance = $storage;
     }
 
     public static function get_instance() {
         if ( self::$instance === null ) {
-            if ( ! self::$storage_type ) {
-                throw new \Exception( 'Please set a storage before initializing' );
+            if ( ! self::$storage_instance ) {
+                throw new \Exception( 'Please set a storage instance before initializing' );
             }
             self::$instance = new self();
         }
         return self::$instance;
     }
 
-
-
     public function __construct() {
+        $this->storage = self::$storage_instance;
+
         register_activation_hook( PERSONAL_CRM_PLUGIN_FILE, [ $this, 'activate' ] );
         register_deactivation_hook( PERSONAL_CRM_PLUGIN_FILE, [ $this, 'deactivate' ] );
-
-        $this->storage = StorageFactory::create( self::$storage_type );
 
         if ( class_exists( '\WP_CLI' ) ) {
             require_once __DIR__ . '/wp-cli-commands.php';
@@ -50,7 +52,37 @@ class PersonalCrm {
         $this->setup_routes();
         $this->setup_menu();
 
-        $this->app->init();
+        // Only initialize wp-app if we're in WordPress environment or can provide required constants
+        if ( defined( 'ABSPATH' ) ) {
+            $this->app->init();
+        } else {
+            // In standalone mode, we need to simulate WordPress environment for wp-app
+            // Define required constants for wp-app's DatabaseManager
+            if ( ! defined( 'ABSPATH' ) ) {
+                define( 'ABSPATH', __DIR__ . '/../../..' . '/' );
+            }
+
+            // Create a dummy upgrade.php file that wp-app's DatabaseManager requires
+            $upgrade_dir = ABSPATH . 'wp-admin/includes';
+            if ( ! file_exists( $upgrade_dir ) ) {
+                mkdir( $upgrade_dir, 0755, true );
+            }
+
+            $upgrade_file = $upgrade_dir . '/upgrade.php';
+            if ( ! file_exists( $upgrade_file ) ) {
+                file_put_contents( $upgrade_file, '<?php
+// Minimal WordPress upgrade.php simulation for wp-app standalone mode
+if ( ! function_exists( "dbDelta" ) ) {
+    function dbDelta( $queries = "", $execute = true ) {
+        // No-op in standalone mode
+        return [];
+    }
+}
+' );
+            }
+
+            $this->app->init();
+        }
 
         wp_app_enqueue_style( 'personal-crm-style', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/style.css' );
         wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.css' );
@@ -60,11 +92,14 @@ class PersonalCrm {
         // Fire action to allow other plugins to register routes and extend functionality
         do_action( 'personal_crm_loaded', $this );
 
-        // Add admin settings page
-        add_action( 'admin_menu', [ $this, 'admin_menu' ] );
+        // WordPress-specific functionality
+        if ( defined( 'WPINC' ) ) {
+            // Add admin settings page
+            add_action( 'admin_menu', [ $this, 'admin_menu' ] );
 
-        // Register settings
-        add_action( 'admin_init', [ $this, 'admin_settings' ] );
+            // Register settings
+            add_action( 'admin_init', [ $this, 'admin_settings' ] );
+        }
     }
 
     private function setup_routes() {
@@ -140,6 +175,11 @@ class PersonalCrm {
     }
 
     public function activate() {
+        // Only run activation in WordPress environment
+        if ( ! defined( 'WPINC' ) ) {
+            return; // Skip activation in standalone mode
+        }
+
         // Create/update database tables if using WpDB storage
         $storage_type = get_option( 'personal_crm_storage_type', 'wpdb' );
         if ( $storage_type === 'wpdb' ) {
@@ -230,7 +270,7 @@ class PersonalCrm {
 
         if ( ! $current_team ) {
             $current_team = $crm->use_default_team();
-            $available_teams = $crm->get_available_teams();
+            $available_teams = $crm->storage->get_available_teams();
             if ( count( $available_teams ) > 1 && ! $current_team ) {
                 header( 'Location: ' . $crm->build_url( 'select.php' ) );
                 exit;
@@ -262,9 +302,9 @@ class PersonalCrm {
             }
         }
         $team_data['deceased'] = $deceased_people;
-        $available_teams = $crm->get_available_teams();
+        $available_teams = $crm->storage->get_available_teams();
 
-        return compact( 'crm', 'common', 'current_team', 'group', 'privacy_mode', 'team_data', 'available_teams' );
+        return compact( 'crm', 'current_team', 'group', 'privacy_mode', 'team_data', 'available_teams' );
     }
 
     /**
@@ -274,7 +314,7 @@ class PersonalCrm {
         if ( empty( $team_slug ) ) {
             return false;
         }
-        return $this->get_team_type_from_storage( $team_slug ) === 'group';
+        return $this->storage->get_team_type( $team_slug ) === 'group';
     }
 
     /**
@@ -346,68 +386,12 @@ class PersonalCrm {
         }
     }
 
-    /**
-     * Get all available teams
-     */
-    public function get_available_teams() {
-        return $this->storage->get_available_teams();
-    }
-
-    /**
-     * Get team name from storage
-     */
-    public function get_team_name_from_file( $team_slug ) {
-        $name = $this->storage->get_team_name( $team_slug );
-        return $name ?: ucfirst( str_replace( '_', ' ', $team_slug ) );
-    }
-
-    /**
-     * Get team name from storage (alias for backward compatibility)
-     */
-    public function get_team_name_from_storage( $team_slug ) {
-        return $this->get_team_name_from_file( $team_slug );
-    }
-
-    /**
-     * Get team type from storage (defaults to 'team')
-     */
-    public function get_team_type_from_file( $team_slug ) {
-        return $this->storage->get_team_type( $team_slug );
-    }
-
-    /**
-     * Get team type from storage (alias for backward compatibility)
-     */
-    public function get_team_type_from_storage( $team_slug ) {
-        return $this->get_team_type_from_file( $team_slug );
-    }
-
-    /**
-     * Get people count from team config file
-     */
-    public function get_team_people_count( $team_slug ) {
-        return $this->storage->get_team_people_count( $team_slug );
-    }
-
-    /**
-     * Get all people names from team config file for search purposes
-     */
-    public function get_team_people_names( $team_slug ) {
-        return $this->storage->get_team_people_names( $team_slug );
-    }
-
-    /**
-     * Get all people data (username => person data) from team config file for search purposes
-     */
-    public function get_team_people_data( $team_slug ) {
-        return $this->storage->get_team_people_data( $team_slug );
-    }
 
     /**
      * Get display word for team type ('team' -> 'team', 'group' -> 'group')
      */
     public function get_type_display_word( $team_slug ) {
-        $type = $this->get_team_type_from_file( $team_slug );
+        $type = $this->storage->get_team_type( $team_slug );
         return ( $type === 'group' ) ? 'group' : 'team';
     }
 
@@ -415,7 +399,8 @@ class PersonalCrm {
      * Get display title with appropriate type word
      */
     public function get_team_display_title( $team_slug, $suffix = '' ) {
-        $team_name = $this->get_team_name_from_file( $team_slug );
+        $team_name = $this->storage->get_team_name( $team_slug );
+        $team_name = $team_name ?: ucfirst( str_replace( '_', ' ', $team_slug ) );
 
         if ( empty( $suffix ) ) {
             return $team_name . ' ' . ucfirst( $this->group );
@@ -533,7 +518,7 @@ class PersonalCrm {
     public function load_team_config_with_objects( $team_slug = 'team' ) {
         if ( ! $this->storage->team_exists( $team_slug ) ) {
             // Redirect to team creation page
-            $create_team_url = $this->$crm->build_url( 'admin.php', array( 'create_team' => 'new' ) );
+            $create_team_url = $this->build_url( 'admin.php', array( 'create_team' => 'new' ) );
             header( 'Location: ' . $create_team_url );
             exit;
         }
@@ -709,9 +694,15 @@ class PersonalCrm {
         // Add team events (if enabled)
         if ( $include_team_events && isset( $team_data['events'] ) ) {
             foreach ( $team_data['events'] as $event ) {
-                if ( $event->date >= $current_date && $event->date <= $cutoff_date ) {
+                $event_start = $event->date;
+                $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
+
+                // Include event if it's upcoming or currently ongoing
+                if ( $event_end >= $current_date && $event_start <= $cutoff_date ) {
                     $all_events[] = $event;
-                    error_log( 'DEBUG: CrmCore - Including team event: ' . $event->get_title() );
+                    error_log( 'DEBUG: CrmCore - Including team event: ' . $event->get_title() . ' (ends: ' . $event_end->format('Y-m-d') . ')' );
+                } else {
+                    error_log( 'DEBUG: CrmCore - Excluding team event: ' . $event->get_title() . ' (ends: ' . $event_end->format('Y-m-d') . ')' );
                 }
             }
         }
@@ -723,14 +714,18 @@ class PersonalCrm {
             return $a->date <=> $b->date;
         } );
 
-        // Filter to upcoming events within 30 days
+        // Filter to upcoming events within the time window (including ongoing multi-day events)
         $upcoming_events = array();
         foreach ( $all_events as $event ) {
-            if ( $event->date >= $current_date && $event->date <= $cutoff_date ) {
+            $event_start = $event->date;
+            $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
+
+            // Include event if it's upcoming or currently ongoing
+            if ( $event_end >= $current_date && $event_start <= $cutoff_date ) {
                 $upcoming_events[] = $event;
-                error_log( 'DEBUG: CrmCore - Including upcoming event: ' . $event->get_title() . ' on ' . $event->date->format('Y-m-d') );
+                error_log( 'DEBUG: CrmCore - Including upcoming event: ' . $event->get_title() . ' on ' . $event->date->format('Y-m-d') . ' (ends: ' . $event_end->format('Y-m-d') . ')' );
             } else {
-                error_log( 'DEBUG: CrmCore - Excluding event: ' . $event->get_title() . ' on ' . $event->date->format('Y-m-d') . ' (outside 30-day window)' );
+                error_log( 'DEBUG: CrmCore - Excluding event: ' . $event->get_title() . ' on ' . $event->date->format('Y-m-d') . ' (ends: ' . $event_end->format('Y-m-d') . ')' );
             }
         }
 
@@ -830,8 +825,8 @@ class PersonalCrm {
      * Build URL with team parameter (uses 'group' parameter for group-type teams)
      */
     public function build_url( $base_url, $additional_params = array() ) {
-        // If running as WordPress plugin, use WordPress URL structure
-        if ( defined( 'WPINC' ) ) {
+        // If wp-app is available, use wp-app URL structure (works in both WordPress and standalone modes)
+        if ( $this->app ) {
             // Convert .php file references to plugin routes
             $route = str_replace( '.php', '', $base_url );
 
@@ -881,7 +876,7 @@ class PersonalCrm {
         // Original standalone functionality
         $params = array();
         if ( $this->current_team !== 'team' ) {
-            $team_type = $this->get_team_type_from_file( $this->current_team );
+            $team_type = $this->storage->get_team_type( $this->current_team );
             $param_name = ( $team_type === 'group' ) ? 'group' : 'team';
             $params[ $param_name ] = $this->current_team;
         }
@@ -914,13 +909,13 @@ class PersonalCrm {
     }
 
     public function init_cmd_k_js( $privacy_mode = false ) {
-        $available_teams = $this->get_available_teams();
+        $available_teams = $this->storage->get_available_teams();
         $json_files = array();
 
         foreach ( $available_teams as $team_slug ) {
             $json_files[] = array(
                 'slug' => $team_slug,
-                'name' => $this->get_team_name_from_file( $team_slug )
+                'name' => $this->storage->get_team_name( $team_slug ) ?: ucfirst( str_replace( '_', ' ', $team_slug ) )
             );
         }
         ?>
@@ -939,6 +934,113 @@ class PersonalCrm {
 
     // Include all the remaining essential functions from the original common.php that are used throughout the system
     // These include event handling, privacy mode functions, etc.
+
+    /**
+     * Get events for calendar display (all events within date range, not just upcoming)
+     */
+    public function get_calendar_events( $team_data, $start_date, $end_date ) {
+        $all_events = array();
+
+        // Get all people from team data
+        $all_people = array();
+        if ( isset( $team_data['team_members'] ) ) {
+            $all_people = array_merge( $all_people, $team_data['team_members'] );
+        }
+        if ( isset( $team_data['leadership'] ) ) {
+            $all_people = array_merge( $all_people, $team_data['leadership'] );
+        }
+        if ( isset( $team_data['consultants'] ) ) {
+            $all_people = array_merge( $all_people, $team_data['consultants'] );
+        }
+
+        // Get personal events from people within date range
+        // For calendar view, we get upcoming events and then filter by date range
+        foreach ( $all_people as $person ) {
+            if ( is_object( $person ) && method_exists( $person, 'get_upcoming_events' ) ) {
+                // Get upcoming events for this person (covers next year)
+                $personal_events = $person->get_upcoming_events();
+                foreach ( $personal_events as $event ) {
+                    $event_start = $event->date;
+                    $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
+
+                    // Include event if it overlaps with our date range
+                    if ( $event_end >= $start_date && $event_start <= $end_date ) {
+                        $all_events[] = $event;
+                    }
+                }
+            }
+        }
+
+        // Add team events within date range
+        if ( isset( $team_data['events'] ) ) {
+            foreach ( $team_data['events'] as $event ) {
+                $event_start = $event->date;
+                $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
+
+                // Include event if it overlaps with our date range
+                if ( $event_end >= $start_date && $event_start <= $end_date ) {
+                    $all_events[] = $event;
+                }
+            }
+        }
+
+        // Sort all events by date
+        usort( $all_events, function( $a, $b ) {
+            return $a->date <=> $b->date;
+        } );
+
+        return $all_events;
+    }
+
+    /**
+     * Get upcoming events for display (includes ongoing multi-day events)
+     */
+    public function get_upcoming_events_for_display( $team_data ) {
+        $current_date = new \DateTime();
+        $cutoff_date = clone $current_date;
+        $cutoff_date->add( new \DateInterval( 'P3M' ) ); // 3 months from now
+        $all_events = array();
+
+        // Get all people from team data
+        $all_people = array();
+        if ( isset( $team_data['team_members'] ) ) {
+            $all_people = array_merge( $all_people, $team_data['team_members'] );
+        }
+        if ( isset( $team_data['leadership'] ) ) {
+            $all_people = array_merge( $all_people, $team_data['leadership'] );
+        }
+        if ( isset( $team_data['consultants'] ) ) {
+            $all_people = array_merge( $all_people, $team_data['consultants'] );
+        }
+
+        // Get personal events from people
+        foreach ( $all_people as $person ) {
+            if ( is_object( $person ) && method_exists( $person, 'get_upcoming_events' ) ) {
+                $personal_events = $person->get_upcoming_events();
+                $all_events = array_merge( $all_events, $personal_events );
+            }
+        }
+
+        // Add team events (including ongoing multi-day events)
+        if ( isset( $team_data['events'] ) ) {
+            foreach ( $team_data['events'] as $event ) {
+                $event_start = $event->date;
+                $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
+
+                // Include event if it's upcoming or currently ongoing
+                if ( $event_end >= $current_date && $event_start <= $cutoff_date ) {
+                    $all_events[] = $event;
+                }
+            }
+        }
+
+        // Sort all events by date
+        usort( $all_events, function( $a, $b ) {
+            return $a->date <=> $b->date;
+        } );
+
+        return $all_events;
+    }
 
     public function get_all_upcoming_events( $team_data ) {
         $all_events = array();
@@ -959,11 +1061,13 @@ class PersonalCrm {
             $all_events = array_merge( $all_events, $personal_events );
         }
 
-        // Add team and company events (within 3 months)
+        // Add team and company events (within 3 months) - Fixed property access
         foreach ( $team_data['events'] as $event ) {
-            $start_date = \DateTime::createFromFormat( 'Y-m-d', $event->start_date );
-            if ( $start_date && $start_date >= $current_date && $start_date <= $cutoff_date ) {
-                $end_date = \DateTime::createFromFormat( 'Y-m-d', $event->end_date );
+            $start_date = $event->date; // Use ->date property, not ->start_date
+            $end_date = isset( $event->end_date ) && $event->end_date ? $event->end_date : $start_date;
+
+            // Include event if it's upcoming or currently ongoing
+            if ( $end_date >= $current_date && $start_date <= $cutoff_date ) {
                 $duration = '';
                 if ( $end_date && $start_date->format( 'Y-m-d' ) !== $end_date->format( 'Y-m-d' ) ) {
                     $duration = ' - ' . $end_date->format( 'M j' );
@@ -972,16 +1076,18 @@ class PersonalCrm {
                 $all_events[] = array(
                     'type' => $event->type,
                     'date' => $start_date,
-                    'description' => $event->name . $duration,
+                    'description' => $event->description . $duration, // Use ->description, not ->name
                     'location' => $event->location ?? '',
-                    'details' => $event->description ?? '',
+                    'details' => $event->details ?? '',
                 );
             }
         }
 
         // Sort all events by date
         usort( $all_events, function( $a, $b ) {
-            return $a['date'] <=> $b['date'];
+            $date_a = is_array( $a ) ? $a['date'] : $a->date;
+            $date_b = is_array( $b ) ? $b['date'] : $b->date;
+            return $date_a <=> $date_b;
         } );
 
         return $all_events;
