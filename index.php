@@ -334,13 +334,10 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 			<?php else : ?>
 				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="footer-link">🔓 Privacy Mode OFF</a>
 			<?php endif; ?>
-			<?php if ( ! ( isset( $team_data['not_managing_team'] ) && $team_data['not_managing_team'] ) ) : ?>
-				<?php if ( isset( $_GET['hr_view'] ) && $_GET['hr_view'] === 'current' ) : ?>
-					<a href="?<?php echo http_build_query( array_diff_key( $_GET, array( 'hr_view' => '' ) ) ); ?>" class="footer-link">📅 HR: Current Month</a>
-				<?php else : ?>
-					<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'hr_view' => 'current' ) ) ); ?>" class="footer-link">📅 HR: Previous Month</a>
-				<?php endif; ?>
-			<?php endif; ?>
+			<?php
+			// Allow other plugins to add footer links
+			do_action( 'personal_crm_footer_links', $team_data, $current_team );
+			?>
 			<a href="<?php echo $crm->build_url( 'admin.php', array( 'team' => $current_team ) ); ?>" class="footer-link">⚙️ Admin Panel</a>
 		</footer>
 	</div>
