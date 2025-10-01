@@ -2,6 +2,12 @@
 /**
  * Event class to represent team events, personal events, etc.
  */
+namespace PersonalCRM;
+
+if ( class_exists( '\PersonalCRM\Event' ) ) {
+    return;
+}
+
 class Event {
 	public $type;
 	public $description;
@@ -9,8 +15,8 @@ class Event {
 	public $location;
 	public $details;
 	public $links;
-	public DateTime $date;
-	public ?DateTime $end_date = null;
+	public \DateTime $date;
+	public ?\DateTime $end_date = null;
 	public ?Person $person = null; // Optional Person object
 	public $privacy_mode = false; // Privacy mode for masking sensitive data
 
@@ -128,7 +134,7 @@ class Event {
 	}
 
 	public function is_past() {
-		return $this->date < new DateTime();
+		return $this->date < new \DateTime();
 	}
 
 	public function get_title() {
@@ -234,14 +240,26 @@ class Event {
 	 * Get ordinal number (1st, 2nd, 3rd, 4th, etc.)
 	 */
 	private static function get_ordinal_number( $number ) {
-		$formatter = new NumberFormatter( 'en_US', NumberFormatter::ORDINAL );
-		return $formatter->format( $number );
+		if ( class_exists( 'NumberFormatter' ) ) {
+			$formatter = new \NumberFormatter( 'en_US', \NumberFormatter::ORDINAL );
+			return $formatter->format( $number );
+		}
+
+		$suffix = 'th';
+		if ( $number % 100 < 11 || $number % 100 > 13 ) {
+			switch ( $number % 10 ) {
+				case 1:  $suffix = 'st'; break;
+				case 2:  $suffix = 'nd'; break;
+				case 3:  $suffix = 'rd'; break;
+			}
+		}
+		return $number . $suffix;
 	}
 	/**
 	 * Create Event from team event data
 	 */
 	public static function from_team_event( $event_data, $privacy_mode = false ) {
-		$start_date = DateTime::createFromFormat( 'Y-m-d', $event_data['start_date'] );
+		$start_date = \DateTime::createFromFormat( 'Y-m-d', $event_data['start_date'] );
 		$event = new self( $event_data['type'], $start_date, $event_data['name'], null, $privacy_mode );
 		
 		$event->set_location( $event_data['location'] ?? '' );
@@ -249,7 +267,7 @@ class Event {
 		$event->set_links( $event_data['links'] ?? array() );
 		
 		if ( ! empty( $event_data['end_date'] ) ) {
-			$event->set_end_date(  DateTime::createFromFormat( 'Y-m-d', $event_data['end_date'] ) );
+			$event->set_end_date( \DateTime::createFromFormat( 'Y-m-d', $event_data['end_date'] ) );
 		}
 		
 		return $event;

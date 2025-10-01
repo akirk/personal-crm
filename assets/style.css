@@ -1991,6 +1991,10 @@ details summary span:last-child {
     margin-right: 15px;
 }
 
+.privacy-footer span,.privacy-footer strong {
+    margin-right: 15px;
+}
+
 /* Additional common styles */
 .header-container {
     flex-grow: 1;

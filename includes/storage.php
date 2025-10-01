@@ -1,252 +1,282 @@
 <?php
 /**
- * SQLite Database Storage Class
- * 
- * SQLite database storage for better performance, concurrent access, and data integrity.
+ * WordPress Database Storage Class
+ *
+ * WordPress database storage using wpdb for compatibility with WordPress infrastructure.
+ * Works with WordPress wpdb, MySQL wpdb polyfill, or SQLite wpdb subclass.
  */
 
-require_once __DIR__ . '/storage-interface.php';
+namespace PersonalCRM;
 
-class Storage implements StorageInterface {
-    private $db;
-    private $db_file;
-    
-    public function __construct( $db_file = null ) {
-        if ( $db_file === null ) {
-            $db_file = __DIR__ . '/../data/a8c.db';
+require_once __DIR__ . '/wpdb-polyfill.php';
+require_once __DIR__ . '/sqlite-wpdb.php';
+
+if ( class_exists( '\PersonalCRM\Storage' ) ) {
+    return;
+}
+
+class Storage {
+    private $wpdb;
+
+    public function __construct( $wpdb_instance ) {
+        global $wpdb;
+        $this->wpdb = $wpdb_instance;
+
+        // Set global wpdb for dbDelta compatibility
+        if ( ! $wpdb ) {
+            $wpdb = $wpdb_instance;
         }
-        $this->db_file = $db_file;
+
         $this->init_database();
     }
-    
+
     /**
-     * Initialize SQLite database and create tables if they don't exist
+     * Initialize WordPress database tables using dbDelta
      */
     private function init_database() {
-        // Create data directory if it doesn't exist
-        $data_dir = dirname( $this->db_file );
-        if ( ! file_exists( $data_dir ) ) {
-            mkdir( $data_dir, 0755, true );
+        if ( ! function_exists( 'dbDelta' ) ) {
+            if ( ! defined( 'ABSPATH' ) ) {
+                throw new \Exception( 'ABSPATH not defined. WpdbStorage requires WordPress environment.' );
+            }
+            require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
         }
-        
-        $this->db = new SQLite3( $this->db_file );
-        $this->db->enableExceptions( true );
 
-        // Run schema migrations
+        $this->create_tables();
         $this->run_migrations();
+    }
 
-        // Create teams table
-        $this->db->exec( "
-            CREATE TABLE IF NOT EXISTS teams (
-                slug TEXT PRIMARY KEY,
-                team_name TEXT NOT NULL,
-                activity_url_prefix TEXT DEFAULT '',
-                not_managing_team INTEGER DEFAULT 1,
-                type TEXT DEFAULT 'team',
-                is_default INTEGER DEFAULT 0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        " );
-        
-        // Create people table  
-        $this->db->exec( "
-            CREATE TABLE IF NOT EXISTS people (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                team_slug TEXT NOT NULL,
-                category TEXT NOT NULL, -- 'team_members', 'leadership', 'consultants', 'alumni'
-                name TEXT NOT NULL,
-                nickname TEXT DEFAULT '',
-                role TEXT DEFAULT '',
-                email TEXT DEFAULT '',
-                birthday TEXT DEFAULT '',
-                company_anniversary TEXT DEFAULT '',
-                partner TEXT DEFAULT '',
-                partner_birthday TEXT DEFAULT '',
-                location TEXT DEFAULT '',
-                timezone TEXT DEFAULT '',
-                github TEXT DEFAULT '',
-                linear TEXT DEFAULT '',
-                wordpress TEXT DEFAULT '',
-                linkedin TEXT DEFAULT '',
-                website TEXT DEFAULT '',
-                new_company TEXT DEFAULT '',
-                new_company_website TEXT DEFAULT '',
-                deceased_date TEXT DEFAULT '',
-                left_company INTEGER DEFAULT 0,
-                deceased INTEGER DEFAULT 0,
-                kids TEXT DEFAULT '[]',
-                github_repos TEXT DEFAULT '[]',
-                personal_events TEXT DEFAULT '[]',
-                notes TEXT DEFAULT '[]',
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (team_slug) REFERENCES teams(slug) ON DELETE CASCADE,
-                UNIQUE(username, team_slug)
-            )
-        " );
-        
-        // Create events table
-        $this->db->exec( "
-            CREATE TABLE IF NOT EXISTS events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                team_slug TEXT NOT NULL,
-                type TEXT NOT NULL,
-                name TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                start_date TEXT NOT NULL,
-                end_date TEXT DEFAULT '',
-                location TEXT DEFAULT '',
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (team_slug) REFERENCES teams(slug) ON DELETE CASCADE
-            )
-        " );
-        
-        // Create hr_feedback table
-        $this->db->exec( "
-            CREATE TABLE IF NOT EXISTS hr_feedback (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                month TEXT NOT NULL,
-                feedback_to_person TEXT DEFAULT '',
-                feedback_to_hr TEXT DEFAULT '',
-                submitted_to_hr INTEGER DEFAULT 0,
-                draft_complete INTEGER DEFAULT 0,
-                google_doc_updated INTEGER DEFAULT 0,
-                not_necessary_reason TEXT DEFAULT '',
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(username, month)
-            )
-        " );
-        
-        // Create team_links table for normalized link storage
-        $this->db->exec( "
-            CREATE TABLE IF NOT EXISTS team_links (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                team_slug TEXT NOT NULL,
-                link_name TEXT NOT NULL,
-                link_url TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (team_slug) REFERENCES teams(slug) ON DELETE CASCADE,
-                UNIQUE(team_slug, link_name)
-            )
-        " );
-        
-        // Create people_links table for normalized link storage
-        $this->db->exec( "
-            CREATE TABLE IF NOT EXISTS people_links (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                person_id INTEGER NOT NULL,
-                link_name TEXT NOT NULL,
-                link_url TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (person_id) REFERENCES people(id) ON DELETE CASCADE,
-                UNIQUE(person_id, link_name)
-            )
-        " );
-        
-        // Create event_links table for normalized link storage
-        $this->db->exec( "
-            CREATE TABLE IF NOT EXISTS event_links (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_id INTEGER NOT NULL,
-                link_name TEXT NOT NULL,
-                link_url TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
-                UNIQUE(event_id, link_name)
-            )
-        " );
-        
-        // Create indexes for better performance
-        $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_people_team_slug ON people(team_slug)" );
-        $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_people_username ON people(username)" );
-        $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_events_team_slug ON events(team_slug)" );
-        $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_team_links_team_slug ON team_links(team_slug)" );
-        $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_people_links_person_id ON people_links(person_id)" );
-        $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_event_links_event_id ON event_links(event_id)" );
-        $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_hr_feedback_username ON hr_feedback(username)" );
-        $this->db->exec( "CREATE INDEX IF NOT EXISTS idx_hr_feedback_month ON hr_feedback(month)" );
+    /**
+     * Create database tables using WordPress dbDelta
+     */
+    private function create_tables() {
+        $charset_collate = $this->wpdb->get_charset_collate();
+
+        // Teams table
+        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_teams (
+            slug varchar(100) NOT NULL,
+            team_name varchar(255) NOT NULL,
+            activity_url_prefix varchar(255) DEFAULT '',
+            not_managing_team tinyint(1) DEFAULT 1,
+            type varchar(50) DEFAULT 'team',
+            is_default tinyint(1) DEFAULT 0,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (slug),
+            KEY idx_team_type (type),
+            KEY idx_team_default (is_default)
+        ) $charset_collate;";
+
+        dbDelta( $sql );
+
+        // People table
+        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_people (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            username varchar(100) NOT NULL,
+            team_slug varchar(100) NOT NULL,
+            category varchar(50) NOT NULL,
+            name varchar(255) NOT NULL,
+            nickname varchar(255) DEFAULT '',
+            role varchar(255) DEFAULT '',
+            email varchar(255) DEFAULT '',
+            birthday varchar(20) DEFAULT '',
+            company_anniversary varchar(20) DEFAULT '',
+            partner varchar(255) DEFAULT '',
+            partner_birthday varchar(20) DEFAULT '',
+            location varchar(255) DEFAULT '',
+            timezone varchar(100) DEFAULT '',
+            github varchar(100) DEFAULT '',
+            `linear` varchar(100) DEFAULT '',
+            wordpress varchar(100) DEFAULT '',
+            linkedin varchar(100) DEFAULT '',
+            website varchar(255) DEFAULT '',
+            new_company varchar(255) DEFAULT '',
+            new_company_website varchar(255) DEFAULT '',
+            deceased_date varchar(20) DEFAULT '',
+            left_company tinyint(1) DEFAULT 0,
+            deceased tinyint(1) DEFAULT 0,
+            kids longtext,
+            github_repos longtext,
+            personal_events longtext,
+            notes longtext,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_people_team_slug (team_slug),
+            KEY idx_people_username (username),
+            KEY idx_people_category (category),
+            UNIQUE KEY unique_user_team (username, team_slug)
+        ) $charset_collate;";
+
+        dbDelta( $sql );
+
+        // Events table
+        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_events (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            team_slug varchar(100) NOT NULL,
+            type varchar(50) NOT NULL,
+            name varchar(255) NOT NULL,
+            description text DEFAULT '',
+            start_date varchar(20) NOT NULL,
+            end_date varchar(20) DEFAULT '',
+            location varchar(255) DEFAULT '',
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_events_team_slug (team_slug),
+            KEY idx_events_type (type),
+            KEY idx_events_start_date (start_date)
+        ) $charset_collate;";
+
+        dbDelta( $sql );
+
+        // HR Feedback table
+        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_hr_feedback (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            username varchar(100) NOT NULL,
+            month varchar(10) NOT NULL,
+            feedback_to_person text DEFAULT '',
+            feedback_to_hr text DEFAULT '',
+            submitted_to_hr tinyint(1) DEFAULT 0,
+            draft_complete tinyint(1) DEFAULT 0,
+            google_doc_updated tinyint(1) DEFAULT 0,
+            not_necessary_reason text DEFAULT '',
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_hr_feedback_username (username),
+            KEY idx_hr_feedback_month (month),
+            UNIQUE KEY unique_user_month (username, month)
+        ) $charset_collate;";
+
+        dbDelta( $sql );
+
+        // Team links table
+        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_team_links (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            team_slug varchar(100) NOT NULL,
+            link_name varchar(100) NOT NULL,
+            link_url text NOT NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_team_links_team_slug (team_slug),
+            UNIQUE KEY unique_team_link (team_slug, link_name)
+        ) $charset_collate;";
+
+        dbDelta( $sql );
+
+        // People links table
+        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_people_links (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            person_id bigint(20) unsigned NOT NULL,
+            link_name varchar(100) NOT NULL,
+            link_url text NOT NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_people_links_person_id (person_id),
+            UNIQUE KEY unique_person_link (person_id, link_name)
+        ) $charset_collate;";
+
+        dbDelta( $sql );
+
+        // Event links table
+        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_event_links (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            event_id bigint(20) unsigned NOT NULL,
+            link_name varchar(100) NOT NULL,
+            link_url text NOT NULL,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY idx_event_links_event_id (event_id),
+            UNIQUE KEY unique_event_link (event_id, link_name)
+        ) $charset_collate;";
+
+        dbDelta( $sql );
     }
 
     /**
      * Run database schema migrations
      */
     private function run_migrations() {
-        // Check if migrations table exists, create if not
-        $this->db->exec( "
-            CREATE TABLE IF NOT EXISTS migrations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                migration_name TEXT UNIQUE NOT NULL,
-                applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        " );
+        // Create migrations table if it doesn't exist
+        $charset_collate = $this->wpdb->get_charset_collate();
+        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_migrations (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            migration_name varchar(255) NOT NULL,
+            applied_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_migration (migration_name)
+        ) $charset_collate;";
 
-        // Migration to add linear column to people table
-        $migration_name = 'add_linear_column_to_people';
-        $stmt = $this->db->prepare( "SELECT COUNT(*) as count FROM migrations WHERE migration_name = ?" );
-        $stmt->bindValue( 1, $migration_name, SQLITE3_TEXT );
-        $result = $stmt->execute();
-        $row = $result->fetchArray( SQLITE3_ASSOC );
+        dbDelta( $sql );
 
-        if ( $row['count'] == 0 ) {
+        // Run migrations
+        $this->run_migration( 'add_linear_column_to_people', function() {
             // Check if linear column already exists
-            $pragma_result = $this->db->query( "PRAGMA table_info(people)" );
+            $columns = $this->wpdb->get_results( "DESCRIBE {$this->wpdb->prefix}personal_crm_people" );
             $has_linear_column = false;
 
-            if ( $pragma_result ) {
-                while ( $column_info = $pragma_result->fetchArray( SQLITE3_ASSOC ) ) {
-                    if ( $column_info['name'] === 'linear' ) {
-                        $has_linear_column = true;
-                        break;
-                    }
+            foreach ( $columns as $column ) {
+                if ( $column->Field === 'linear' ) {
+                    $has_linear_column = true;
+                    break;
                 }
             }
 
             if ( ! $has_linear_column ) {
-                // Add linear column to existing people table
-                $this->db->exec( "ALTER TABLE people ADD COLUMN linear TEXT DEFAULT ''" );
+                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_people ADD COLUMN `linear` varchar(100) DEFAULT ''" );
             }
+        } );
+    }
 
-            // Record that migration has been applied
-            $stmt = $this->db->prepare( "INSERT INTO migrations (migration_name) VALUES (?)" );
-            $stmt->bindValue( 1, $migration_name, SQLITE3_TEXT );
-            $stmt->execute();
+    /**
+     * Run a specific migration
+     */
+    private function run_migration( $migration_name, $migration_callback ) {
+        $migration_exists = $this->wpdb->get_var( $this->wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_migrations WHERE migration_name = %s",
+            $migration_name
+        ) );
+
+        if ( ! $migration_exists ) {
+            call_user_func( $migration_callback );
+
+            $this->wpdb->insert(
+                $this->table_prefix . 'migrations',
+                array( 'migration_name' => $migration_name ),
+                array( '%s' )
+            );
         }
     }
-    
+
     /**
      * Get team configuration data
      */
     public function get_team_config( $team_slug ) {
-        $stmt = $this->db->prepare( "SELECT * FROM teams WHERE slug = ?" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        $result = $stmt->execute();
-        $team = $result->fetchArray( SQLITE3_ASSOC );
-        
+        $team = $this->wpdb->get_row( $this->wpdb->prepare(
+            "SELECT * FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
+            $team_slug
+        ), ARRAY_A );
+
         if ( ! $team ) {
             return null;
         }
-        
-        // Get team members
+
+        // Get team members by category
         $team_members = $this->get_people_by_category( $team_slug, 'team_members' );
         $leadership = $this->get_people_by_category( $team_slug, 'leadership' );
         $consultants = $this->get_people_by_category( $team_slug, 'consultants' );
         $alumni = $this->get_people_by_category( $team_slug, 'alumni' );
-        
+
         // Get events
         $events = $this->get_team_events( $team_slug );
-        
+
         return array(
             'activity_url_prefix' => $team['activity_url_prefix'],
             'team_name' => $team['team_name'],
-            'not_managing_team' => $team['not_managing_team'],
+            'not_managing_team' => (bool) $team['not_managing_team'],
             'team_links' => $this->get_team_links( $team_slug ),
             'type' => $team['type'],
-            'default' => $team['is_default'],
+            'default' => (bool) $team['is_default'],
             'team_members' => $team_members,
             'leadership' => $leadership,
             'consultants' => $consultants,
@@ -254,85 +284,114 @@ class Storage implements StorageInterface {
             'events' => $events
         );
     }
-    
+
     /**
      * Get people by category
      */
     private function get_people_by_category( $team_slug, $category ) {
-        $stmt = $this->db->prepare( "SELECT * FROM people WHERE team_slug = ? AND category = ? ORDER BY name" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        $stmt->bindValue( 2, $category, SQLITE3_TEXT );
-        $result = $stmt->execute();
-        
+        $results = $this->wpdb->get_results( $this->wpdb->prepare(
+            "SELECT * FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s AND category = %s ORDER BY name",
+            $team_slug, $category
+        ), ARRAY_A );
+
         $people = array();
-        while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
+        foreach ( $results as $row ) {
             $username = $row['username'];
             $person_id = $row['id'];
+
+            // Remove database specific fields
             unset( $row['id'], $row['username'], $row['team_slug'], $row['category'], $row['created_at'], $row['updated_at'] );
-            
-            // Get normalized links from people_links table
+
+            // Get normalized links
             $row['links'] = $this->get_person_links( $person_id );
-            
+
             // Convert JSON fields back to arrays
-            $row['kids'] = json_decode( $row['kids'], true ) ?: array();
-            $row['github_repos'] = json_decode( $row['github_repos'], true ) ?: array();
-            $row['personal_events'] = json_decode( $row['personal_events'], true ) ?: array();
-            $row['notes'] = json_decode( $row['notes'], true ) ?: array();
-            
+            $row['kids'] = json_decode( $row['kids'] ?: '[]', true );
+            $row['github_repos'] = json_decode( $row['github_repos'] ?: '[]', true );
+            $row['personal_events'] = json_decode( $row['personal_events'] ?: '[]', true );
+            $row['notes'] = json_decode( $row['notes'] ?: '[]', true );
+
+            // Convert boolean fields
+            $row['left_company'] = (bool) $row['left_company'];
+            $row['deceased'] = (bool) $row['deceased'];
+
             $people[$username] = $row;
         }
-        
+
         return $people;
     }
-    
+
     /**
      * Get team events
      */
     private function get_team_events( $team_slug ) {
-        $stmt = $this->db->prepare( "SELECT * FROM events WHERE team_slug = ? ORDER BY start_date" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        $result = $stmt->execute();
-        
+        $results = $this->wpdb->get_results( $this->wpdb->prepare(
+            "SELECT * FROM {$this->wpdb->prefix}personal_crm_events WHERE team_slug = %s ORDER BY start_date",
+            $team_slug
+        ), ARRAY_A );
+
         $events = array();
-        while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
+        foreach ( $results as $row ) {
             $event_id = $row['id'];
             unset( $row['id'], $row['team_slug'], $row['created_at'], $row['updated_at'] );
             $row['links'] = $this->get_event_links( $event_id );
             $events[] = $row;
         }
-        
+
         return $events;
     }
-    
+
     /**
      * Save team configuration data
      */
     public function save_team_config( $team_slug, $config ) {
-        $this->db->exec( 'BEGIN TRANSACTION' );
-        
+        // Start transaction
+        $this->wpdb->query( 'START TRANSACTION' );
+
         try {
             // Save/update team info
-            $stmt = $this->db->prepare( "
-                INSERT OR REPLACE INTO teams 
-                (slug, team_name, activity_url_prefix, not_managing_team, type, is_default, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            " );
-            $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-            $stmt->bindValue( 2, $config['team_name'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 3, $config['activity_url_prefix'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 4, $config['not_managing_team'] ?? 1, SQLITE3_INTEGER );
-            $stmt->bindValue( 5, $config['type'] ?? 'team', SQLITE3_TEXT );
-            $stmt->bindValue( 6, $config['default'] ?? 0, SQLITE3_INTEGER );
-            $stmt->execute();
-            
-            // Save team links using normalized table
+            $team_data = array(
+                'slug' => $team_slug,
+                'team_name' => $config['team_name'] ?? '',
+                'activity_url_prefix' => $config['activity_url_prefix'] ?? '',
+                'not_managing_team' => $config['not_managing_team'] ?? 1,
+                'type' => $config['type'] ?? 'team',
+                'is_default' => $config['default'] ?? 0,
+                'updated_at' => current_time( 'mysql' )
+            );
+
+            $existing_team = $this->wpdb->get_var( $this->wpdb->prepare(
+                "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
+                $team_slug
+            ) );
+
+            if ( $existing_team ) {
+                $this->wpdb->update(
+                    $this->table_prefix . 'teams',
+                    $team_data,
+                    array( 'slug' => $team_slug ),
+                    array( '%s', '%s', '%s', '%d', '%s', '%d', '%s' ),
+                    array( '%s' )
+                );
+            } else {
+                $team_data['created_at'] = current_time( 'mysql' );
+                $this->wpdb->insert(
+                    $this->table_prefix . 'teams',
+                    $team_data,
+                    array( '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s' )
+                );
+            }
+
+            // Save team links
             $this->save_team_links( $team_slug, $config['team_links'] ?? array() );
-            
+
             // Clear existing people for this team
-            $stmt = $this->db->prepare( "DELETE FROM people WHERE team_slug = ?" );
-            $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-            $stmt->execute();
-            
+            $this->wpdb->delete(
+                $this->table_prefix . 'people',
+                array( 'team_slug' => $team_slug ),
+                array( '%s' )
+            );
+
             // Save people
             $categories = array( 'team_members', 'leadership', 'consultants', 'alumni' );
             foreach ( $categories as $category ) {
@@ -340,258 +399,458 @@ class Storage implements StorageInterface {
                     $this->save_people( $team_slug, $category, $config[$category] );
                 }
             }
-            
+
             // Clear existing events for this team
-            $stmt = $this->db->prepare( "DELETE FROM events WHERE team_slug = ?" );
-            $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-            $stmt->execute();
-            
+            $this->wpdb->delete(
+                $this->table_prefix . 'events',
+                array( 'team_slug' => $team_slug ),
+                array( '%s' )
+            );
+
             // Save events
             if ( isset( $config['events'] ) && is_array( $config['events'] ) ) {
                 $this->save_events( $team_slug, $config['events'] );
             }
-            
-            $this->db->exec( 'COMMIT' );
+
+            $this->wpdb->query( 'COMMIT' );
             return true;
-            
+
         } catch ( Exception $e ) {
-            $this->db->exec( 'ROLLBACK' );
+            $this->wpdb->query( 'ROLLBACK' );
             throw $e;
         }
     }
-    
+
     /**
      * Save people for a category
      */
     private function save_people( $team_slug, $category, $people ) {
-        $stmt = $this->db->prepare( "
-            INSERT INTO people
-            (username, team_slug, category, name, nickname, role, email, birthday, company_anniversary,
-             partner, partner_birthday, location, timezone, github, linear, wordpress, linkedin, website,
-             new_company, new_company_website, deceased_date, left_company, deceased,
-             kids, github_repos, personal_events, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        " );
-        
         foreach ( $people as $username => $person ) {
-            $stmt->bindValue( 1, $username, SQLITE3_TEXT );
-            $stmt->bindValue( 2, $team_slug, SQLITE3_TEXT );
-            $stmt->bindValue( 3, $category, SQLITE3_TEXT );
-            $stmt->bindValue( 4, $person['name'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 5, $person['nickname'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 6, $person['role'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 7, $person['email'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 8, $person['birthday'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 9, $person['company_anniversary'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 10, $person['partner'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 11, $person['partner_birthday'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 12, $person['location'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 13, $person['timezone'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 14, $person['github'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 15, $person['linear'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 16, $person['wordpress'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 17, $person['linkedin'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 18, $person['website'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 19, $person['new_company'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 20, $person['new_company_website'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 21, $person['deceased_date'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 22, $person['left_company'] ?? 0, SQLITE3_INTEGER );
-            $stmt->bindValue( 23, $person['deceased'] ?? 0, SQLITE3_INTEGER );
-            $stmt->bindValue( 24, json_encode( $person['kids'] ?? array() ), SQLITE3_TEXT );
-            $stmt->bindValue( 25, json_encode( $person['github_repos'] ?? array() ), SQLITE3_TEXT );
-            $stmt->bindValue( 26, json_encode( $person['personal_events'] ?? array() ), SQLITE3_TEXT );
-            $stmt->bindValue( 27, json_encode( $person['notes'] ?? array() ), SQLITE3_TEXT );
-            $stmt->execute();
-            
-            // Get the person ID and save their links separately
-            $person_id = $this->db->lastInsertRowID();
-            $this->save_person_links( $person_id, $person['links'] ?? array() );
-            
-            $stmt->reset();
+            $person_data = array(
+                'username' => $username,
+                'team_slug' => $team_slug,
+                'category' => $category,
+                'name' => $person['name'] ?? '',
+                'nickname' => $person['nickname'] ?? '',
+                'role' => $person['role'] ?? '',
+                'email' => $person['email'] ?? '',
+                'birthday' => $person['birthday'] ?? '',
+                'company_anniversary' => $person['company_anniversary'] ?? '',
+                'partner' => $person['partner'] ?? '',
+                'partner_birthday' => $person['partner_birthday'] ?? '',
+                'location' => $person['location'] ?? '',
+                'timezone' => $person['timezone'] ?? '',
+                'github' => $person['github'] ?? '',
+                'linear' => $person['linear'] ?? '',
+                'wordpress' => $person['wordpress'] ?? '',
+                'linkedin' => $person['linkedin'] ?? '',
+                'website' => $person['website'] ?? '',
+                'new_company' => $person['new_company'] ?? '',
+                'new_company_website' => $person['new_company_website'] ?? '',
+                'deceased_date' => $person['deceased_date'] ?? '',
+                'left_company' => $person['left_company'] ?? 0,
+                'deceased' => $person['deceased'] ?? 0,
+                'kids' => wp_json_encode( $person['kids'] ?? array() ),
+                'github_repos' => wp_json_encode( $person['github_repos'] ?? array() ),
+                'personal_events' => wp_json_encode( $person['personal_events'] ?? array() ),
+                'notes' => wp_json_encode( $person['notes'] ?? array() ),
+                'created_at' => current_time( 'mysql' ),
+                'updated_at' => current_time( 'mysql' )
+            );
+
+            $format = array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' );
+
+            $person_id = $this->wpdb->insert(
+                $this->table_prefix . 'people',
+                $person_data,
+                $format
+            );
+
+            if ( $person_id ) {
+                $person_id = $this->wpdb->insert_id;
+                $this->save_person_links( $person_id, $person['links'] ?? array() );
+            }
         }
     }
-    
+
     /**
      * Save events for a team
      */
     private function save_events( $team_slug, $events ) {
-        $stmt = $this->db->prepare( "
-            INSERT INTO events 
-            (team_slug, type, name, description, start_date, end_date, location)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        " );
-        
         foreach ( $events as $event ) {
-            $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-            $stmt->bindValue( 2, $event['type'] ?? 'event', SQLITE3_TEXT );
-            $stmt->bindValue( 3, $event['name'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 4, $event['description'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 5, $event['start_date'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 6, $event['end_date'] ?? '', SQLITE3_TEXT );
-            $stmt->bindValue( 7, $event['location'] ?? '', SQLITE3_TEXT );
-            $stmt->execute();
-            
-            // Get the event ID and save links separately
-            $event_id = $this->db->lastInsertRowID();
-            $this->save_event_links( $event_id, $event['links'] ?? array() );
-            
-            $stmt->reset();
+            $event_data = array(
+                'team_slug' => $team_slug,
+                'type' => $event['type'] ?? 'event',
+                'name' => $event['name'] ?? '',
+                'description' => $event['description'] ?? '',
+                'start_date' => $event['start_date'] ?? '',
+                'end_date' => $event['end_date'] ?? '',
+                'location' => $event['location'] ?? '',
+                'created_at' => current_time( 'mysql' ),
+                'updated_at' => current_time( 'mysql' )
+            );
+
+            $event_id = $this->wpdb->insert(
+                $this->table_prefix . 'events',
+                $event_data,
+                array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+            );
+
+            if ( $event_id ) {
+                $event_id = $this->wpdb->insert_id;
+                $this->save_event_links( $event_id, $event['links'] ?? array() );
+            }
         }
     }
-    
+
     /**
-     * Get all team slugs
+     * Get all available team slugs
      */
     public function get_available_teams() {
-        $result = $this->db->query( "SELECT slug FROM teams ORDER BY slug" );
-        $teams = array();
-        while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
-            $teams[] = $row['slug'];
-        }
-        return $teams;
+        return $this->wpdb->get_col( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_teams ORDER BY slug" );
     }
-    
+
     /**
      * Get team name by slug
      */
     public function get_team_name( $team_slug ) {
-        $stmt = $this->db->prepare( "SELECT team_name FROM teams WHERE slug = ?" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        $result = $stmt->execute();
-        $row = $result->fetchArray( SQLITE3_ASSOC );
-        return $row ? $row['team_name'] : null;
+        return $this->wpdb->get_var( $this->wpdb->prepare(
+            "SELECT team_name FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
+            $team_slug
+        ) );
     }
-    
+
     /**
      * Get team type by slug
      */
     public function get_team_type( $team_slug ) {
-        $stmt = $this->db->prepare( "SELECT type FROM teams WHERE slug = ?" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        $result = $stmt->execute();
-        $row = $result->fetchArray( SQLITE3_ASSOC );
-        return $row ? $row['type'] : 'team';
+        $type = $this->wpdb->get_var( $this->wpdb->prepare(
+            "SELECT type FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
+            $team_slug
+        ) );
+        return $type ?: 'team';
     }
-    
+
     /**
      * Get default team slug
      */
     public function get_default_team() {
-        $result = $this->db->query( "SELECT slug FROM teams WHERE is_default = 1 LIMIT 1" );
-        $row = $result->fetchArray( SQLITE3_ASSOC );
-        
-        if ( $row ) {
-            return $row['slug'];
+        $slug = $this->wpdb->get_var( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_teams WHERE is_default = 1 LIMIT 1" );
+
+        if ( ! $slug ) {
+            // If no default team, return first available team
+            $slug = $this->wpdb->get_var( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_teams ORDER BY slug LIMIT 1" );
         }
-        
-        // If no default team, return first available team
-        $result = $this->db->query( "SELECT slug FROM teams ORDER BY slug LIMIT 1" );
-        $row = $result->fetchArray( SQLITE3_ASSOC );
-        return $row ? $row['slug'] : '';
+
+        return $slug ?: '';
     }
-    
+
+    /**
+     * Check if team exists
+     */
+    public function team_exists( $team_slug ) {
+        $count = $this->wpdb->get_var( $this->wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
+            $team_slug
+        ) );
+        return (bool) $count;
+    }
+
+    /**
+     * Delete a team and all its data
+     */
+    public function delete_team( $team_slug ) {
+        return $this->wpdb->delete(
+            $this->table_prefix . 'teams',
+            array( 'slug' => $team_slug ),
+            array( '%s' )
+        );
+    }
+
     /**
      * Get HR feedback for a person
      */
     public function get_hr_feedback( $username, $month = null ) {
         if ( $month ) {
-            $stmt = $this->db->prepare( "SELECT * FROM hr_feedback WHERE username = ? AND month = ?" );
-            $stmt->bindValue( 1, $username, SQLITE3_TEXT );
-            $stmt->bindValue( 2, $month, SQLITE3_TEXT );
+            return $this->wpdb->get_row( $this->wpdb->prepare(
+                "SELECT * FROM {$this->wpdb->prefix}personal_crm_hr_feedback WHERE username = %s AND month = %s",
+                $username, $month
+            ), ARRAY_A );
         } else {
-            $stmt = $this->db->prepare( "SELECT * FROM hr_feedback WHERE username = ? ORDER BY month DESC" );
-            $stmt->bindValue( 1, $username, SQLITE3_TEXT );
-        }
-        
-        $result = $stmt->execute();
-        
-        if ( $month ) {
-            return $result->fetchArray( SQLITE3_ASSOC ) ?: null;
-        } else {
+            $results = $this->wpdb->get_results( $this->wpdb->prepare(
+                "SELECT * FROM {$this->wpdb->prefix}personal_crm_hr_feedback WHERE username = %s ORDER BY month DESC",
+                $username
+            ), ARRAY_A );
+
             $feedback = array();
-            while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
+            foreach ( $results as $row ) {
                 $feedback[$row['month']] = $row;
             }
             return $feedback;
         }
     }
-    
+
     /**
      * Save HR feedback for a person
      */
     public function save_hr_feedback( $username, $month, $data ) {
-        $stmt = $this->db->prepare( "
-            INSERT OR REPLACE INTO hr_feedback 
-            (username, month, feedback_to_person, feedback_to_hr, submitted_to_hr, 
-             draft_complete, google_doc_updated, not_necessary_reason, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        " );
-        
-        $stmt->bindValue( 1, $username, SQLITE3_TEXT );
-        $stmt->bindValue( 2, $month, SQLITE3_TEXT );
-        $stmt->bindValue( 3, $data['feedback_to_person'] ?? '', SQLITE3_TEXT );
-        $stmt->bindValue( 4, $data['feedback_to_hr'] ?? '', SQLITE3_TEXT );
-        $stmt->bindValue( 5, $data['submitted_to_hr'] ?? 0, SQLITE3_INTEGER );
-        $stmt->bindValue( 6, $data['draft_complete'] ?? 0, SQLITE3_INTEGER );
-        $stmt->bindValue( 7, $data['google_doc_updated'] ?? 0, SQLITE3_INTEGER );
-        $stmt->bindValue( 8, $data['not_necessary_reason'] ?? '', SQLITE3_TEXT );
-        
-        return $stmt->execute();
+        $feedback_data = array(
+            'username' => $username,
+            'month' => $month,
+            'feedback_to_person' => $data['feedback_to_person'] ?? '',
+            'feedback_to_hr' => $data['feedback_to_hr'] ?? '',
+            'submitted_to_hr' => $data['submitted_to_hr'] ?? 0,
+            'draft_complete' => $data['draft_complete'] ?? 0,
+            'google_doc_updated' => $data['google_doc_updated'] ?? 0,
+            'not_necessary_reason' => $data['not_necessary_reason'] ?? '',
+            'updated_at' => current_time( 'mysql' )
+        );
+
+        $existing_feedback = $this->wpdb->get_var( $this->wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_hr_feedback WHERE username = %s AND month = %s",
+            $username, $month
+        ) );
+
+        if ( $existing_feedback ) {
+            return $this->wpdb->update(
+                $this->table_prefix . 'hr_feedback',
+                $feedback_data,
+                array( 'username' => $username, 'month' => $month ),
+                array( '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s' ),
+                array( '%s', '%s' )
+            );
+        } else {
+            $feedback_data['created_at'] = current_time( 'mysql' );
+            return $this->wpdb->insert(
+                $this->table_prefix . 'hr_feedback',
+                $feedback_data,
+                array( '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s' )
+            );
+        }
     }
-    
+
     /**
-     * Check if team exists
+     * Get people count from team config
      */
-    public function team_exists( $team_slug ) {
-        $stmt = $this->db->prepare( "SELECT 1 FROM teams WHERE slug = ? LIMIT 1" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        $result = $stmt->execute();
-        return (bool) $result->fetchArray( SQLITE3_ASSOC );
+    public function get_team_people_count( $team_slug ) {
+        return (int) $this->wpdb->get_var( $this->wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s",
+            $team_slug
+        ) );
     }
-    
+
     /**
-     * Delete a team and all its data
+     * Get all people names from team config for search purposes
      */
-    public function delete_team( $team_slug ) {
-        $stmt = $this->db->prepare( "DELETE FROM teams WHERE slug = ?" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        return $stmt->execute();
+    public function get_team_people_names( $team_slug ) {
+        return $this->wpdb->get_col( $this->wpdb->prepare(
+            "SELECT name FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s ORDER BY name",
+            $team_slug
+        ) );
     }
-    
+
     /**
-     * Migrate data from JSON files to SQLite
+     * Get all people data from team config for search purposes
+     */
+    public function get_team_people_data( $team_slug ) {
+        $results = $this->wpdb->get_results( $this->wpdb->prepare(
+            "SELECT * FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s ORDER BY name",
+            $team_slug
+        ), ARRAY_A );
+
+        $people_data = array();
+        foreach ( $results as $row ) {
+            $username = $row['username'];
+            $person_id = $row['id'];
+
+            unset( $row['id'], $row['username'], $row['team_slug'], $row['category'], $row['created_at'], $row['updated_at'] );
+
+            // Convert JSON fields back to arrays and get normalized links
+            $row['links'] = $this->get_person_links( $person_id );
+            $row['kids'] = json_decode( $row['kids'] ?: '[]', true );
+            $row['github_repos'] = json_decode( $row['github_repos'] ?: '[]', true );
+            $row['personal_events'] = json_decode( $row['personal_events'] ?: '[]', true );
+            $row['notes'] = json_decode( $row['notes'] ?: '[]', true );
+
+            // Convert boolean fields
+            $row['left_company'] = (bool) $row['left_company'];
+            $row['deceased'] = (bool) $row['deceased'];
+
+            $people_data[$username] = $row;
+        }
+
+        return $people_data;
+    }
+
+    /**
+     * Get team links
+     */
+    private function get_team_links( $team_slug ) {
+        $results = $this->wpdb->get_results( $this->wpdb->prepare(
+            "SELECT link_name, link_url FROM {$this->wpdb->prefix}personal_crm_team_links WHERE team_slug = %s ORDER BY link_name",
+            $team_slug
+        ), ARRAY_A );
+
+        $links = array();
+        foreach ( $results as $row ) {
+            $links[$row['link_name']] = $row['link_url'];
+        }
+
+        return $links;
+    }
+
+    /**
+     * Save team links
+     */
+    private function save_team_links( $team_slug, $links ) {
+        // Delete existing links
+        $this->wpdb->delete(
+            $this->table_prefix . 'team_links',
+            array( 'team_slug' => $team_slug ),
+            array( '%s' )
+        );
+
+        // Insert new links
+        if ( is_array( $links ) && ! empty( $links ) ) {
+            foreach ( $links as $link_name => $link_url ) {
+                $this->wpdb->insert(
+                    $this->table_prefix . 'team_links',
+                    array(
+                        'team_slug' => $team_slug,
+                        'link_name' => $link_name,
+                        'link_url' => $link_url,
+                        'created_at' => current_time( 'mysql' )
+                    ),
+                    array( '%s', '%s', '%s', '%s' )
+                );
+            }
+        }
+    }
+
+    /**
+     * Get person links
+     */
+    private function get_person_links( $person_id ) {
+        $results = $this->wpdb->get_results( $this->wpdb->prepare(
+            "SELECT link_name, link_url FROM {$this->wpdb->prefix}personal_crm_people_links WHERE person_id = %d ORDER BY link_name",
+            $person_id
+        ), ARRAY_A );
+
+        $links = array();
+        foreach ( $results as $row ) {
+            $links[$row['link_name']] = $row['link_url'];
+        }
+
+        return $links;
+    }
+
+    /**
+     * Save person links
+     */
+    private function save_person_links( $person_id, $links ) {
+        // Delete existing links
+        $this->wpdb->delete(
+            $this->table_prefix . 'people_links',
+            array( 'person_id' => $person_id ),
+            array( '%d' )
+        );
+
+        // Insert new links
+        if ( is_array( $links ) && ! empty( $links ) ) {
+            foreach ( $links as $link_name => $link_url ) {
+                $this->wpdb->insert(
+                    $this->table_prefix . 'people_links',
+                    array(
+                        'person_id' => $person_id,
+                        'link_name' => $link_name,
+                        'link_url' => $link_url,
+                        'created_at' => current_time( 'mysql' )
+                    ),
+                    array( '%d', '%s', '%s', '%s' )
+                );
+            }
+        }
+    }
+
+    /**
+     * Get event links
+     */
+    private function get_event_links( $event_id ) {
+        $results = $this->wpdb->get_results( $this->wpdb->prepare(
+            "SELECT link_name, link_url FROM {$this->wpdb->prefix}personal_crm_event_links WHERE event_id = %d ORDER BY link_name",
+            $event_id
+        ), ARRAY_A );
+
+        $links = array();
+        foreach ( $results as $row ) {
+            $links[$row['link_name']] = $row['link_url'];
+        }
+
+        return $links;
+    }
+
+    /**
+     * Save event links
+     */
+    private function save_event_links( $event_id, $links ) {
+        // Delete existing links
+        $this->wpdb->delete(
+            $this->table_prefix . 'event_links',
+            array( 'event_id' => $event_id ),
+            array( '%d' )
+        );
+
+        // Insert new links
+        if ( is_array( $links ) && ! empty( $links ) ) {
+            foreach ( $links as $link_name => $link_url ) {
+                $this->wpdb->insert(
+                    $this->table_prefix . 'event_links',
+                    array(
+                        'event_id' => $event_id,
+                        'link_name' => $link_name,
+                        'link_url' => $link_url,
+                        'created_at' => current_time( 'mysql' )
+                    ),
+                    array( '%d', '%s', '%s', '%s' )
+                );
+            }
+        }
+    }
+
+    /**
+     * Migrate data from JSON files to WordPress database
      */
     public function migrate_from_json( $json_dir = null ) {
         if ( $json_dir === null ) {
             $json_dir = __DIR__ . '/../';
         }
-        
+
         $json_files = glob( $json_dir . '*.json' );
         $migrated_teams = 0;
-        
+
         foreach ( $json_files as $file ) {
             $basename = basename( $file, '.json' );
-            
+
             // Skip backup files, hr-feedback file, and composer file
             if ( $basename === 'hr-feedback' || $basename === 'composer' || strpos( $basename, '.bak' ) !== false || strpos( $basename, 'bak-' ) !== false ) {
                 continue;
             }
-            
+
             $content = file_get_contents( $file );
             $config = json_decode( $content, true );
-            
+
             if ( json_last_error() === JSON_ERROR_NONE && $config ) {
                 $this->save_team_config( $basename, $config );
                 $migrated_teams++;
             }
         }
-        
+
         // Migrate HR feedback data
         $feedback_file = $json_dir . 'hr-feedback.json';
         if ( file_exists( $feedback_file ) ) {
             $content = file_get_contents( $feedback_file );
             $feedback_data = json_decode( $content, true );
-            
+
             if ( json_last_error() === JSON_ERROR_NONE && isset( $feedback_data['feedback'] ) ) {
                 foreach ( $feedback_data['feedback'] as $username => $user_feedback ) {
                     foreach ( $user_feedback as $month => $data ) {
@@ -606,192 +865,14 @@ class Storage implements StorageInterface {
                 }
             }
         }
-        
+
         return $migrated_teams;
     }
-    
-    /**
-     * Get database connection for custom queries
-     */
-    public function get_db() {
-        return $this->db;
-    }
-    
-    /**
-     * Get people count from team config
-     */
-    public function get_team_people_count( $team_slug ) {
-        $stmt = $this->db->prepare( "SELECT COUNT(*) as count FROM people WHERE team_slug = ?" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        $result = $stmt->execute();
-        $row = $result->fetchArray( SQLITE3_ASSOC );
-        return $row ? (int) $row['count'] : 0;
-    }
-    
-    /**
-     * Get all people names from team config for search purposes
-     */
-    public function get_team_people_names( $team_slug ) {
-        $stmt = $this->db->prepare( "SELECT name FROM people WHERE team_slug = ? ORDER BY name" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        $result = $stmt->execute();
-        
-        $names = array();
-        while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
-            $names[] = $row['name'];
-        }
-        
-        return $names;
-    }
-    
-    /**
-     * Get all people data from team config for search purposes
-     */
-    public function get_team_people_data( $team_slug ) {
-        $stmt = $this->db->prepare( "SELECT * FROM people WHERE team_slug = ? ORDER BY name" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        $result = $stmt->execute();
-        
-        $people_data = array();
-        while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
-            $username = $row['username'];
-            $person_id = $row['id'];
-            unset( $row['id'], $row['username'], $row['team_slug'], $row['category'], $row['created_at'], $row['updated_at'] );
-            
-            // Convert JSON fields back to arrays and get normalized links
-            $row['links'] = $this->get_person_links( $person_id );
-            $row['kids'] = json_decode( $row['kids'], true ) ?: array();
-            $row['github_repos'] = json_decode( $row['github_repos'], true ) ?: array();
-            $row['personal_events'] = json_decode( $row['personal_events'], true ) ?: array();
-            $row['notes'] = json_decode( $row['notes'], true ) ?: array();
-            
-            $people_data[$username] = $row;
-        }
-        
-        return $people_data;
-    }
-
-    
-    /**
-     * Get team links
-     */
-    private function get_team_links( $team_slug ) {
-        $stmt = $this->db->prepare( "SELECT link_name, link_url FROM team_links WHERE team_slug = ? ORDER BY link_name" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        $result = $stmt->execute();
-        
-        $links = array();
-        while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
-            $links[$row['link_name']] = $row['link_url'];
-        }
-        
-        return $links;
-    }
-    
-    /**
-     * Save team links
-     */
-    private function save_team_links( $team_slug, $links ) {
-        // Delete existing links
-        $stmt = $this->db->prepare( "DELETE FROM team_links WHERE team_slug = ?" );
-        $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-        $stmt->execute();
-        
-        // Insert new links
-        if ( is_array( $links ) && ! empty( $links ) ) {
-            $stmt = $this->db->prepare( "INSERT INTO team_links (team_slug, link_name, link_url) VALUES (?, ?, ?)" );
-            foreach ( $links as $link_name => $link_url ) {
-                $stmt->bindValue( 1, $team_slug, SQLITE3_TEXT );
-                $stmt->bindValue( 2, $link_name, SQLITE3_TEXT );
-                $stmt->bindValue( 3, $link_url, SQLITE3_TEXT );
-                $stmt->execute();
-                $stmt->reset();
-            }
-        }
-    }
-    
-    /**
-     * Get person links
-     */
-    private function get_person_links( $person_id ) {
-        $stmt = $this->db->prepare( "SELECT link_name, link_url FROM people_links WHERE person_id = ? ORDER BY link_name" );
-        $stmt->bindValue( 1, $person_id, SQLITE3_INTEGER );
-        $result = $stmt->execute();
-        
-        $links = array();
-        while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
-            $links[$row['link_name']] = $row['link_url'];
-        }
-        
-        return $links;
-    }
-    
-    /**
-     * Save person links
-     */
-    private function save_person_links( $person_id, $links ) {
-        // Delete existing links
-        $stmt = $this->db->prepare( "DELETE FROM people_links WHERE person_id = ?" );
-        $stmt->bindValue( 1, $person_id, SQLITE3_INTEGER );
-        $stmt->execute();
-        
-        // Insert new links
-        if ( is_array( $links ) && ! empty( $links ) ) {
-            $stmt = $this->db->prepare( "INSERT INTO people_links (person_id, link_name, link_url) VALUES (?, ?, ?)" );
-            foreach ( $links as $link_name => $link_url ) {
-                $stmt->bindValue( 1, $person_id, SQLITE3_INTEGER );
-                $stmt->bindValue( 2, $link_name, SQLITE3_TEXT );
-                $stmt->bindValue( 3, $link_url, SQLITE3_TEXT );
-                $stmt->execute();
-                $stmt->reset();
-            }
-        }
-    }
-    
-    /**
-     * Get event links
-     */
-    private function get_event_links( $event_id ) {
-        $stmt = $this->db->prepare( "SELECT link_name, link_url FROM event_links WHERE event_id = ? ORDER BY link_name" );
-        $stmt->bindValue( 1, $event_id, SQLITE3_INTEGER );
-        $result = $stmt->execute();
-        
-        $links = array();
-        while ( $row = $result->fetchArray( SQLITE3_ASSOC ) ) {
-            $links[$row['link_name']] = $row['link_url'];
-        }
-        
-        return $links;
-    }
-    
-    /**
-     * Save event links
-     */
-    private function save_event_links( $event_id, $links ) {
-        // Delete existing links
-        $stmt = $this->db->prepare( "DELETE FROM event_links WHERE event_id = ?" );
-        $stmt->bindValue( 1, $event_id, SQLITE3_INTEGER );
-        $stmt->execute();
-        
-        // Insert new links
-        if ( is_array( $links ) && ! empty( $links ) ) {
-            $stmt = $this->db->prepare( "INSERT INTO event_links (event_id, link_name, link_url) VALUES (?, ?, ?)" );
-            foreach ( $links as $link_name => $link_url ) {
-                $stmt->bindValue( 1, $event_id, SQLITE3_INTEGER );
-                $stmt->bindValue( 2, $link_name, SQLITE3_TEXT );
-                $stmt->bindValue( 3, $link_url, SQLITE3_TEXT );
-                $stmt->execute();
-                $stmt->reset();
-            }
-        }
-    }
 
     /**
-     * Close database connection
+     * Get wpdb instance for custom queries
      */
-    public function close() {
-        if ( $this->db ) {
-            $this->db->close();
-        }
+    public function get_wpdb() {
+        return $this->wpdb;
     }
 }

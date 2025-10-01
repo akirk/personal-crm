@@ -2,7 +2,12 @@
 /**
  * Person class to represent team members and leadership
  */
-require_once __DIR__ . '/event.php';
+namespace PersonalCRM;
+
+if ( class_exists( '\PersonalCRM\Person' ) ) {
+    return;
+}
+
 class Person {
 	public $name;
 	public $nickname; // Preferred nickname or short name
@@ -33,11 +38,11 @@ class Person {
 	private $original_username; // Store original username for data lookups
 
 	public function __construct( $name, $username = '', $links = array(), $role = '', $privacy_mode = false ) {
-		// Apply privacy masking at the Person level
-		$this->name = $privacy_mode ? $this->mask_name( $name ) : $name;
-		$this->nickname = $privacy_mode ? '' : ''; // Will be set later
-		$this->original_username = $username; // Always store the original username for data lookups
-		$this->username = $privacy_mode ? $this->mask_username( $username ) : $username;
+		// Always store original data - privacy masking will be applied at display time
+		$this->name = $name;
+		$this->nickname = ''; // Will be set later
+		$this->original_username = $username;
+		$this->username = $username;
 		$this->links = $links;
 		$this->role = $role;
 		$this->birthday = '';
@@ -89,19 +94,25 @@ class Person {
 	 * Get display name with nickname
 	 */
 	public function get_display_name_with_nickname() {
-		$name = $this->name; // Already masked in constructor if privacy mode is on
+		$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
-		if ( ! empty( $this->nickname ) && ! $this->privacy_mode ) {
+		if ( $privacy_mode ) {
+			return '[Hidden]';
+		}
+
+		$name = $this->name;
+
+		if ( ! empty( $this->nickname ) ) {
 			// Split name into parts and insert nickname between first and last name
 			$name_parts = explode( ' ', $name );
 			if ( count( $name_parts ) >= 2 ) {
 				// Insert nickname after first name: "John 'Johnny' Smith"
 				$first_name = array_shift( $name_parts );
 				$last_parts = implode( ' ', $name_parts );
-				return $first_name . ' "' . htmlspecialchars( $this->nickname ) . '" ' . $last_parts;
+				return $first_name . ' "' . esc_html( $this->nickname ) . '" ' . $last_parts;
 			} else {
 				// Fallback for single name: "John 'Johnny'"
-				return $name . ' "' . htmlspecialchars( $this->nickname ) . '"';
+				return $name . ' "' . esc_html( $this->nickname ) . '"';
 			}
 		}
 
@@ -112,26 +123,27 @@ class Person {
 	 * Get username (automatically handles privacy mode)
 	 */
 	public function get_username() {
-		return $this->username; // Already masked in constructor if privacy mode is on
+		$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
+
+		if ( $privacy_mode ) {
+			return '[hidden]';
+		}
+
+		return $this->username;
 	}
 
 	/**
 	 * Get URL to this person's profile page
 	 */
 	public function get_profile_url( $additional_params = array() ) {
-		global $current_team;
 		$params = array( 'person' => $this->original_username );
-		
-		if ( $current_team !== 'team' ) {
-			$params['team'] = $current_team;
-		}
-		
+
 		if ( $this->privacy_mode ) {
 			$params['privacy'] = '1';
 		}
-		
+
 		$params = array_merge( $params, $additional_params );
-		return 'index.php?' . http_build_query( $params );
+		return PersonalCrm::get_instance()->build_url( 'person.php', $params );
 	}
 
 	/**
@@ -158,10 +170,10 @@ class Person {
 	 */
 	public function get_upcoming_events() {
 		$events = array();
-		$current_date = new DateTime();
+		$current_date = new \DateTime();
 		$current_year = (int) $current_date->format( 'Y' );
 		$cutoff_date = clone $current_date;
-		$cutoff_date->add( new DateInterval( 'P1Y' ) )->sub( new DateInterval( 'P1D' ) ); // 1 year minus 1 day from now
+		$cutoff_date->add( new \DateInterval( 'P1Y' ) )->sub( new \DateInterval( 'P1D' ) ); // 1 year minus 1 day from now
 
 		// Birthday - skip if person is deceased
 		if ( ! empty( $this->birthday ) && empty( $this->deceased ) ) {
@@ -170,13 +182,13 @@ class Person {
 
 			// Check if it's full YYYY-MM-DD format
 			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->birthday ) ) {
-				$birth_date = DateTime::createFromFormat( 'Y-m-d', $this->birthday );
+				$birth_date = \DateTime::createFromFormat( 'Y-m-d', $this->birthday );
 				if ( $birth_date ) {
-					$birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
+					$birthday_this_year = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
 				}
 			} elseif ( preg_match( '/^\d{2}-\d{2}$/', $this->birthday ) ) {
 				// Legacy MM-DD format
-				$birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->birthday );
+				$birthday_this_year = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->birthday );
 			}
 
 			if ( isset( $birthday_this_year ) && $birthday_this_year ) {
@@ -190,7 +202,7 @@ class Person {
 					$events[] = Event::from_person_event( 'birthday', $birthday_this_year, $this, $event_data );
 				} elseif ( $birthday_this_year < $current_date ) {
 					// Check next year's birthday
-					$birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birthday_this_year->format( 'm-d' ) );
+					$birthday_next_year = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birthday_this_year->format( 'm-d' ) );
 					if ( $birthday_next_year && $birthday_next_year <= $cutoff_date ) {
 						// Calculate the person's age on next year's birthday (only if we have birth year)
 						$event_data = array();
@@ -211,13 +223,13 @@ class Person {
 
 			// Check if it's full YYYY-MM-DD format
 			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->partner_birthday ) ) {
-				$partner_birth_date = DateTime::createFromFormat( 'Y-m-d', $this->partner_birthday );
+				$partner_birth_date = \DateTime::createFromFormat( 'Y-m-d', $this->partner_birthday );
 				if ( $partner_birth_date ) {
-					$partner_birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $partner_birth_date->format( 'm-d' ) );
+					$partner_birthday_this_year = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $partner_birth_date->format( 'm-d' ) );
 				}
 			} elseif ( preg_match( '/^\d{2}-\d{2}$/', $this->partner_birthday ) ) {
 				// Year-unknown MM-DD format
-				$partner_birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->partner_birthday );
+				$partner_birthday_this_year = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->partner_birthday );
 			}
 
 			if ( isset( $partner_birthday_this_year ) && $partner_birthday_this_year ) {
@@ -231,7 +243,7 @@ class Person {
 					$events[] = Event::from_person_event( 'partner_birthday', $partner_birthday_this_year, $this, $event_data );
 				} elseif ( $partner_birthday_this_year < $current_date ) {
 					// Check next year's partner birthday
-					$partner_birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $partner_birthday_this_year->format( 'm-d' ) );
+					$partner_birthday_next_year = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $partner_birthday_this_year->format( 'm-d' ) );
 					if ( $partner_birthday_next_year && $partner_birthday_next_year <= $cutoff_date ) {
 						// Calculate the partner's age on next year's birthday (only if we have birth year)
 						$event_data = array( 'partner_name' => $this->partner );
@@ -247,12 +259,21 @@ class Person {
 
 		// Company anniversary
 		if ( ! empty( $this->company_anniversary ) ) {
-			$anniversary_date = DateTime::createFromFormat( 'Y-m-d', $this->company_anniversary );
+			$anniversary_date = \DateTime::createFromFormat( 'Y-m-d', $this->company_anniversary );
 			if ( $anniversary_date ) {
-				$anniversary_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $anniversary_date->format( 'm-d' ) );
-				if ( $anniversary_this_year && $anniversary_this_year >= $current_date && $anniversary_this_year <= $cutoff_date ) {
-					$years = $current_year - (int) $anniversary_date->format( 'Y' );
-					$events[] = Event::from_person_event( 'anniversary', $anniversary_this_year, $this, array( 'years' => $years ) );
+				$anniversary_this_year = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $anniversary_date->format( 'm-d' ) );
+				if ( $anniversary_this_year ) {
+					// If anniversary already passed this year, look at next year
+					if ( $anniversary_this_year < $current_date ) {
+						$anniversary_next_year = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $anniversary_date->format( 'm-d' ) );
+						if ( $anniversary_next_year && $anniversary_next_year <= $cutoff_date ) {
+							$years = ( $current_year + 1 ) - (int) $anniversary_date->format( 'Y' );
+							$events[] = Event::from_person_event( 'anniversary', $anniversary_next_year, $this, array( 'years' => $years ) );
+						}
+					} else if ( $anniversary_this_year <= $cutoff_date ) {
+						$years = $current_year - (int) $anniversary_date->format( 'Y' );
+						$events[] = Event::from_person_event( 'anniversary', $anniversary_this_year, $this, array( 'years' => $years ) );
+					}
 				}
 			}
 		}
@@ -264,15 +285,15 @@ class Person {
 					// Check if it's a full birthday date (YYYY-MM-DD)
 					if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $kid['birthday'] ) ) {
 						// Full birthday date available
-						$kid_birth_date = DateTime::createFromFormat( 'Y-m-d', $kid['birthday'] );
+						$kid_birth_date = \DateTime::createFromFormat( 'Y-m-d', $kid['birthday'] );
 						if ( $kid_birth_date ) {
-							$kid_birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid_birth_date->format( 'm-d' ) );
+							$kid_birthday_this_year = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid_birth_date->format( 'm-d' ) );
 							if ( $kid_birthday_this_year >= $current_date && $kid_birthday_this_year <= $cutoff_date ) {
 								$age = $current_year - (int) $kid_birth_date->format( 'Y' );
 								$events[] = Event::from_person_event( 'birthday', $kid_birthday_this_year, $this, array( 'kid_name' => $kid['name'], 'age' => $age ) );
 							} elseif ( $kid_birthday_this_year < $current_date ) {
 								// Check next year's birthday
-								$kid_birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid_birth_date->format( 'm-d' ) );
+								$kid_birthday_next_year = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid_birth_date->format( 'm-d' ) );
 								if ( $kid_birthday_next_year && $kid_birthday_next_year <= $cutoff_date ) {
 									$age = ( $current_year + 1 ) - (int) $kid_birth_date->format( 'Y' );
 									$events[] = Event::from_person_event( 'birthday', $kid_birthday_next_year, $this, array( 'kid_name' => $kid['name'], 'age' => $age ) );
@@ -281,13 +302,13 @@ class Person {
 						}
 					} elseif ( preg_match( '/^\d{2}-\d{2}$/', $kid['birthday'] ) ) {
 						// Month-day format (MM-DD) - no birth year known
-						$kid_birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid['birthday'] );
+						$kid_birthday_this_year = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid['birthday'] );
 						if ( $kid_birthday_this_year ) {
 							if ( $kid_birthday_this_year >= $current_date && $kid_birthday_this_year <= $cutoff_date ) {
 								$events[] = Event::from_person_event( 'birthday', $kid_birthday_this_year, $this, array( 'kid_name' => $kid['name'] ) );
 							} elseif ( $kid_birthday_this_year < $current_date ) {
 								// Check next year's birthday
-								$kid_birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid['birthday'] );
+								$kid_birthday_next_year = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid['birthday'] );
 								if ( $kid_birthday_next_year && $kid_birthday_next_year <= $cutoff_date ) {
 									$events[] = Event::from_person_event( 'birthday', $kid_birthday_next_year, $this, array( 'kid_name' => $kid['name'] ) );
 								}
@@ -302,7 +323,7 @@ class Person {
 		if ( ! empty( $this->personal_events ) && is_array( $this->personal_events ) ) {
 			foreach ( $this->personal_events as $personal_event ) {
 				if ( ! empty( $personal_event['date'] ) && ! empty( $personal_event['description'] ) ) {
-					$event_date = DateTime::createFromFormat( 'Y-m-d', $personal_event['date'] );
+					$event_date = \DateTime::createFromFormat( 'Y-m-d', $personal_event['date'] );
 					if ( $event_date && $event_date >= $current_date && $event_date <= $cutoff_date ) {
 						$events[] = Event::from_person_event( 
 							$personal_event['type'] ?? 'personal', 
@@ -327,7 +348,7 @@ class Person {
 	 * Get age of kids with enhanced display
 	 */
 	public function get_kids_ages() {
-		$current_date = new DateTime();
+		$current_date = new \DateTime();
 		$current_year = (int) $current_date->format( 'Y' );
 		$kids_with_ages = array();
 
@@ -336,12 +357,12 @@ class Person {
 				// Check if it's a full birthday date (YYYY-MM-DD)
 				if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $kid['birthday'] ) ) {
 					// Full birthday available
-					$birth_date = DateTime::createFromFormat( 'Y-m-d', $kid['birthday'] );
+					$birth_date = \DateTime::createFromFormat( 'Y-m-d', $kid['birthday'] );
 					if ( $birth_date ) {
 						$age = $current_date->diff( $birth_date )->y;
-						$next_birthday = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
+						$next_birthday = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
 						if ( $next_birthday && $next_birthday < $current_date ) {
-							$next_birthday = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birth_date->format( 'm-d' ) );
+							$next_birthday = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birth_date->format( 'm-d' ) );
 						}
 
 						$time_info = '';
@@ -359,9 +380,9 @@ class Person {
 					}
 				} elseif ( preg_match( '/^\d{2}-\d{2}$/', $kid['birthday'] ) ) {
 					// Month-day format (MM-DD) - no birth year known
-					$next_birthday = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid['birthday'] );
+					$next_birthday = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $kid['birthday'] );
 					if ( $next_birthday && $next_birthday < $current_date ) {
-						$next_birthday = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid['birthday'] );
+						$next_birthday = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $kid['birthday'] );
 					}
 
 					$time_info = '';
@@ -407,8 +428,8 @@ class Person {
 
 		// Only calculate age for full YYYY-MM-DD format
 		if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->birthday ) ) {
-			$birth_date = DateTime::createFromFormat( 'Y-m-d', $this->birthday );
-			$current_date = new DateTime();
+			$birth_date = \DateTime::createFromFormat( 'Y-m-d', $this->birthday );
+			$current_date = new \DateTime();
 
 			if ( $birth_date ) {
 				$age = $current_date->diff( $birth_date )->y;
@@ -437,12 +458,12 @@ class Person {
 			return '[Hidden]';
 		}
 
-		$current_date = new DateTime();
+		$current_date = new \DateTime();
 		$current_year = (int) $current_date->format( 'Y' );
 
 		if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->birthday ) ) {
 			// Full YYYY-MM-DD format
-			$birth_date = DateTime::createFromFormat( 'Y-m-d', $this->birthday );
+			$birth_date = \DateTime::createFromFormat( 'Y-m-d', $this->birthday );
 			if ( $birth_date ) {
 				$age = $this->get_age();
 				$display = $birth_date->format( 'F j, Y' );
@@ -451,9 +472,9 @@ class Person {
 				}
 
 				// Add time to next birthday
-				$next_birthday = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
+				$next_birthday = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
 				if ( $next_birthday && $next_birthday < $current_date ) {
-					$next_birthday = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birth_date->format( 'm-d' ) );
+					$next_birthday = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birth_date->format( 'm-d' ) );
 				}
 
 				if ( $next_birthday ) {
@@ -467,14 +488,14 @@ class Person {
 			}
 		} elseif ( preg_match( '/^\d{2}-\d{2}$/', $this->birthday ) ) {
 			// Legacy MM-DD format
-			$display_date = DateTime::createFromFormat( 'm-d', $this->birthday );
+			$display_date = \DateTime::createFromFormat( 'm-d', $this->birthday );
 			if ( $display_date ) {
 				$display = $display_date->format( 'F j' );
 
 				// Add time to next birthday
-				$next_birthday = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->birthday );
+				$next_birthday = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->birthday );
 				if ( $next_birthday && $next_birthday < $current_date ) {
-					$next_birthday = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $this->birthday );
+					$next_birthday = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $this->birthday );
 				}
 
 				if ( $next_birthday ) {
@@ -525,111 +546,6 @@ class Person {
 		}
 	}
 
-
-	/**
-	 * Get monthly feedback status for this person
-	 */
-	public function get_monthly_feedback_status( $month = null ) {
-		$feedback_file = __DIR__ . '/../hr-feedback.json';
-
-		if ( ! file_exists( $feedback_file ) ) {
-			return array(
-				'status' => 'not-started',
-				'updated' => null,
-				'text' => 'Feedback not started',
-				'css_class' => 'not-started'
-			);
-		}
-
-		$content = file_get_contents( $feedback_file );
-		$feedback_data = json_decode( $content, true ) ?: array();
-
-		$target_month = $month ?: get_hr_feedback_month();
-		$feedback = $feedback_data['feedback'][$this->original_username][$target_month] ?? null;
-
-		if ( ! $feedback ) {
-			return array(
-				'status' => 'not-started',
-				'updated' => null,
-				'text' => 'Feedback not started',
-				'css_class' => 'not-started'
-			);
-		}
-
-		// Deduce status from checklist todos
-		$submitted_to_hr = $feedback['submitted_to_hr'] ?? false;
-		$draft_complete = $feedback['draft_complete'] ?? false;
-		$google_doc_updated = $feedback['google_doc_updated'] ?? false;
-		$has_feedback_content = !empty($feedback['feedback_to_person']) || !empty($feedback['feedback_to_hr']);
-
-		// 5. Submitted
-		if ( $submitted_to_hr ) {
-			return array(
-				'status' => 'submitted',
-				'updated' => $feedback['updated_at'],
-				'text' => '✅ Submitted',
-				'css_class' => 'completed'
-			);
-		}
-
-		// 4. Google doc updated = Ready for review
-		if ( $google_doc_updated ) {
-			return array(
-				'status' => 'ready-for-review',
-				'updated' => $feedback['updated_at'],
-				'text' => '📤 Ready for review',
-				'css_class' => 'review'
-			);
-		}
-
-		// 3. First draft finalized
-		if ( $draft_complete ) {
-			return array(
-				'status' => 'draft-finalized',
-				'updated' => $feedback['updated_at'],
-				'text' => '📋 Draft finalized',
-				'css_class' => 'draft-finalized'
-			);
-		}
-
-		// 2. Feedback started (has content but draft not marked complete)
-		if ( $has_feedback_content ) {
-			return array(
-				'status' => 'started',
-				'updated' => $feedback['updated_at'],
-				'text' => '📝 Started',
-				'css_class' => 'draft'
-			);
-		}
-
-		// Fallback to legacy status field for backwards compatibility
-		if ( isset( $feedback['status'] ) ) {
-			if ( $feedback['status'] === 'submitted' ) {
-				return array(
-					'status' => 'submitted',
-					'updated' => $feedback['submitted_at'] ?? $feedback['updated_at'],
-					'text' => 'Submitted',
-					'css_class' => 'completed'
-				);
-			} elseif ( $feedback['status'] === 'review' ) {
-				return array(
-					'status' => 'ready-for-review',
-					'updated' => $feedback['review_at'] ?? $feedback['updated_at'],
-					'text' => 'Ready for review',
-					'css_class' => 'review'
-				);
-			}
-		}
-
-		// 1. Default fallback - feedback not started
-		return array(
-			'status' => 'not-started',
-			'updated' => null,
-			'text' => 'Feedback not started',
-			'css_class' => 'not-started'
-		);
-	}
-
 	/**
 	 * Get upcoming events for this person with guaranteed birthday and anniversary inclusion
 	 * This method ensures that the person's next birthday and anniversary are always included,
@@ -637,10 +553,10 @@ class Person {
 	 */
 	public function get_upcoming_events_with_personal_dates() {
 		$events = array();
-		$current_date = new DateTime();
+		$current_date = new \DateTime();
 		$current_year = (int) $current_date->format( 'Y' );
 		$cutoff_date = clone $current_date;
-		$cutoff_date->add( new DateInterval( 'P1Y' ) ); // 1 year from now
+		$cutoff_date->add( new \DateInterval( 'P1Y' ) ); // 1 year from now
 
 		// Always include birthday - find the next occurrence (this year or next year) - skip if deceased
 		if ( ! empty( $this->birthday ) && empty( $this->deceased ) ) {
@@ -648,10 +564,10 @@ class Person {
 
 			// Check if it's full YYYY-MM-DD format
 			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $this->birthday ) ) {
-				$birth_date = DateTime::createFromFormat( 'Y-m-d', $this->birthday );
+				$birth_date = \DateTime::createFromFormat( 'Y-m-d', $this->birthday );
 				if ( $birth_date ) {
-					$birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
-					$birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birth_date->format( 'm-d' ) );
+					$birthday_this_year = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $birth_date->format( 'm-d' ) );
+					$birthday_next_year = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $birth_date->format( 'm-d' ) );
 					
 					// Use this year's birthday if it hasn't passed yet, otherwise use next year's
 					if ( $birthday_this_year >= $current_date ) {
@@ -664,8 +580,8 @@ class Person {
 				}
 			} elseif ( preg_match( '/^\d{2}-\d{2}$/', $this->birthday ) ) {
 				// Legacy MM-DD format
-				$birthday_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->birthday );
-				$birthday_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $this->birthday );
+				$birthday_this_year = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $this->birthday );
+				$birthday_next_year = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $this->birthday );
 				
 				if ( $birthday_this_year >= $current_date ) {
 					$events[] = Event::from_person_event( 'birthday', $birthday_this_year, $this );
@@ -677,10 +593,10 @@ class Person {
 
 		// Always include company anniversary - find the next occurrence
 		if ( ! empty( $this->company_anniversary ) ) {
-			$anniversary_date = DateTime::createFromFormat( 'Y-m-d', $this->company_anniversary );
+			$anniversary_date = \DateTime::createFromFormat( 'Y-m-d', $this->company_anniversary );
 			if ( $anniversary_date ) {
-				$anniversary_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $anniversary_date->format( 'm-d' ) );
-				$anniversary_next_year = DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $anniversary_date->format( 'm-d' ) );
+				$anniversary_this_year = \DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $anniversary_date->format( 'm-d' ) );
+				$anniversary_next_year = \DateTime::createFromFormat( 'Y-m-d', ( $current_year + 1 ) . '-' . $anniversary_date->format( 'm-d' ) );
 				
 				if ( $anniversary_this_year >= $current_date ) {
 					$years = $current_year - (int) $anniversary_date->format( 'Y' );

@@ -3,7 +3,8 @@
  * Test for both JSON and SQLite storage backends
  */
 
-require_once __DIR__ . '/../includes/storage-factory.php';
+require_once __DIR__ . '/../includes/sqlite-wpdb.php';
+require_once __DIR__ . '/../includes/storage.php';
 
 class DualStorageTest {
     
