@@ -866,6 +866,9 @@ if ( ! function_exists( "dbDelta" ) ) {
                 $url = home_url( '/crm/' . ltrim( $route, '/' ) );
             }
 
+            // Allow other plugins to add persistent parameters
+            $additional_params = apply_filters( 'personal_crm_build_url_params', $additional_params, $base_url );
+
             if ( ! empty( $additional_params ) ) {
                 $url .= '?' . http_build_query( $additional_params );
             }
@@ -881,6 +884,9 @@ if ( ! function_exists( "dbDelta" ) ) {
             $params[ $param_name ] = $this->current_team;
         }
         $params = array_merge( $params, $additional_params );
+
+        // Allow other plugins to add persistent parameters
+        $params = apply_filters( 'personal_crm_build_url_params', $params, $base_url );
 
         if ( ! empty( $params ) ) {
             return $base_url . '?' . http_build_query( $params );

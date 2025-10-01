@@ -103,13 +103,18 @@ function createSimpleTimeUpdater(timezone, personId) {
 
 function initializeDarkMode() {
     const toggle = document.getElementById('dark-mode-toggle');
+
+    if (!toggle) {
+        return; // Exit if toggle doesn't exist
+    }
+
     const sunIcon = toggle.querySelector('.sun-icon');
     const sunForcedIcon = toggle.querySelector('.sun-forced-icon');
     const moonIcon = toggle.querySelector('.moon-icon');
     const moonForcedIcon = toggle.querySelector('.moon-forced-icon');
-    
-    if (!toggle || !sunIcon || !sunForcedIcon || !moonIcon || !moonForcedIcon) {
-        return; // Exit if elements don't exist
+
+    if (!sunIcon || !sunForcedIcon || !moonIcon || !moonForcedIcon) {
+        return; // Exit if icons don't exist
     }
     
     const getSystemTheme = () => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

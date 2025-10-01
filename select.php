@@ -82,8 +82,8 @@ if ( empty( $available_teams ) ) {
                 <?php
                 $team_name = $crm->storage->get_team_name( $team_slug );
                 $team_type = $crm->storage->get_team_type( $team_slug );
-                $people_count = $crm->get_team_people_count( $team_slug );
                 $people_data = $crm->storage->get_team_people_data( $team_slug );
+                $people_count = count( $people_data );
                 $param_name = ( $team_type === 'group' ) ? 'group' : 'team';
                 ?>
                 <a href="<?php

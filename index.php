@@ -73,6 +73,10 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 						<?php endforeach; ?>
 					</div>
 				<?php endif; ?>
+				<?php
+				// Allow other plugins to add header content
+				do_action( 'personal_crm_header_content', $team_data, $current_team );
+				?>
 				<div class="navigation" style="display: flex; align-items: center; gap: 10px;">
 					<select id="team-selector" onchange="switchTeam()">
 						<?php

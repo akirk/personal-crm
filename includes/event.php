@@ -240,8 +240,20 @@ class Event {
 	 * Get ordinal number (1st, 2nd, 3rd, 4th, etc.)
 	 */
 	private static function get_ordinal_number( $number ) {
-		$formatter = new \NumberFormatter( 'en_US', \NumberFormatter::ORDINAL );
-		return $formatter->format( $number );
+		if ( class_exists( 'NumberFormatter' ) ) {
+			$formatter = new \NumberFormatter( 'en_US', \NumberFormatter::ORDINAL );
+			return $formatter->format( $number );
+		}
+
+		$suffix = 'th';
+		if ( $number % 100 < 11 || $number % 100 > 13 ) {
+			switch ( $number % 10 ) {
+				case 1:  $suffix = 'st'; break;
+				case 2:  $suffix = 'nd'; break;
+				case 3:  $suffix = 'rd'; break;
+			}
+		}
+		return $number . $suffix;
 	}
 	/**
 	 * Create Event from team event data

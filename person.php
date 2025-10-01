@@ -660,6 +660,10 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 			<?php else : ?>
 				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>">🔓 Privacy Mode OFF</a>
 			<?php endif; ?>
+			<?php
+			// Allow other plugins to add footer links
+			do_action( 'personal_crm_footer_links', $team_data, $current_team );
+			?>
 			<a href="<?php echo $crm->build_url( 'admin.php' ); ?>">⚙️ Admin Panel</a>
 			<a href="/crm/admin/<?php echo $current_team; ?>/person/<?php echo $person; ?>/">✏️ Edit Person</a>
 		</footer>

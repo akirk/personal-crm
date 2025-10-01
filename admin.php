@@ -108,7 +108,8 @@ if ( ! empty( $edit_member ) ) {
  * Load existing configuration from storage or return empty structure
  */
 function load_or_create_config( $team_slug ) {
-	$storage = Common::get_instance()->get_storage();
+	$crm = PersonalCrm::get_instance();
+	$storage = $crm->storage;
 	
 	if ( $storage->team_exists( $team_slug ) ) {
 		return $storage->get_team_config( $team_slug );
@@ -144,7 +145,8 @@ function save_config( $config, $team_slug ) {
 	}
 
 	try {
-		return Common::get_instance()->get_storage()->save_team_config( $team_slug, $config );
+		$crm = PersonalCrm::get_instance();
+		return $crm->storage->save_team_config( $team_slug, $config );
 	} catch ( \Exception $e ) {
 		error_log( 'Error saving team config: ' . $e->getMessage() );
 		return false;
@@ -688,7 +690,7 @@ function mask_date_input( $date, $privacy_mode ) {
  */
 function get_person_type_config( $person_type ) {
 	global $group, $current_team;
-	$crm = Common::get_instance();
+	$crm = PersonalCrm::get_instance();
 
 	$configs = array(
 		'member' => array(
@@ -698,9 +700,9 @@ function get_person_type_config( $person_type ) {
 			'edit_action' => 'edit_member',
 			'add_action' => 'add_member',
 			'delete_action' => 'delete_member',
-			'edit_text' => 'Update ' . ucfirst( $group ) . ' Member',
-			'add_text' => 'Add ' . ucfirst( $group ) . ' Member',
-			'display_name' => ucfirst( $group ) . ' Member',
+			'edit_text' => 'Update ' . $crm->get_type_display_word( $current_team ) . ' Member',
+			'add_text' => 'Add ' . $crm->get_type_display_word( $current_team ) . ' Member',
+			'display_name' => $crm->get_type_display_word( $current_team ) . ' Member',
 			'show_hr_feedback' => true,
 			'show_alumni_actions' => ! $crm->is_social_group( $current_team ),
 		),
@@ -827,11 +829,11 @@ function generate_username_from_name( $name ) {
 		return null;
 	}
 	
-	// Convert to lowercase, remove special characters, replace spaces with dots
+	// Convert to lowercase, remove special characters, replace spaces with hyphens
 	$username = strtolower( $name );
 	$username = iconv( 'UTF-8', 'ASCII//TRANSLIT', $username ); // Remove accents
 	$username = preg_replace( '/[^a-z0-9\s]/', '', $username );
-	$username = preg_replace( '/\s+/', '.', trim( $username ) );
+	$username = preg_replace( '/\s+/', '-', trim( $username ) );
 	
 	return $username;
 }
@@ -1081,7 +1083,7 @@ function parse_personal_events_data( $events_data ) {
  */
 function get_missing_data_points( $person, $person_type = 'member', $team_slug = null ) {
 	$missing = array();
-	$is_social_group = Common::get_instance()->is_social_group( $team_slug );
+	$is_social_group = PersonalCrm::get_instance()->is_social_group( $team_slug );
 
 	// Core fields (required)
 	if ( empty( $person['name'] ) ) {
@@ -1153,7 +1155,7 @@ function get_missing_data_points( $person, $person_type = 'member', $team_slug =
  * Get completeness score as percentage
  */
 function get_completeness_score( $missing_data, $person_type = 'member', $team_slug = null ) {
-	$is_social_group = Common::get_instance()->is_social_group( $team_slug );
+	$is_social_group = PersonalCrm::get_instance()->is_social_group( $team_slug );
 
 	// Count total fields by priority
 	if ( $is_social_group ) {
@@ -1267,7 +1269,7 @@ function format_kids_for_form( $kids ) {
 
 function get_person_form_value( $field_name, $edit_data = array(), $is_editing = false, $error = '' ) {
 	$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
-	$crm = Common::get_instance();
+	$crm = PersonalCrm::get_instance();
 
 
 	// Use global error if no error parameter provided
@@ -1316,8 +1318,9 @@ function get_person_checkbox_checked( $field_name, $edit_data = array(), $is_edi
  * Render a person form (team member, leader, or alumni)
  */
 function render_person_form( $type, $edit_data = null, $is_editing = false ) {
-	global $privacy_mode, $group;
-	$crm = Common::get_instance();
+	global $group;
+	$crm = PersonalCrm::get_instance();
+	$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
 	$config = get_person_type_config( $type );
 	if ( ! $config ) {
@@ -1333,7 +1336,6 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	$action = $is_editing ? $config['edit_action'] : $config['add_action'];
 	$submit_text = 'Save';
 	$prefix = $config['form_prefix'];
-	$show_hr_feedback = $config['show_hr_feedback'];
 	$show_alumni_actions = $config['show_alumni_actions'];
 
 	// Helper function to get form field values (POST data if error, edit data if editing, empty if new)
@@ -1786,7 +1788,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	</div>
 
 	<script>
-		let personalEventIndex = <?php echo $is_editing && ! empty( $personal_events ) ? count( $personal_events ) : 0; ?>;
+		var personalEventIndex = <?php echo $is_editing && ! empty( $personal_events ) ? count( $personal_events ) : 0; ?>;
 
 		function addPersonalEvent() {
 			const container = document.getElementById('personal-events-container');
@@ -3435,6 +3437,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
         echo '<script src="' . plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js"></script>';
         echo '<script src="' . plugin_dir_url( __FILE__ ) . 'assets/script.js"></script>';
     }
+	if ( function_exists( '\wp_app_body_close' ) ) \wp_app_body_close();
     ?>
     <?php $crm->init_cmd_k_js( $privacy_mode ); ?>
 </body>
