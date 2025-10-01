@@ -3,6 +3,30 @@
  * Common functions shared between admin.php and index.php
  */
 
+// Include configuration
+if ( file_exists( __DIR__ . '/../config.php' ) ) {
+    require_once __DIR__ . '/../config.php';
+}
+
+// Include storage factory
+require_once __DIR__ . '/storage-factory.php';
+
+// Global storage instance
+$storage = null;
+
+/**
+ * Get storage instance
+ */
+function get_storage() {
+    global $storage;
+    if ( $storage === null ) {
+        // Check for storage type preference
+        $storage_type = defined( 'STORAGE_TYPE' ) ? STORAGE_TYPE : 'sqlite';
+        $storage = StorageFactory::create( $storage_type );
+    }
+    return $storage;
+}
+
 /**
  * Check if a team is configured as a social group
  */
@@ -10,11 +34,16 @@ function is_social_group( $team_slug ) {
 	if ( empty( $team_slug ) ) {
 		return false;
 	}
-	return get_team_type_from_file( $team_slug ) === 'group';
+	return get_team_type_from_storage( $team_slug ) === 'group';
 }
 
 // Security: Only allow access from localhost
 function only_allow_access_from_localhost() {
+	// Allow CLI access (when running from command line)
+	if ( php_sapi_name() === 'cli' ) {
+		return;
+	}
+	
 	$remote_addr = $_SERVER['REMOTE_ADDR'] ?? '';
 	$allowed_ips = array( '127.0.0.1', '::1' );
 
@@ -252,182 +281,60 @@ function build_team_url( $base_url, $additional_params = array() ) {
 }
 
 /**
- * Get all available team files (excluding backup files)
+ * Get all available teams
  */
 function get_available_teams() {
-	$teams = array();
-	$json_files = glob( __DIR__ . '/../*.json' );
-	
-	foreach ( $json_files as $file ) {
-		$basename = basename( $file, '.json' );
-		// Skip backup files
-		if ( $basename !== 'hr-feedback' && strpos( $basename, '.bak' ) === false && strpos( $basename, 'bak-' ) === false ) {
-			$teams[] = $basename;
-		}
-	}
-	
-	sort( $teams );
-	return $teams;
+	return get_storage()->get_available_teams();
 }
 
 /**
- * Get team name from config file
+ * Get team name from storage
  */
 function get_team_name_from_file( $team_slug ) {
-	$file_path = __DIR__ . '/../' . $team_slug . '.json';
-	if ( file_exists( $file_path ) ) {
-		$config = json_decode( file_get_contents( $file_path ), true );
-		if ( json_last_error() === JSON_ERROR_NONE && isset( $config['team_name'] ) ) {
-			return $config['team_name'];
-		}
-	}
-	return ucfirst( str_replace( '_', ' ', $team_slug ) );
+	$name = get_storage()->get_team_name( $team_slug );
+	return $name ?: ucfirst( str_replace( '_', ' ', $team_slug ) );
 }
 
 /**
- * Get team type from config file (defaults to 'team')
+ * Get team name from storage (alias for backward compatibility)
+ */
+function get_team_name_from_storage( $team_slug ) {
+	return get_team_name_from_file( $team_slug );
+}
+
+/**
+ * Get team type from storage (defaults to 'team')
  */
 function get_team_type_from_file( $team_slug ) {
-	$file_path = __DIR__ . '/../' . $team_slug . '.json';
-	if ( file_exists( $file_path ) ) {
-		$config = json_decode( file_get_contents( $file_path ), true );
-		if ( json_last_error() === JSON_ERROR_NONE && isset( $config['type'] ) ) {
-			return $config['type'];
-		}
-	}
-	return 'team'; // Default to 'team' if not specified
+	return get_storage()->get_team_type( $team_slug );
+}
+
+/**
+ * Get team type from storage (alias for backward compatibility)
+ */
+function get_team_type_from_storage( $team_slug ) {
+	return get_team_type_from_file( $team_slug );
 }
 
 /**
  * Get people count from team config file
  */
 function get_team_people_count( $team_slug ) {
-	$file_path = __DIR__ . '/../' . $team_slug . '.json';
-	if ( ! file_exists( $file_path ) ) {
-		return 0;
-	}
-	
-	$config = json_decode( file_get_contents( $file_path ), true );
-	if ( json_last_error() !== JSON_ERROR_NONE ) {
-		return 0;
-	}
-	
-	$count = 0;
-	
-	// Count team members
-	if ( isset( $config['team_members'] ) && is_array( $config['team_members'] ) ) {
-		$count += count( $config['team_members'] );
-	}
-	
-	// Count leadership
-	if ( isset( $config['leadership'] ) && is_array( $config['leadership'] ) ) {
-		$count += count( $config['leadership'] );
-	}
-	
-	// Count consultants
-	if ( isset( $config['consultants'] ) && is_array( $config['consultants'] ) ) {
-		$count += count( $config['consultants'] );
-	}
-	
-	// Count alumni (but don't include in main count for most teams)
-	// You can uncomment this if you want to include alumni in the count
-	// if ( isset( $config['alumni'] ) && is_array( $config['alumni'] ) ) {
-	//     $count += count( $config['alumni'] );
-	// }
-	
-	return $count;
+	return get_storage()->get_team_people_count( $team_slug );
 }
 
 /**
  * Get all people names from team config file for search purposes
  */
 function get_team_people_names( $team_slug ) {
-	$file_path = __DIR__ . '/../' . $team_slug . '.json';
-	if ( ! file_exists( $file_path ) ) {
-		return array();
-	}
-	
-	$config = json_decode( file_get_contents( $file_path ), true );
-	if ( json_last_error() !== JSON_ERROR_NONE ) {
-		return array();
-	}
-	
-	$names = array();
-	
-	// Get names from team members
-	if ( isset( $config['team_members'] ) && is_array( $config['team_members'] ) ) {
-		foreach ( $config['team_members'] as $person ) {
-			if ( isset( $person['name'] ) ) {
-				$names[] = $person['name'];
-			}
-		}
-	}
-	
-	// Get names from leadership
-	if ( isset( $config['leadership'] ) && is_array( $config['leadership'] ) ) {
-		foreach ( $config['leadership'] as $person ) {
-			if ( isset( $person['name'] ) ) {
-				$names[] = $person['name'];
-			}
-		}
-	}
-	
-	// Get names from consultants
-	if ( isset( $config['consultants'] ) && is_array( $config['consultants'] ) ) {
-		foreach ( $config['consultants'] as $person ) {
-			if ( isset( $person['name'] ) ) {
-				$names[] = $person['name'];
-			}
-		}
-	}
-	
-	return $names;
+	return get_storage()->get_team_people_names( $team_slug );
 }
 
 /**
  * Get all people data (username => person data) from team config file for search purposes
  */
 function get_team_people_data( $team_slug ) {
-	$file_path = __DIR__ . '/../' . $team_slug . '.json';
-	if ( ! file_exists( $file_path ) ) {
-		return array();
-	}
-	
-	$config = json_decode( file_get_contents( $file_path ), true );
-	if ( json_last_error() !== JSON_ERROR_NONE ) {
-		return array();
-	}
-	
-	$people_data = array();
-	
-	// Get data from team members
-	if ( isset( $config['team_members'] ) && is_array( $config['team_members'] ) ) {
-		foreach ( $config['team_members'] as $username => $person ) {
-			if ( isset( $person['name'] ) ) {
-				$people_data[$username] = $person;
-			}
-		}
-	}
-	
-	// Get data from leadership
-	if ( isset( $config['leadership'] ) && is_array( $config['leadership'] ) ) {
-		foreach ( $config['leadership'] as $username => $person ) {
-			if ( isset( $person['name'] ) ) {
-				$people_data[$username] = $person;
-			}
-		}
-	}
-	
-	// Get data from consultants
-	if ( isset( $config['consultants'] ) && is_array( $config['consultants'] ) ) {
-		foreach ( $config['consultants'] as $username => $person ) {
-			if ( isset( $person['name'] ) ) {
-				$people_data[$username] = $person;
-			}
-		}
-	}
-	
-	return $people_data;
+	return get_storage()->get_team_people_data( $team_slug );
 }
 
 /**
@@ -517,22 +424,7 @@ function mask_username( $username, $privacy_mode ) {
  * Get the default team slug (team marked with default: true)
  */
 function get_default_team() {
-	$available_teams = get_available_teams();
-	if ( count( $available_teams ) === 1 ) {
-		return $available_teams[0];
-	}
-
-	foreach ( $available_teams as $team_slug ) {
-		$file_path = __DIR__ . '/../' . $team_slug . '.json';
-		if ( file_exists( $file_path ) ) {
-			$config = json_decode( file_get_contents( $file_path ), true );
-			if ( json_last_error() === JSON_ERROR_NONE && isset( $config['default'] ) && $config['default'] ) {
-				return $team_slug;
-			}
-		}
-	}
-
-	return '';
+	return get_storage()->get_default_team();
 }
 
 /**
@@ -835,23 +727,22 @@ function create_person_from_data( $username, $person_data, $privacy_mode = false
 }
 
 /**
- * Load team configuration from JSON file and convert to Person objects
+ * Load team configuration from storage and convert to Person objects
  */
 function load_team_config_with_objects( $team_slug = 'team', $privacy_mode = false ) {
-	$config_file = __DIR__ . '/../' . $team_slug . '.json';
-
-	if ( ! file_exists( $config_file ) ) {
+	$storage = get_storage();
+	
+	if ( ! $storage->team_exists( $team_slug ) ) {
 		// Redirect to team creation page
 		$create_team_url = 'admin.php?create_team=new';
 		header( 'Location: ' . $create_team_url );
 		exit;
 	}
 
-	$json_content = file_get_contents( $config_file );
-	$config = json_decode( $json_content, true );
-
-	if ( json_last_error() !== JSON_ERROR_NONE ) {
-		die( 'Error: Invalid JSON in team-config.json file: ' . json_last_error_msg() );
+	$config = $storage->get_team_config( $team_slug );
+	
+	if ( ! $config ) {
+		die( 'Error: Unable to load team configuration' );
 	}
 
 	// Convert arrays to Person objects

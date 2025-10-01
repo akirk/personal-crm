@@ -16,26 +16,20 @@ class PeopleFinderCLI {
     }
 
     /**
-     * Load all team and people data from JSON files
+     * Load all team and people data using the storage backend
      */
     private function loadData(): void {
-        $jsonFiles = glob( '*.json' );
+        // Include common functions to get storage access
+        require_once __DIR__ . '/includes/common.php';
         
-        foreach ( $jsonFiles as $file ) {
-            if ( !is_readable( $file ) ) {
-                continue;
-            }
-
-            $data = json_decode( file_get_contents( $file ), true );
+        $storage = get_storage();
+        $available_teams = $storage->get_available_teams();
+        
+        foreach ( $available_teams as $teamSlug ) {
+            $teamName = $storage->get_team_name( $teamSlug );
+            $data = $storage->get_team_config( $teamSlug );
+            
             if ( !$data ) {
-                continue;
-            }
-
-            $teamSlug = basename( $file, '.json' );
-            $teamName = $data['team_name'] ?? ucfirst( $teamSlug );
-
-            // Skip hr-feedback file
-            if ( $teamSlug === 'hr-feedback' ) {
                 continue;
             }
 

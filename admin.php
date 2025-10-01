@@ -46,7 +46,7 @@ $is_editing_event = false;
 
 
 if ( ! empty( $edit_member ) ) {
-	$config = load_or_create_config( $config_file );
+	$config = load_or_create_config( $current_team );
 	if ( isset( $config['team_members'][ $edit_member ] ) ) {
 		$edit_data = $config['team_members'][ $edit_member ];
 		$edit_data['username'] = $edit_member;
@@ -69,7 +69,7 @@ if ( ! empty( $edit_member ) ) {
 		$active_tab = 'alumni';
 	}
 } elseif ( $edit_event_index !== '' && is_numeric( $edit_event_index ) ) {
-	$config = load_or_create_config( $config_file );
+	$config = load_or_create_config( $current_team );
 	if ( isset( $config['events'][ $edit_event_index ] ) ) {
 		$edit_data = $config['events'][ $edit_event_index ];
 		$edit_data['event_index'] = $edit_event_index;
@@ -79,15 +79,13 @@ if ( ! empty( $edit_member ) ) {
 }
 
 /**
- * Load existing configuration or return empty structure
+ * Load existing configuration from storage or return empty structure
  */
-function load_or_create_config( $file_path ) {
-	if ( $file_path && file_exists( $file_path ) ) {
-		$content = file_get_contents( $file_path );
-		$config = json_decode( $content, true );
-		if ( json_last_error() === JSON_ERROR_NONE ) {
-			return $config;
-		}
+function load_or_create_config( $team_slug ) {
+	$storage = get_storage();
+	
+	if ( $storage->team_exists( $team_slug ) ) {
+		return $storage->get_team_config( $team_slug );
 	}
 	
 	// Return default structure
@@ -98,19 +96,18 @@ function load_or_create_config( $file_path ) {
 		'leadership' => array(),
 		'consultants' => array(),
 		'alumni' => array(),
-		'events' => array()
+		'events' => array(),
+		'type' => 'team',
+		'default' => false,
+		'not_managing_team' => true,
+		'team_links' => array()
 	);
 }
 
 /**
- * Save configuration to JSON file with backup
+ * Save configuration to storage
  */
-function save_config( $config, $file_path ) {
-	// Create backup first
-	if ( ! create_backup( $file_path ) ) {
-		return false;
-	}
-
+function save_config( $config, $team_slug ) {
 	// Sort events by date before saving
 	if ( isset( $config['events'] ) && is_array( $config['events'] ) ) {
 		usort( $config['events'], function( $a, $b ) {
@@ -120,8 +117,12 @@ function save_config( $config, $file_path ) {
 		} );
 	}
 
-	$json = json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
-	return file_put_contents( $file_path, $json ) !== false;
+	try {
+		return get_storage()->save_team_config( $team_slug, $config );
+	} catch ( Exception $e ) {
+		error_log( 'Error saving team config: ' . $e->getMessage() );
+		return false;
+	}
 }
 
 $message = '';
@@ -129,7 +130,7 @@ $error = '';
 
 // Handle form submissions
 if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
-	$config = load_or_create_config( $config_file ); // Load config for POST operations
+	$config = load_or_create_config( $current_team ); // Load config for POST operations
 
 	switch ( $action ) {
 		case 'save_general':
@@ -181,7 +182,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				}
 			}
 
-			if ( save_config( $config, $config_file ) ) {
+			if ( save_config( $config, $current_team ) ) {
 				$message = 'General settings saved successfully!';
 			} else {
 				$error = 'Failed to save configuration.';
@@ -202,7 +203,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			}
 			$config['team_links'] = $team_links;
 
-			if ( save_config( $config, $config_file ) ) {
+			if ( save_config( $config, $current_team ) ) {
 				$message = 'Links saved successfully!';
 			} else {
 				$error = 'Failed to save links.';
@@ -275,7 +276,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			);
 			
 			$config['events'][ $event_index ] = $event;
-			if ( save_config( $config, $config_file ) ) {
+			if ( save_config( $config, $current_team ) ) {
 				$message = 'Event updated successfully!';
 				// Reload the edit data to show updated information
 				$edit_data = $config['events'][ $event_index ];
@@ -320,10 +321,10 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			);
 			
 			$config['events'][] = $event;
-			if ( save_config( $config, $config_file ) ) {
+			if ( save_config( $config, $current_team ) ) {
 				$message = 'Event added successfully!';
 				// Reload config to get the latest data
-				$config = load_or_create_config( $config_file );
+				$config = load_or_create_config( $current_team );
 			} else {
 				$error = 'Failed to save event.';
 			}
@@ -385,7 +386,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$config['alumni'][ $username ] = $person_data;
 			}
 
-			if ( save_config( $config, $config_file ) ) {
+			if ( save_config( $config, $current_team ) ) {
 				$message = 'Person moved to alumni successfully!';
 			} else {
 				$error = 'Failed to move person to alumni.';
@@ -413,7 +414,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				}
 			}
 
-			if ( save_config( $config, $config_file ) ) {
+			if ( save_config( $config, $current_team ) ) {
 				$message = 'Person restored from alumni successfully!';
 			} else {
 				$error = 'Failed to restore person from alumni.';
@@ -443,8 +444,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			
 			if ( $person_data ) {
 				// Load target team config
-				$target_team_file = __DIR__ . '/' . $target_team . '.json';
-				$target_config = load_or_create_config( $target_team_file );
+				$target_config = load_or_create_config( $target_team );
 				
 				// Add person to target team (default to team_members)
 				$target_config['team_members'][ $username ] = $person_data;
@@ -453,8 +453,8 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$has_members = ! empty( $config['team_members'] ) || ! empty( $config['leadership'] );
 				
 				// Save both configs
-				$current_saved = save_config( $config, $config_file );
-				$target_saved = save_config( $target_config, $target_team_file );
+				$current_saved = save_config( $config, $current_team );
+				$target_saved = save_config( $target_config, $target_team );
 				
 				if ( $current_saved && $target_saved ) {
 					// Delete current team if requested and it's empty
@@ -485,7 +485,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			$event_index = (int) ( $_POST['event_index'] ?? -1 );
 			if ( $event_index >= 0 && isset( $config['events'][ $event_index ] ) ) {
 				array_splice( $config['events'], $event_index, 1 );
-				if ( save_config( $config, $config_file ) ) {
+				if ( save_config( $config, $current_team ) ) {
 					$message = 'Event deleted successfully!';
 				} else {
 					$error = 'Failed to delete event.';
@@ -642,7 +642,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 }
 
 // Load config for display (after any POST operations)
-$config = load_or_create_config( $config_file );
+$config = load_or_create_config( $current_team );
 
 // WordPress-style sanitization functions (simplified versions)
 function mask_date_input( $date, $privacy_mode ) {
@@ -725,9 +725,9 @@ function get_person_type_config( $person_type ) {
  * Unified person CRUD operations
  */
 function handle_person_action( $action, $config, $person_data ) {
-	global $config_file;
+	global $config_file, $current_team;
 
-	$main_config = load_or_create_config( $config_file );
+	$main_config = load_or_create_config( $current_team );
 
 	if ( strpos( $action, 'edit_' ) === 0 ) {
 		$username = $person_data['username'] ?? '';
@@ -744,8 +744,7 @@ function handle_person_action( $action, $config, $person_data ) {
 
 		$main_config[ $config['section_key'] ][ $username ] = $person_data;
 
-		if ( save_config( $main_config, $config_file ) ) {
-			global $current_team;
+		if ( save_config( $main_config, $current_team ) ) {
 			$redirect_url = build_team_url( 'index.php', array( 'person' => $username ) );
 			header( 'Location: ' . $redirect_url );
 			exit;
@@ -761,8 +760,7 @@ function handle_person_action( $action, $config, $person_data ) {
 
 		$main_config[ $config['section_key'] ][ $username ] = $person_data;
 
-		if ( save_config( $main_config, $config_file ) ) {
-			global $current_team;
+		if ( save_config( $main_config, $current_team ) ) {
 			$redirect_url = build_team_url( 'index.php', array( 'person' => $username ) );
 			header( 'Location: ' . $redirect_url );
 			exit;
@@ -773,7 +771,7 @@ function handle_person_action( $action, $config, $person_data ) {
 		$username = $_POST['username'] ?? '';
 		if ( isset( $main_config[ $config['section_key'] ][ $username ] ) ) {
 			unset( $main_config[ $config['section_key'] ][ $username ] );
-			if ( save_config( $main_config, $config_file ) ) {
+			if ( save_config( $main_config, $current_team ) ) {
 				return array( 'message' => $config['display_name'] . ' deleted successfully!' );
 			} else {
 				return array( 'error' => 'Failed to delete ' . strtolower( $config['display_name'] ) . '.' );
@@ -918,7 +916,8 @@ function create_notes_from_form() {
 	
 	// Get existing notes if we're editing
 	if ( isset( $_POST['action'] ) && in_array( $_POST['action'], array( 'edit_member', 'edit_leadership', 'edit_consultants', 'edit_alumni' ) ) && isset( $_POST['username'] ) ) {
-		$team_data = load_or_create_config( $config_file );
+		global $current_team;
+		$team_data = load_or_create_config( $current_team );
 		$username = sanitize_text_field( $_POST['username'] );
 		
 		// Check all person types for existing data
@@ -1632,7 +1631,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		<?php
 		// Get all repos used across the team for tag display
 		global $config_file;
-		$team_config = load_or_create_config( $config_file );
+		$team_config = load_or_create_config( $current_team );
 		$all_repos = array();
 		$all_people = array_merge( $team_config['team_members'] ?? array(), $team_config['leadership'] ?? array(), $team_config['alumni'] ?? array() );
 		foreach ( $all_people as $person ) {
@@ -1895,8 +1894,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 								$team_name = get_team_name_from_file( $team_slug );
 								
 								// Load target team config to get member count
-								$target_team_file = __DIR__ . '/' . $team_slug . '.json';
-								$target_team_config = load_or_create_config( $target_team_file );
+								$target_team_config = load_or_create_config( $team_slug );
 								$member_count = count( $target_team_config['team_members'] ?? array() ) + count( $target_team_config['leadership'] ?? array() );
 								
 								$display_name = $team_name . ' (' . $member_count . ' members)';
@@ -1911,7 +1909,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 					<?php 
 					// Check if moving this person would leave current team empty (excluding alumni)
 					global $config_file;
-					$team_config = load_or_create_config( $config_file );
+					$team_config = load_or_create_config( $current_team );
 					$current_username = $edit_data['username'] ?? '';
 					$temp_members = $team_config['team_members'] ?? array();
 					$temp_leadership = $team_config['leadership'] ?? array();
