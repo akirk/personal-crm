@@ -35,6 +35,7 @@ if ( ! function_exists( 'dbDelta' ) ) {
     }
 }
 
+require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../includes/storage.php';
 
 class WpdbStorageTest {
@@ -157,7 +158,7 @@ class WpdbStorageTest {
         assert( $type === 'team', 'Team type should be "team"' );
 
         // Test get available teams
-        $teams = $this->storage->get_available_teams();
+        $teams = $this->storage->get_available_groups();
         assert( is_array( $teams ), 'Available teams should return an array' );
 
         echo "✓ Team operations tests passed\n";
@@ -207,11 +208,11 @@ class WpdbStorageTest {
         );
 
         // Test save team config
-        $result = $this->storage->save_team_config( 'test-team', $test_config );
+        $result = $this->storage->save_group( 'test-team', $test_config );
         assert( $result === true, 'Save team config should return true' );
 
         // Test get team config
-        $config = $this->storage->get_team_config( 'test-team' );
+        $config = $this->storage->get_group( 'test-team' );
         assert( $config !== null, 'Team config should not be null' );
         assert( isset( $config['team_name'] ), 'Config should have team_name' );
 

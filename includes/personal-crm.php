@@ -8,8 +8,8 @@ class PersonalCrm {
     private static $instance = null;
     private static $storage_instance = null;
     public $storage;
-    private $app;
-    private $current_team;
+    public $app;
+    private $current_group;
     private $group;
 
     public static function set_storage( $storage ) {
@@ -44,6 +44,7 @@ class PersonalCrm {
                 'show_masterbar_for_anonymous' => false,
                 'show_wp_logo' => true,
                 'show_site_name' => true,
+                'app_name' => 'Personal CRM',
                 'require_capability' => 'read',  // Require login
                 'clear_admin_bar' => false
             ]
@@ -51,6 +52,8 @@ class PersonalCrm {
 
         $this->setup_routes();
         $this->setup_menu();
+
+        add_filter( 'personal_crm_sort_people', [ $this, 'default_sort_people' ], 5, 3 );
 
         // Only initialize wp-app if we're in WordPress environment or can provide required constants
         if ( defined( 'ABSPATH' ) ) {
@@ -91,6 +94,10 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         // Fire action to allow other plugins to register routes and extend functionality
         do_action( 'personal_crm_loaded', $this );
+
+        // Register AJAX endpoint for cmd-k data
+        add_action( 'wp_ajax_personal_crm_get_person_details', [ $this, 'ajax_get_person_details' ] );
+        add_action( 'wp_ajax_nopriv_personal_crm_get_person_details', [ $this, 'ajax_get_person_details' ] );
 
         // WordPress-specific functionality
         if ( defined( 'WPINC' ) ) {
@@ -133,13 +140,6 @@ if ( ! function_exists( "dbDelta" ) ) {
         // Audit reports (audit.php)
         $this->app->route( 'audit', 'audit.php' );
 
-        // HR Routes (if HR addon is active)
-        if ( is_plugin_active( 'a8c-hr/a8c-hr-addon.php' ) ) {
-            $this->app->route( 'hr-stats', '../a8c-hr/hr-stats.php' );
-            $this->app->route( 'hr-reports', '../a8c-hr/hr-reports.php' );
-            $this->app->route( 'hr-config', '../a8c-hr/hr-config.php' );
-        }
-
         // Import person (import-person.php)
         $this->app->route( 'import-person', 'import-person.php' );
 
@@ -150,16 +150,14 @@ if ( ! function_exists( "dbDelta" ) ) {
     private function setup_menu() {
         // Main navigation - Personal CRM focused
         $this->app->add_menu_item( 'dashboard', 'Dashboard', home_url( '/crm/' ) );
-        $this->app->add_menu_item( 'finder', 'Find People', home_url( '/crm/finder' ) );
         $this->app->add_menu_item( 'person', 'People', home_url( '/crm/person' ) );
         $this->app->add_menu_item( 'events', 'Events', home_url( '/crm/events' ) );
+        $this->app->add_menu_item( 'select', 'Select Group', home_url( '/crm/select' ) );
 
         // Admin menu items (only for administrators)
         if ( current_user_can( 'manage_options' ) ) {
             $this->app->add_menu_item( 'admin', 'Admin', home_url( '/crm/admin' ) );
             $this->app->add_menu_item( 'audit', 'Audit', home_url( '/crm/audit' ) );
-            $this->app->add_menu_item( 'import-person', 'Import Person', home_url( '/crm/import-person' ) );
-            $this->app->add_menu_item( 'select', 'Select Tool', home_url( '/crm/select' ) );
             $this->app->add_menu_item( 'settings', 'Plugin Settings', admin_url( 'options-general.php?page=personal-crm-settings' ) );
         }
 
@@ -266,55 +264,52 @@ if ( ! function_exists( "dbDelta" ) ) {
 
     public static function get_globals() {
         $crm = self::get_instance();
-        $current_team = $crm->get_current_team_from_params();
+        $current_group = $crm->get_current_group_from_params();
 
-        if ( ! $current_team ) {
-            $current_team = $crm->use_default_team();
-            $available_teams = $crm->storage->get_available_teams();
-            if ( count( $available_teams ) > 1 && ! $current_team ) {
+        if ( ! $current_group ) {
+            $current_group = $crm->use_default_group();
+            $available_groups = $crm->storage->get_available_groups();
+            if ( count( $available_groups ) > 1 && ! $current_group ) {
                 header( 'Location: ' . $crm->build_url( 'select.php' ) );
                 exit;
             }
         }
 
-        $group = $crm->is_social_group( $current_team ) ? 'group' : 'team';
+        $group = $crm->is_social_group( $current_group ) ? 'group' : 'team';
         $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
-        // Load team configuration with Person objects
-        $team_data = $crm->load_team_config_with_objects( $current_team );
+        $group_data = $crm->load_group_config_with_objects( $current_group );
 
-        // Ensure all expected sections exist as arrays
         $expected_sections = array( 'team_members', 'leadership', 'consultants', 'alumni' );
         foreach ( $expected_sections as $section ) {
-            if ( ! isset( $team_data[$section] ) || ! is_array( $team_data[$section] ) ) {
-                $team_data[$section] = array();
+            if ( ! isset( $group_data[$section] ) || ! is_array( $group_data[$section] ) ) {
+                $group_data[$section] = array();
             }
         }
 
-        // Separate deceased people from their original sections
         $deceased_people = array();
         foreach ( $expected_sections as $section ) {
-            foreach ( $team_data[$section] as $username => $person ) {
+            foreach ( $group_data[$section] as $username => $person ) {
                 if ( ! empty( $person->deceased ) ) {
                     $deceased_people[$username] = $person;
-                    unset( $team_data[$section][$username] );
+                    unset( $group_data[$section][$username] );
                 }
             }
         }
-        $team_data['deceased'] = $deceased_people;
-        $available_teams = $crm->storage->get_available_teams();
+        $group_data['deceased'] = $deceased_people;
+        $available_groups = $crm->storage->get_available_groups();
 
-        return compact( 'crm', 'current_team', 'group', 'privacy_mode', 'team_data', 'available_teams' );
+        return compact( 'crm', 'current_group', 'group', 'privacy_mode', 'group_data', 'available_groups' );
     }
 
     /**
-     * Check if a team is configured as a social group
+     * Check if a group is configured as a social group
      */
-    public function is_social_group( $team_slug ) {
-        if ( empty( $team_slug ) ) {
+    public function is_social_group( $group_slug ) {
+        if ( empty( $group_slug ) ) {
             return false;
         }
-        return $this->storage->get_team_type( $team_slug ) === 'group';
+        return $this->storage->get_group_type( $group_slug ) === 'group';
     }
 
     /**
@@ -388,44 +383,42 @@ if ( ! function_exists( "dbDelta" ) ) {
 
 
     /**
-     * Get display word for team type ('team' -> 'team', 'group' -> 'group')
+     * Get display word for group type ('team' -> 'team', 'group' -> 'group')
      */
-    public function get_type_display_word( $team_slug ) {
-        $type = $this->storage->get_team_type( $team_slug );
+    public function get_type_display_word( $group_slug ) {
+        $type = $this->storage->get_group_type( $group_slug );
         return ( $type === 'group' ) ? 'group' : 'team';
     }
 
     /**
      * Get display title with appropriate type word
      */
-    public function get_team_display_title( $team_slug, $suffix = '' ) {
-        $team_name = $this->storage->get_team_name( $team_slug );
-        $team_name = $team_name ?: ucfirst( str_replace( '_', ' ', $team_slug ) );
+    public function get_group_display_title( $group_slug, $suffix = '' ) {
+        $group_name = $this->storage->get_group_name( $group_slug );
+        $group_name = $group_name ?: ucfirst( str_replace( '_', ' ', $group_slug ) );
 
         if ( empty( $suffix ) ) {
-            return $team_name . ' ' . ucfirst( $this->group );
+            return $group_name . ' ' . ucfirst( $this->group );
         }
 
-        return $team_name . ' ' . ucfirst( $this->group ) . ' ' . $suffix;
+        return $group_name . ' ' . ucfirst( $this->group ) . ' ' . $suffix;
     }
 
     /**
-     * Get current team slug from URL parameters, treating 'group' as synonym for 'team'
+     * Get current group slug from URL parameters, treating 'group' as synonym for 'team'
      */
-    public function get_current_team_from_params() {
-        // Check both 'team' and 'group' parameters as synonyms
-        $team_param = $_POST['team'] ?? $_GET['team'] ?? null;
-        $group_param = $_POST['group'] ?? $_GET['group'] ?? null;
+    public function get_current_group_from_params() {
+        $group_param_from_get = $_POST['team'] ?? $_GET['team'] ?? null;
+        $group_param_alt = $_POST['group'] ?? $_GET['group'] ?? null;
 
-        // Check wp-app route parameters using WordPress query vars
-        if ( empty( $team_param ) && function_exists( '\get_query_var' ) ) {
-            $team_param = \get_query_var( 'team' );
+        if ( empty( $group_param_from_get ) && function_exists( '\get_query_var' ) ) {
+            $group_param_from_get = \get_query_var( 'team' );
         }
 
-        $this->current_team = $group_param ?? $team_param ?? null;
+        $this->current_group = $group_param_alt ?? $group_param_from_get ?? null;
 
-        $this->group = $this->get_type_display_word( $this->current_team ); // 'team' or 'group'
-        return $this->current_team;
+        $this->group = $this->get_type_display_word( $this->current_group );
+        return $this->current_group;
     }
     /**
      * Privacy mode helper functions
@@ -475,15 +468,15 @@ if ( ! function_exists( "dbDelta" ) ) {
     }
 
     /**
-     * Get the default team slug (team marked with default: true)
+     * Get the default group slug (group marked with default: true)
      */
-    public function get_default_team() {
-        return $this->storage->get_default_team();
+    public function get_default_group() {
+        return $this->storage->get_default_group();
     }
 
-    public function use_default_team() {
-        $this->current_team = $this->get_default_team();
-        return $this->current_team;
+    public function use_default_group() {
+        $this->current_group = $this->get_default_group();
+        return $this->current_group;
     }
 
     /**
@@ -513,26 +506,24 @@ if ( ! function_exists( "dbDelta" ) ) {
     }
 
     /**
-     * Load team configuration from storage and convert to Person objects
+     * Load group configuration from storage and convert to Person objects
      */
-    public function load_team_config_with_objects( $team_slug = 'team' ) {
-        if ( ! $this->storage->team_exists( $team_slug ) ) {
-            // Redirect to team creation page
-            $create_team_url = $this->build_url( 'admin.php', array( 'create_team' => 'new' ) );
-            header( 'Location: ' . $create_team_url );
+    public function load_group_config_with_objects( $group_slug = 'team' ) {
+        if ( ! $this->storage->group_exists( $group_slug ) ) {
+            $create_group_url = $this->build_url( 'admin.php', array( 'create_team' => 'new' ) );
+            header( 'Location: ' . $create_group_url );
             exit;
         }
 
-        $config = $this->storage->get_team_config( $team_slug );
+        $config = $this->storage->get_group( $group_slug );
 
         if ( ! $config ) {
-            die( 'Error: Unable to load team configuration' );
+            die( 'Error: Unable to load group configuration' );
         }
 
-        // Convert arrays to Person objects
-        $team_members = array();
+        $group_members = array();
         foreach ( $config['team_members'] as $username => $member_data ) {
-            $team_members[$username] = $this->create_person_from_data( $username, $member_data );
+            $group_members[$username] = $this->create_person_from_data( $username, $member_data );
         }
 
         $leadership = array();
@@ -550,24 +541,11 @@ if ( ! function_exists( "dbDelta" ) ) {
             $alumni[$username] = $this->create_person_from_data( $username, $alumni_data );
         }
 
-        // Sort all collections by name
-        uasort( $team_members, function( $a, $b ) {
-            return strcasecmp( $a->name, $b->name );
-        } );
+        $group_members = apply_filters( 'personal_crm_sort_people', $group_members, 'team_members', $group_slug );
+        $leadership = apply_filters( 'personal_crm_sort_people', $leadership, 'leadership', $group_slug );
+        $consultants = apply_filters( 'personal_crm_sort_people', $consultants, 'consultants', $group_slug );
+        $alumni = apply_filters( 'personal_crm_sort_people', $alumni, 'alumni', $group_slug );
 
-        uasort( $leadership, function( $a, $b ) {
-            return strcasecmp( $a->name, $b->name );
-        } );
-
-        uasort( $consultants, function( $a, $b ) {
-            return strcasecmp( $a->name, $b->name );
-        } );
-
-        uasort( $alumni, function( $a, $b ) {
-            return strcasecmp( $a->name, $b->name );
-        } );
-
-        // Convert team events to Event objects
         $events = array();
         foreach ( $config['events'] ?? array() as $event_data ) {
             $events[] = Event::from_team_event( $event_data );
@@ -575,10 +553,10 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         return array(
             'activity_url_prefix' => $config['activity_url_prefix'],
-            'team_name' => $config['team_name'],
-            'not_managing_team' => $config['not_managing_team'] ?? true,
-            'team_links' => $config['team_links'] ?? array(),
-            'team_members' => $team_members,
+            'team_name' => $config['group_name'],
+            'not_managing_team' => $config['not_managing'] ?? true,
+            'team_links' => $config['links'] ?? array(),
+            'team_members' => $group_members,
             'leadership' => $leadership,
             'consultants' => $consultants,
             'alumni' => $alumni,
@@ -596,12 +574,9 @@ if ( ! function_exists( "dbDelta" ) ) {
             // New format - use links directly
             $links = $person_data['links'];
         } else {
-            // Old format - migrate one_on_one and hr_feedback to links
+            // Old format - migrate one_on_one to links
             if ( ! empty( $person_data['one_on_one'] ) ) {
                 $links['1:1 doc'] = $person_data['one_on_one'];
-            }
-            if ( ! empty( $person_data['hr_feedback'] ) ) {
-                $links['HR monthly'] = $person_data['hr_feedback'];
             }
         }
 
@@ -648,31 +623,28 @@ if ( ! function_exists( "dbDelta" ) ) {
     /**
      * Render upcoming events sidebar section
      *
-     * @param array $team_data Team data containing people and events
+     * @param array $group_data Group data containing people and events
      * @param int $days_ahead Number of days to look ahead (default: 90 for team page, 365 for person page)
      * @param string $filter_person Show events only for this person (null for all people)
      * @param bool $include_team_events Whether to include team-wide events
      */
-    public function render_upcoming_events_sidebar( $team_data, $days_ahead = 90, $filter_person = null, $include_team_events = true ) {
+    public function render_upcoming_events_sidebar( $group_data, $days_ahead = 90, $filter_person = null, $include_team_events = true ) {
         $current_date = new \DateTime();
         $cutoff_date = clone $current_date;
         $cutoff_date->add( new \DateInterval( 'P' . $days_ahead . 'D' ) );
 
         $all_events = array();
 
-        // Get all people from team data
         $all_people = array();
-        if ( isset( $team_data['team_members'] ) ) {
-            $all_people = array_merge( $all_people, $team_data['team_members'] );
+        if ( isset( $group_data['team_members'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['team_members'] );
         }
-        if ( isset( $team_data['leadership'] ) ) {
-            $all_people = array_merge( $all_people, $team_data['leadership'] );
+        if ( isset( $group_data['leadership'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['leadership'] );
         }
-        if ( isset( $team_data['consultants'] ) ) {
-            $all_people = array_merge( $all_people, $team_data['consultants'] );
+        if ( isset( $group_data['consultants'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['consultants'] );
         }
-
-        // Get personal events from people (filter if specified)
         foreach ( $all_people as $person ) {
             if ( is_object( $person ) && method_exists( $person, 'get_upcoming_events' ) ) {
                 error_log( 'DEBUG: CrmCore - Checking person: ' . $person->username . ', filter_person: ' . ( $filter_person ?: 'null' ) );
@@ -691,9 +663,8 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         error_log( 'DEBUG: CrmCore - Total personal events collected: ' . count( $all_events ) );
 
-        // Add team events (if enabled)
-        if ( $include_team_events && isset( $team_data['events'] ) ) {
-            foreach ( $team_data['events'] as $event ) {
+        if ( $include_team_events && isset( $group_data['events'] ) ) {
+            foreach ( $group_data['events'] as $event ) {
                 $event_start = $event->date;
                 $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
 
@@ -822,52 +793,73 @@ if ( ! function_exists( "dbDelta" ) ) {
     }
 
     /**
-     * Build URL with team parameter (uses 'group' parameter for group-type teams)
+     * Default sorting for people - sort by name
+     */
+    public function default_sort_people( $people, $type, $group_slug ) {
+        uasort( $people, function( $a, $b ) {
+            return strcasecmp( $a->name, $b->name );
+        } );
+        return $people;
+    }
+
+    /**
+     * Build URL with group parameter (uses 'group' parameter for group-type groups)
      */
     public function build_url( $base_url, $additional_params = array() ) {
-        // If wp-app is available, use wp-app URL structure (works in both WordPress and standalone modes)
         if ( $this->app ) {
-            // Convert .php file references to plugin routes
             $route = str_replace( '.php', '', $base_url );
 
-            // Handle special cases
             if ( $route === 'index' || $route === '' || $route === './' ) {
                 $route = '';
             }
 
-            // Special handling for person URLs - use {team}/{person} format
-            if ( $route === 'person' && isset( $additional_params['person'] ) ) {
+            if ( ( $route === 'person' || $route === '' ) && isset( $additional_params['person'] ) ) {
                 $username = $additional_params['person'];
-                unset( $additional_params['person'] ); // Remove from query params
+                unset( $additional_params['person'] );
 
                 if ( isset( $additional_params['team'] ) ) {
-                    $team = $additional_params['team'];
-                    unset( $additional_params['team'] ); // Remove team param if present
+                    $group = $additional_params['team'];
+                    unset( $additional_params['team'] );
                 } else {
-                    $team = $this->current_team;
+                    $group = $this->current_group;
                 }
 
-                $url = home_url( '/crm/' . $team . '/' . $username );
+                $url = home_url( '/crm/' . $group . '/' . $username );
             } elseif ( $route === 'admin' ) {
                 $username = '';
                 if ( isset( $additional_params['person'] ) ) {
                     $username = $additional_params['person'];
-                    unset( $additional_params['person'] ); // Remove from query params
+                    unset( $additional_params['person'] );
                 }
                 if ( isset( $additional_params['team'] ) ) {
-                    $team = $additional_params['team'];
-                    unset( $additional_params['team'] ); // Remove team param if present
+                    $group = $additional_params['team'];
+                    unset( $additional_params['team'] );
                 } else {
-                    $team = $this->current_team;
+                    $group = $this->current_group;
                 }
 
-                $url = home_url( '/crm/admin/' . $team . '/' . $username );
+                $url = home_url( '/crm/admin/' . $group . '/' . $username );
             } else {
                 $url = home_url( '/crm/' . ltrim( $route, '/' ) );
             }
 
-            // Allow other plugins to add persistent parameters
+            // Allow plugins to modify the URL and parameters before adding query string
+            $url_data = apply_filters( 'personal_crm_build_url', array( 'url' => $url, 'params' => $additional_params ), $base_url );
+            $url = $url_data['url'];
+            $additional_params = $url_data['params'];
+
             $additional_params = apply_filters( 'personal_crm_build_url_params', $additional_params, $base_url );
+
+            // Automatically add privacy mode if active and not already set
+            if ( ! isset( $additional_params['privacy'] ) ) {
+                $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
+                if ( $privacy_mode ) {
+                    $additional_params['privacy'] = '1';
+                }
+            } elseif ( $additional_params['privacy'] === '0' ) {
+                // Remove privacy=0 since it's the default
+                unset( $additional_params['privacy'] );
+            }
 
             if ( ! empty( $additional_params ) ) {
                 $url .= '?' . http_build_query( $additional_params );
@@ -876,16 +868,14 @@ if ( ! function_exists( "dbDelta" ) ) {
             return $url;
         }
 
-        // Original standalone functionality
         $params = array();
-        if ( $this->current_team !== 'team' ) {
-            $team_type = $this->storage->get_team_type( $this->current_team );
-            $param_name = ( $team_type === 'group' ) ? 'group' : 'team';
-            $params[ $param_name ] = $this->current_team;
+        if ( $this->current_group !== 'team' ) {
+            $group_type = $this->storage->get_group_type( $this->current_group );
+            $param_name = ( $group_type === 'group' ) ? 'group' : 'team';
+            $params[ $param_name ] = $this->current_group;
         }
         $params = array_merge( $params, $additional_params );
 
-        // Allow other plugins to add persistent parameters
         $params = apply_filters( 'personal_crm_build_url_params', $params, $base_url );
 
         if ( ! empty( $params ) ) {
@@ -914,24 +904,86 @@ if ( ! function_exists( "dbDelta" ) ) {
         <?php
     }
 
-    public function init_cmd_k_js( $privacy_mode = false ) {
-        $available_teams = $this->storage->get_available_teams();
-        $json_files = array();
+    public function ajax_get_person_details() {
+        $username = $_GET['username'] ?? '';
+        $group_slug = $_GET['team'] ?? '';
 
-        foreach ( $available_teams as $team_slug ) {
-            $json_files[] = array(
-                'slug' => $team_slug,
-                'name' => $this->storage->get_team_name( $team_slug ) ?: ucfirst( str_replace( '_', ' ', $team_slug ) )
-            );
+        if ( empty( $username ) || empty( $group_slug ) || ! $this->storage->group_exists( $group_slug ) ) {
+            wp_send_json_error( 'Invalid request' );
+            return;
         }
+
+        $person = $this->storage->get_person( $group_slug, $username );
+
+        if ( ! $person ) {
+            wp_send_json_error( 'Person not found' );
+            return;
+        }
+
+        wp_send_json_success( array(
+            'role' => $person['role'] ?? '',
+            'location' => $person['location'] ?? '',
+            'birthday' => $person['birthday'] ?? '',
+            'links' => $person['links'] ?? array(),
+            'linear' => $person['linear'] ?? ''
+        ) );
+    }
+
+    public function init_cmd_k_js( $privacy_mode = false ) {
+        $available_groups = $this->storage->get_available_groups();
+        $groups = array();
+        $search_index = array();
+
+        foreach ( $available_groups as $group_slug ) {
+            $group_name = $this->storage->get_group_name( $group_slug ) ?: ucfirst( str_replace( '_', ' ', $group_slug ) );
+            $group_config = $this->storage->get_group( $group_slug );
+
+            $group_members_count = count( $group_config['team_members'] ?? array() );
+            $leadership_count = count( $group_config['leadership'] ?? array() );
+            $alumni_count = count( $group_config['alumni'] ?? array() );
+
+            $groups[] = array(
+                'slug' => $group_slug,
+                'name' => $group_name,
+                'team_members' => $group_members_count,
+                'leadership' => $leadership_count,
+                'alumni' => $alumni_count,
+                'total_people' => $group_members_count + $leadership_count + $alumni_count,
+                'url' => $this->build_url( 'index.php', array( 'team' => $group_slug ) )
+            );
+
+            foreach ( array( 'team_members', 'leadership', 'alumni' ) as $type ) {
+                if ( isset( $group_config[ $type ] ) ) {
+                    foreach ( $group_config[ $type ] as $username => $person ) {
+                        $type_label = $type === 'team_members' ? 'Team Member' :
+                                    ( $type === 'leadership' ? 'Leadership' : 'Alumni' );
+
+                        $search_index[] = array(
+                            'username' => $username,
+                            'name' => $person['name'] ?? '',
+                            'nickname' => $person['nickname'] ?? '',
+                            'team_slug' => $group_slug,
+                            'team_name' => $group_name,
+                            'type' => $type_label,
+                            'url' => $this->build_url( 'index.php', array( 'person' => $username, 'team' => $group_slug ) )
+                        );
+                    }
+                }
+            }
+        }
+
+        $ajax_url = admin_url( 'admin-ajax.php' );
+        $base_url = home_url( '/crm/' );
         ?>
         <script>
-            // Initialize Command-K with list of JSON files
             document.addEventListener('DOMContentLoaded', () => {
                 if (typeof CmdK !== 'undefined') {
-                    const jsonFiles = <?php echo json_encode( $json_files ); ?>;
+                    const teams = <?php echo json_encode( $groups ); ?>;
+                    const searchIndex = <?php echo json_encode( $search_index ); ?>;
                     const privacyMode = <?php echo $privacy_mode ? 'true' : 'false'; ?>;
-                    CmdK.init(jsonFiles, privacyMode);
+                    const ajaxUrl = <?php echo json_encode( $ajax_url ); ?>;
+                    const baseUrl = <?php echo json_encode( $base_url ); ?>;
+                    CmdK.init(teams, searchIndex, privacyMode, ajaxUrl, baseUrl);
                 }
             });
         </script>
@@ -944,32 +996,27 @@ if ( ! function_exists( "dbDelta" ) ) {
     /**
      * Get events for calendar display (all events within date range, not just upcoming)
      */
-    public function get_calendar_events( $team_data, $start_date, $end_date ) {
+    public function get_calendar_events( $group_data, $start_date, $end_date ) {
         $all_events = array();
 
-        // Get all people from team data
         $all_people = array();
-        if ( isset( $team_data['team_members'] ) ) {
-            $all_people = array_merge( $all_people, $team_data['team_members'] );
+        if ( isset( $group_data['team_members'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['team_members'] );
         }
-        if ( isset( $team_data['leadership'] ) ) {
-            $all_people = array_merge( $all_people, $team_data['leadership'] );
+        if ( isset( $group_data['leadership'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['leadership'] );
         }
-        if ( isset( $team_data['consultants'] ) ) {
-            $all_people = array_merge( $all_people, $team_data['consultants'] );
+        if ( isset( $group_data['consultants'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['consultants'] );
         }
 
-        // Get personal events from people within date range
-        // For calendar view, we get upcoming events and then filter by date range
         foreach ( $all_people as $person ) {
             if ( is_object( $person ) && method_exists( $person, 'get_upcoming_events' ) ) {
-                // Get upcoming events for this person (covers next year)
                 $personal_events = $person->get_upcoming_events();
                 foreach ( $personal_events as $event ) {
                     $event_start = $event->date;
                     $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
 
-                    // Include event if it overlaps with our date range
                     if ( $event_end >= $start_date && $event_start <= $end_date ) {
                         $all_events[] = $event;
                     }
@@ -977,20 +1024,17 @@ if ( ! function_exists( "dbDelta" ) ) {
             }
         }
 
-        // Add team events within date range
-        if ( isset( $team_data['events'] ) ) {
-            foreach ( $team_data['events'] as $event ) {
+        if ( isset( $group_data['events'] ) ) {
+            foreach ( $group_data['events'] as $event ) {
                 $event_start = $event->date;
                 $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
 
-                // Include event if it overlaps with our date range
                 if ( $event_end >= $start_date && $event_start <= $end_date ) {
                     $all_events[] = $event;
                 }
             }
         }
 
-        // Sort all events by date
         usort( $all_events, function( $a, $b ) {
             return $a->date <=> $b->date;
         } );
@@ -1001,25 +1045,23 @@ if ( ! function_exists( "dbDelta" ) ) {
     /**
      * Get upcoming events for display (includes ongoing multi-day events)
      */
-    public function get_upcoming_events_for_display( $team_data ) {
+    public function get_upcoming_events_for_display( $group_data ) {
         $current_date = new \DateTime();
         $cutoff_date = clone $current_date;
-        $cutoff_date->add( new \DateInterval( 'P3M' ) ); // 3 months from now
+        $cutoff_date->add( new \DateInterval( 'P3M' ) );
         $all_events = array();
 
-        // Get all people from team data
         $all_people = array();
-        if ( isset( $team_data['team_members'] ) ) {
-            $all_people = array_merge( $all_people, $team_data['team_members'] );
+        if ( isset( $group_data['team_members'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['team_members'] );
         }
-        if ( isset( $team_data['leadership'] ) ) {
-            $all_people = array_merge( $all_people, $team_data['leadership'] );
+        if ( isset( $group_data['leadership'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['leadership'] );
         }
-        if ( isset( $team_data['consultants'] ) ) {
-            $all_people = array_merge( $all_people, $team_data['consultants'] );
+        if ( isset( $group_data['consultants'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['consultants'] );
         }
 
-        // Get personal events from people
         foreach ( $all_people as $person ) {
             if ( is_object( $person ) && method_exists( $person, 'get_upcoming_events' ) ) {
                 $personal_events = $person->get_upcoming_events();
@@ -1027,20 +1069,17 @@ if ( ! function_exists( "dbDelta" ) ) {
             }
         }
 
-        // Add team events (including ongoing multi-day events)
-        if ( isset( $team_data['events'] ) ) {
-            foreach ( $team_data['events'] as $event ) {
+        if ( isset( $group_data['events'] ) ) {
+            foreach ( $group_data['events'] as $event ) {
                 $event_start = $event->date;
                 $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
 
-                // Include event if it's upcoming or currently ongoing
                 if ( $event_end >= $current_date && $event_start <= $cutoff_date ) {
                     $all_events[] = $event;
                 }
             }
         }
 
-        // Sort all events by date
         usort( $all_events, function( $a, $b ) {
             return $a->date <=> $b->date;
         } );
@@ -1048,31 +1087,27 @@ if ( ! function_exists( "dbDelta" ) ) {
         return $all_events;
     }
 
-    public function get_all_upcoming_events( $team_data ) {
+    public function get_all_upcoming_events( $group_data ) {
         $all_events = array();
         $current_date = new \DateTime();
         $cutoff_date = clone $current_date;
-        $cutoff_date->add( new \DateInterval( 'P3M' ) ); // 3 months from now
+        $cutoff_date->add( new \DateInterval( 'P3M' ) );
 
-        // Check if alumni events should be included (undocumented parameter)
         $include_alumni = isset( $_GET['alumni'] ) && $_GET['alumni'] === '1';
 
-        // Get personal events from team members, leadership, consultants, and optionally alumni
-        $all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['consultants'] ?? array() );
+        $all_people = array_merge( $group_data['team_members'], $group_data['leadership'], $group_data['consultants'] ?? array() );
         if ( $include_alumni ) {
-            $all_people = array_merge( $all_people, $team_data['alumni'] );
+            $all_people = array_merge( $all_people, $group_data['alumni'] );
         }
         foreach ( $all_people as $person ) {
             $personal_events = $person->get_upcoming_events();
             $all_events = array_merge( $all_events, $personal_events );
         }
 
-        // Add team and company events (within 3 months) - Fixed property access
-        foreach ( $team_data['events'] as $event ) {
-            $start_date = $event->date; // Use ->date property, not ->start_date
+        foreach ( $group_data['events'] as $event ) {
+            $start_date = $event->date;
             $end_date = isset( $event->end_date ) && $event->end_date ? $event->end_date : $start_date;
 
-            // Include event if it's upcoming or currently ongoing
             if ( $end_date >= $current_date && $start_date <= $cutoff_date ) {
                 $duration = '';
                 if ( $end_date && $start_date->format( 'Y-m-d' ) !== $end_date->format( 'Y-m-d' ) ) {
@@ -1082,14 +1117,13 @@ if ( ! function_exists( "dbDelta" ) ) {
                 $all_events[] = array(
                     'type' => $event->type,
                     'date' => $start_date,
-                    'description' => $event->description . $duration, // Use ->description, not ->name
+                    'description' => $event->description . $duration,
                     'location' => $event->location ?? '',
                     'details' => $event->details ?? '',
                 );
             }
         }
 
-        // Sort all events by date
         usort( $all_events, function( $a, $b ) {
             $date_a = is_array( $a ) ? $a['date'] : $a->date;
             $date_b = is_array( $b ) ? $b['date'] : $b->date;

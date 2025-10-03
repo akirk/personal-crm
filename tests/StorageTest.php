@@ -3,6 +3,7 @@
  * Simple test for SQLite Storage implementation
  */
 
+require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../includes/sqlite-wpdb.php';
 require_once __DIR__ . '/../includes/storage.php';
 
@@ -76,7 +77,7 @@ class StorageTest {
             )
         );
         
-        $result = $this->storage->save_team_config( 'test-team', $config );
+        $result = $this->storage->save_group( 'test-team', $config );
         $this->assert( $result === true, 'Team creation failed' );
         
         echo "✓\n";
@@ -85,7 +86,7 @@ class StorageTest {
     private function testTeamRetrieval() {
         echo "Testing team retrieval... ";
         
-        $config = $this->storage->get_team_config( 'test-team' );
+        $config = $this->storage->get_group( 'test-team' );
         $this->assert( $config !== null, 'Team retrieval returned null' );
         $this->assert( $config['team_name'] === 'Test Team', 'Team name mismatch' );
         $this->assert( count( $config['team_members'] ) === 1, 'Team members count mismatch' );
@@ -97,7 +98,7 @@ class StorageTest {
     private function testTeamListing() {
         echo "Testing team listing... ";
         
-        $teams = $this->storage->get_available_teams();
+        $teams = $this->storage->get_available_groups();
         $this->assert( in_array( 'test-team', $teams ), 'Test team not found in listing' );
         
         $team_name = $this->storage->get_team_name( 'test-team' );
@@ -157,7 +158,7 @@ class StorageTest {
         $migrated_count = $this->storage->migrate_from_json( $test_json_dir );
         $this->assert( $migrated_count === 1, 'Migration count mismatch' );
         
-        $migrated_config = $this->storage->get_team_config( 'migrated-team' );
+        $migrated_config = $this->storage->get_group( 'migrated-team' );
         $this->assert( $migrated_config !== null, 'Migrated team not found' );
         $this->assert( $migrated_config['team_name'] === 'Migrated Team', 'Migrated team name mismatch' );
         

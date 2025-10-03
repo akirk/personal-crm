@@ -45,6 +45,11 @@ if ( defined( 'WPINC' ) ) {
     } );
 } else {
     // Standalone mode - use SQLite by default
+    // Ensure wp-app database classes are loaded
+    if ( ! class_exists( 'wpdb' ) || ! class_exists( 'sqlite_wpdb' ) ) {
+        require_once __DIR__ . '/vendor/akirk/wp-app/src/wpdb-polyfill.php';
+        require_once __DIR__ . '/vendor/akirk/wp-app/src/sqlite-wpdb.php';
+    }
     $sqlite_file = __DIR__ . '/data/a8c.db';
     $sqlite_wpdb = new \sqlite_wpdb( $sqlite_file, '' );
     $storage = new Storage( $sqlite_wpdb );

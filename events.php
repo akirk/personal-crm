@@ -10,14 +10,14 @@ require_once __DIR__ . '/personal-crm.php';
 
 // For events page, we need to handle initialization differently to avoid wp-app routing conflicts
 $crm = PersonalCrm::get_instance();
-$current_team = $crm->get_current_team_from_params();
+$current_group = $crm->get_current_group_from_params();
 // If no team specified, use default team or first available team
-if ( ! $current_team ) {
-    $current_team = $crm->get_default_team();
-    if ( ! $current_team ) {
-        $available_teams = $crm->storage->get_available_teams();
+if ( ! $current_group ) {
+    $current_group = $crm->get_default_group();
+    if ( ! $current_group ) {
+        $available_teams = $crm->storage->get_available_groups();
         if ( ! empty( $available_teams ) ) {
-            $current_team = $available_teams[0]; // Use first available team instead of redirecting
+            $current_group = $available_teams[0]; // Use first available team instead of redirecting
         }
     }
 }
@@ -25,38 +25,38 @@ if ( ! $current_team ) {
 $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
 // Events-specific logic
-$all_teams_mode = $current_team === 'all-teams';
+$all_teams_mode = $current_group === 'all-teams';
 
 // Load team configuration with Person objects
 if ( $all_teams_mode ) {
     // For all-teams mode, we'll load this later after we set up the parameters
-    $team_data = null;
+    $group_data = null;
 } else {
-    $group = $crm->is_social_group( $current_team ) ? 'group' : 'team';
-    $team_data = $crm->load_team_config_with_objects( $current_team );
+    $group = $crm->is_social_group( $current_group ) ? 'group' : 'team';
+    $group_data = $crm->load_group_config_with_objects( $current_group );
 
     // Ensure all expected sections exist as arrays
     $expected_sections = array( 'team_members', 'leadership', 'consultants', 'alumni' );
     foreach ( $expected_sections as $section ) {
-        if ( ! isset( $team_data[$section] ) || ! is_array( $team_data[$section] ) ) {
-            $team_data[$section] = array();
+        if ( ! isset( $group_data[$section] ) || ! is_array( $group_data[$section] ) ) {
+            $group_data[$section] = array();
         }
     }
 
     // Separate deceased people from their original sections
     $deceased_people = array();
     foreach ( $expected_sections as $section ) {
-        foreach ( $team_data[$section] as $username => $person ) {
+        foreach ( $group_data[$section] as $username => $person ) {
             if ( ! empty( $person->deceased ) ) {
                 $deceased_people[$username] = $person;
-                unset( $team_data[$section][$username] );
+                unset( $group_data[$section][$username] );
             }
         }
     }
-    $team_data['deceased'] = $deceased_people;
+    $group_data['deceased'] = $deceased_people;
 }
 
-$available_teams = $crm->storage->get_available_teams();
+$available_teams = $crm->storage->get_available_groups();
 
 // Get calendar view parameters
 $view_mode = isset( $_GET['view'] ) ? $_GET['view'] : 'list';
@@ -83,10 +83,10 @@ if ( $all_teams_mode ) {
 	// Load events from all teams
 	$all_teams_data = array();
 	foreach ( $available_teams as $team_slug ) {
-		$all_teams_data[$team_slug] = $crm->load_team_config_with_objects( $team_slug );
+		$all_teams_data[$team_slug] = $crm->load_group_config_with_objects( $team_slug );
 	}
 	// Create a combined team_data structure
-	$team_data = array(
+	$group_data = array(
 		'team_name' => 'All Teams',
 		'events' => array(),
 		'people' => array(),
@@ -99,12 +99,12 @@ if ( $all_teams_mode ) {
 
 	// Combine all events and people from all teams
 	foreach ( $all_teams_data as $team_slug => $data ) {
-		$team_data['events'] = array_merge( $team_data['events'], $data['events'] ?? array() );
-		$team_data['team_members'] = array_merge( $team_data['team_members'], $data['team_members'] ?? array() );
-		$team_data['leadership'] = array_merge( $team_data['leadership'], $data['leadership'] ?? array() );
-		$team_data['consultants'] = array_merge( $team_data['consultants'], $data['consultants'] ?? array() );
-		$team_data['alumni'] = array_merge( $team_data['alumni'], $data['alumni'] ?? array() );
-		$team_data['deceased'] = array_merge( $team_data['deceased'], $data['deceased'] ?? array() );
+		$group_data['events'] = array_merge( $group_data['events'], $data['events'] ?? array() );
+		$group_data['team_members'] = array_merge( $group_data['team_members'], $data['team_members'] ?? array() );
+		$group_data['leadership'] = array_merge( $group_data['leadership'], $data['leadership'] ?? array() );
+		$group_data['consultants'] = array_merge( $group_data['consultants'], $data['consultants'] ?? array() );
+		$group_data['alumni'] = array_merge( $group_data['alumni'], $data['alumni'] ?? array() );
+		$group_data['deceased'] = array_merge( $group_data['deceased'], $data['deceased'] ?? array() );
 	}
 }
 
@@ -112,7 +112,7 @@ if ( $all_teams_mode ) {
 $team_events = array();
 
 // Separate team events into upcoming and past
-$past_team_events = array_filter( $team_data['events'], function( $event ) {
+$past_team_events = array_filter( $group_data['events'], function( $event ) {
 	return $event->is_past();
 });
 
@@ -123,7 +123,7 @@ usort( $past_team_events, function( $a, $b ) {
 // Get events for display - different logic for list vs calendar views
 if ( $view_mode === 'list' ) {
     // For list view, show upcoming events only
-    $all_upcoming_events = $crm->get_upcoming_events_for_display( $team_data );
+    $all_upcoming_events = $crm->get_upcoming_events_for_display( $group_data );
 } else {
     // For calendar views, show events within a broader date range around the selected month
     $month_start = new \DateTime( "$calendar_year-$calendar_month-01" );
@@ -136,13 +136,13 @@ if ( $view_mode === 'list' ) {
     $range_end = clone $month_end;
     $range_end->modify( 'last day of next month' );
 
-    $all_upcoming_events = $crm->get_calendar_events( $team_data, $range_start, $range_end );
+    $all_upcoming_events = $crm->get_calendar_events( $group_data, $range_start, $range_end );
 }
 
 // Calendar helper functions
 function build_calendar_url( $params = array() ) {
-    global $current_team, $all_teams_mode;
-    $base_params = array( 'team' => $all_teams_mode ? 'all-teams' : $current_team );
+    global $current_group, $all_teams_mode;
+    $base_params = array( 'team' => $all_teams_mode ? 'all-teams' : $current_group );
     if ( isset( $_GET['privacy'] ) ) {
         $base_params['privacy'] = $_GET['privacy'];
     }
@@ -249,7 +249,7 @@ foreach ( $past_team_events as $event ) {
 
 
 // Get available teams for switcher
-$available_teams = $crm->storage->get_available_teams();
+$available_teams = $crm->storage->get_available_groups();
 
 ?>
 <!DOCTYPE html>
@@ -258,7 +258,7 @@ $available_teams = $crm->storage->get_available_teams();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $team_data['team_name'] ) . ' Events' ) : htmlspecialchars( $team_data['team_name'] ) . ' Events'; ?></title>
+    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $group_data['group_name'] ) . ' Events' ) : htmlspecialchars( $group_data['group_name'] ) . ' Events'; ?></title>
     <?php
     if ( function_exists( 'wp_app_enqueue_style' ) ) {
         wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
@@ -279,16 +279,16 @@ $available_teams = $crm->storage->get_available_teams();
             <div class="header-container">
                 <h1>
                     <?php if ( $all_teams_mode ) : ?>
-                        <a href="<?php echo $crm->build_url( 'select.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
+                        <a href="<?php echo $crm->build_url( 'select.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $group_data['group_name'] ); ?> Events</a>
                     <?php else : ?>
-                        <a href="<?php echo $crm->build_url( 'index.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $team_data['team_name'] ); ?> Events</a>
+                        <a href="<?php echo $crm->build_url( 'index.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $group_data['group_name'] ); ?> Events</a>
                     <?php endif; ?>
                 </h1>
                 <div class="back-nav">
                     <?php if ( $all_teams_mode ) : ?>
                         <a href="<?php echo $crm->build_url( 'select.php' ); ?>">← Back to Team Selection</a>
                     <?php else : ?>
-                    <a href="<?php echo $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">← Back to <?php echo $team_data['team_name'], ' ', ucfirst( $group ); ?> Overview</a>
+                    <a href="<?php echo $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">← Back to <?php echo $group_data['group_name'], ' ', ucfirst( $group ); ?> Overview</a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -308,9 +308,9 @@ $available_teams = $crm->storage->get_available_teams();
                     $groups = array();
 
                     foreach ( $available_teams as $team_slug ) {
-                        $team_name = $crm->storage->get_team_name( $team_slug );
-                        $team_type = $crm->storage->get_team_type( $team_slug );
-                        $is_default = $crm->get_default_team() === $team_slug;
+                        $team_name = $crm->storage->get_group_name( $team_slug );
+                        $team_type = $crm->storage->get_group_type( $team_slug );
+                        $is_default = $crm->get_default_group() === $team_slug;
 
                         $item = array(
                             'slug' => $team_slug,
@@ -336,7 +336,7 @@ $available_teams = $crm->storage->get_available_teams();
                     <?php if ( ! empty( $default_teams ) ) : ?>
                     <optgroup label="Default">
                         <?php foreach ( $default_teams as $item ) : ?>
-                            <option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_team ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+                            <option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
                         <?php endforeach; ?>
                     </optgroup>
                     <?php endif; ?>
@@ -344,7 +344,7 @@ $available_teams = $crm->storage->get_available_teams();
                     <?php if ( ! empty( $teams ) ) : ?>
                     <optgroup label="Teams">
                         <?php foreach ( $teams as $item ) : ?>
-                            <option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_team ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+                            <option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
                         <?php endforeach; ?>
                     </optgroup>
                     <?php endif; ?>
@@ -352,7 +352,7 @@ $available_teams = $crm->storage->get_available_teams();
                     <?php if ( ! empty( $groups ) ) : ?>
                     <optgroup label="Groups">
                         <?php foreach ( $groups as $item ) : ?>
-                            <option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_team ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+                            <option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
                         <?php endforeach; ?>
                     </optgroup>
                     <?php endif; ?>
@@ -454,7 +454,7 @@ $available_teams = $crm->storage->get_available_teams();
                                             if ( ! $event->has_person() ) {
                                                 // Find the event index in the original events array for editing
                                                 $event_index = null;
-                                                foreach ( $team_data['events'] as $index => $team_event ) {
+                                                foreach ( $group_data['events'] as $index => $team_event ) {
                                                     if ( $team_event->description === $event->description && 
                                                          $team_event->date->format( 'Y-m-d' ) === $event->date->format( 'Y-m-d' ) ) {
                                                         $event_index = $index;
@@ -677,7 +677,7 @@ $available_teams = $crm->storage->get_available_teams();
                                             <?php 
                                             // Add edit link for past team events
                                             $event_index = null;
-                                            foreach ( $team_data['events'] as $index => $team_event ) {
+                                            foreach ( $group_data['events'] as $index => $team_event ) {
                                                 if ( $team_event->description === $event->description && 
                                                      $team_event->date->format( 'Y-m-d' ) === $event->date->format( 'Y-m-d' ) ) {
                                                     $event_index = $index;
@@ -722,7 +722,7 @@ $available_teams = $crm->storage->get_available_teams();
         echo '<script src="' . plugin_dir_url( __FILE__ ) . 'assets/script.js"></script>';
     }
     ?>
-    <?php $crm->init_cmd_k_js( $privacy_mode ); ?>
+    <?php $crm->init_cmd_k_js(); ?>
     <script>
         
         // Team switching functionality

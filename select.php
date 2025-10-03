@@ -8,7 +8,8 @@ namespace PersonalCRM;
 
 require_once __DIR__ . '/personal-crm.php';
 
-extract( PersonalCrm::get_globals() );
+$crm = PersonalCrm::get_instance();
+$available_teams = $crm->storage->get_available_groups();
 
 // Check for type filter parameter
 $type_filter = isset( $_GET['type'] ) ? sanitize_text_field( $_GET['type'] ) : null;
@@ -20,7 +21,7 @@ if ( $type_filter && !in_array( $type_filter, array( 'team', 'group' ) ) ) {
 if ( $type_filter ) {
 	$filtered_teams = array();
 	foreach ( $available_teams as $team_slug ) {
-		$team_type = $crm->storage->get_team_type( $team_slug );
+		$team_type = $crm->storage->get_group_type( $team_slug );
 		if ( $team_type === $type_filter ) {
 			$filtered_teams[] = $team_slug;
 		}
@@ -80,15 +81,15 @@ if ( empty( $available_teams ) ) {
         <div class="team-grid" id="team-grid">
             <?php foreach ( $available_teams as $team_slug ) : ?>
                 <?php
-                $team_name = $crm->storage->get_team_name( $team_slug );
-                $team_type = $crm->storage->get_team_type( $team_slug );
-                $people_data = $crm->storage->get_team_people_data( $team_slug );
+                $team_name = $crm->storage->get_group_name( $team_slug );
+                $team_type = $crm->storage->get_group_type( $team_slug );
+                $people_data = $crm->storage->get_group_people_names( $team_slug );
                 $people_count = count( $people_data );
                 $param_name = ( $team_type === 'group' ) ? 'group' : 'team';
                 ?>
                 <a href="<?php
                     $params = array();
-                    if ( $crm->get_default_team() !== $team_slug ) {
+                    if ( $crm->get_default_group() !== $team_slug ) {
                         $params[$param_name] = $team_slug;
                     }
                     echo $crm->build_url( 'index.php', $params );

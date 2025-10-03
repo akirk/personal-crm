@@ -98,7 +98,7 @@ function get_completeness_score( $missing_data, $person_type = 'member' ) {
 $audit_data = array();
 
 // Team members
-foreach ( $team_data['team_members'] as $username => $member ) {
+foreach ( $group_data['team_members'] as $username => $member ) {
 	$missing = get_missing_data_points( $member, 'member' );
 	$score = get_completeness_score( $missing, 'member' );
 	$audit_data[] = array(
@@ -112,7 +112,7 @@ foreach ( $team_data['team_members'] as $username => $member ) {
 }
 
 // Leadership
-foreach ( $team_data['leadership'] as $username => $leader ) {
+foreach ( $group_data['leadership'] as $username => $leader ) {
 	$missing = get_missing_data_points( $leader, 'leader' );
 	$score = get_completeness_score( $missing, 'leader' );
 	$audit_data[] = array(
@@ -126,7 +126,7 @@ foreach ( $team_data['leadership'] as $username => $leader ) {
 }
 
 // Alumni
-foreach ( $team_data['alumni'] as $username => $alumnus ) {
+foreach ( $group_data['alumni'] as $username => $alumnus ) {
 	$missing = get_missing_data_points( $alumnus, 'alumni' );
 	$score = get_completeness_score( $missing, 'alumni' );
 	$audit_data[] = array(
@@ -148,7 +148,7 @@ usort( $audit_data, function( $a, $b ) {
 } );
 
 // Get available teams for switcher
-$available_teams = $crm->storage->get_available_teams();
+$available_teams = $crm->storage->get_available_groups();
 
 ?>
 <!DOCTYPE html>
@@ -157,7 +157,7 @@ $available_teams = $crm->storage->get_available_teams();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $team_data['team_name'] ) . ' Team Audit' ) : htmlspecialchars( $team_data['team_name'] ) . ' Team Audit'; ?></title>
+    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $group_data['group_name'] ) . ' Team Audit' ) : htmlspecialchars( $group_data['group_name'] ) . ' Team Audit'; ?></title>
     <?php
     if ( function_exists( 'wp_app_enqueue_style' ) ) {
         wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
@@ -317,7 +317,7 @@ $available_teams = $crm->storage->get_available_teams();
     <div class="container">
         <div class="header">
             <div style="flex-grow: 1;">
-                <h1><a href="<?php echo $crm->build_url( 'audit.php' ); ?>" style="color: inherit; text-decoration: none;">📊 <?php echo htmlspecialchars( $team_data['team_name'] ); ?> Team Audit</a></h1>
+                <h1><a href="<?php echo $crm->build_url( 'audit.php' ); ?>" style="color: inherit; text-decoration: none;">📊 <?php echo htmlspecialchars( $group_data['group_name'] ); ?> Team Audit</a></h1>
                 <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Identify missing data points and improve team profiles</p>
             </div>
             <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
@@ -325,8 +325,8 @@ $available_teams = $crm->storage->get_available_teams();
                 <select id="team-selector" onchange="switchTeam()">
                     <?php
                     foreach ( $available_teams as $team_slug ) {
-                        $team_display_name = $crm->storage->get_team_name( $team_slug );
-                        $selected = $team_slug === $current_team ? 'selected' : '';
+                        $team_display_name = $crm->storage->get_group_name( $team_slug );
+                        $selected = $team_slug === $current_group ? 'selected' : '';
                         echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
                     }
                     ?>
@@ -480,6 +480,6 @@ $available_teams = $crm->storage->get_available_teams();
     </script>
     <script src="<?php echo plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js'; ?>"></script>
     <script src="<?php echo plugin_dir_url( __FILE__ ) . 'assets/script.js'; ?>"></script>
-    <?php $crm->init_cmd_k_js( $privacy_mode ); ?>
+    <?php $crm->init_cmd_k_js(); ?>
 </body>
 </html>

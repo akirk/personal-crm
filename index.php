@@ -10,7 +10,7 @@ namespace PersonalCRM;
 require_once __DIR__ . '/personal-crm.php';
 
 extract( PersonalCrm::get_globals() );
-if ( $current_team && $current_team === $crm->get_default_team() && ! isset( $_GET['person'] ) && isset( $_GET['team'] ) ) {
+if ( $current_group && $current_group === $crm->get_default_group() && ! isset( $_GET['person'] ) && isset( $_GET['group'] ) ) {
     // Redirect to root if default team is selected, preserve privacy parameter
     $redirect_params = array();
     if ( isset( $_GET['privacy'] ) && $_GET['privacy'] === '1' ) {
@@ -32,7 +32,7 @@ if ( isset( $_GET['person'] ) && ! empty( $_GET['person'] ) ) {
 
 // Only overview action is handled by index.php now
 $action = 'overview';
-do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
+do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 
 ?>
 <!DOCTYPE html>
@@ -41,7 +41,7 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="color-scheme" content="light dark">
-	<title><?php echo function_exists( '\wp_app_title' ) ? \wp_app_title( $crm->get_team_display_title( $current_team, 'Management' ) ) : htmlspecialchars( $crm->get_team_display_title( $current_team, 'Management' ) ); ?></title>
+	<title><?php echo function_exists( '\wp_app_title' ) ? \wp_app_title( $crm->get_group_display_title( $current_group, 'Management' ) ) : htmlspecialchars( $crm->get_group_display_title( $current_group, 'Management' ) ); ?></title>
 	<?php
 	if ( function_exists( '\wp_app_enqueue_style' ) ) {
 		wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
@@ -61,11 +61,11 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 		<?php if ( $action === 'overview' ) : ?>
 			<div class="header">
 				<div>
-					<h1><a href="<?php echo $crm->build_url( 'index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $crm->get_team_display_title( $current_team, 'Overview' ) ); ?></a></h1>
+					<h1><a href="<?php echo $crm->build_url( 'index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $crm->get_group_display_title( $current_group, 'Overview' ) ); ?></a></h1>
 				</div>
-				<?php if ( ! empty( $team_data['team_links'] ) ) : ?>
+				<?php if ( ! empty( $group_data['links'] ) ) : ?>
 					<div class="person-links" style="flex-grow: 1;">
-						<?php foreach ( $team_data['team_links'] as $link_text => $link_url ) : ?>
+						<?php foreach ( $group_data['links'] as $link_text => $link_url ) : ?>
 							<a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank">
 								<?php echo $crm->get_link_icon( $link_text, $link_url, 12 ); ?>
 								<?php echo htmlspecialchars( $link_text ); ?>
@@ -75,7 +75,7 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 				<?php endif; ?>
 				<?php
 				// Allow other plugins to add header content
-				do_action( 'personal_crm_header_content', $team_data, $current_team );
+				do_action( 'personal_crm_header_content', $group_data, $current_group );
 				?>
 				<div class="navigation" style="display: flex; align-items: center; gap: 10px;">
 					<select id="team-selector" onchange="switchTeam()">
@@ -85,20 +85,20 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 						$teams = array();
 						$groups = array();
 
-						foreach ( $available_teams as $team_slug ) {
-							$team_name = $crm->storage->get_team_name( $team_slug );
-							$team_type = $crm->storage->get_team_type( $team_slug );
-							$is_default = $crm->get_default_team() === $team_slug;
+						foreach ( $available_groups as $group_slug ) {
+							$group_name = $crm->storage->get_group_name( $group_slug );
+							$group_type = $crm->storage->get_group_type( $group_slug );
+							$is_default = $crm->get_default_group() === $group_slug;
 
 							$item = array(
-								'slug' => $team_slug,
-								'name' => $team_name,
-								'type' => $team_type
+								'slug' => $group_slug,
+								'name' => $group_name,
+								'type' => $group_type
 							);
 
 							if ( $is_default ) {
 								$default_teams[] = $item;
-							} elseif ( $team_type === 'group' ) {
+							} elseif ( $group_type === 'group' ) {
 								$groups[] = $item;
 							} else {
 								$teams[] = $item;
@@ -114,7 +114,7 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 						<?php if ( ! empty( $default_teams ) ) : ?>
 						<optgroup label="Default">
 							<?php foreach ( $default_teams as $item ) : ?>
-								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_team ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
 							<?php endforeach; ?>
 						</optgroup>
 						<?php endif; ?>
@@ -122,7 +122,7 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 						<?php if ( ! empty( $teams ) ) : ?>
 						<optgroup label="Teams">
 							<?php foreach ( $teams as $item ) : ?>
-								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_team ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
 							<?php endforeach; ?>
 						</optgroup>
 						<?php endif; ?>
@@ -130,7 +130,7 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 						<?php if ( ! empty( $groups ) ) : ?>
 						<optgroup label="Groups">
 							<?php foreach ( $groups as $item ) : ?>
-								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_team ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
 							<?php endforeach; ?>
 						</optgroup>
 						<?php endif; ?>
@@ -141,17 +141,17 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 			<div class="overview-layout">
 				<div class="people-section">
 					<div class="section">
-						<h3><?php echo ucfirst( $group ); ?> Members (<?php echo count( $team_data['team_members'] ); ?>)</h3>
-						<?php if ( ! empty( $team_data['team_members'] ) ) : ?>
+						<h3><?php echo ucfirst( $group ); ?> Members (<?php echo count( $group_data['team_members'] ); ?>)</h3>
+						<?php if ( ! empty( $group_data['team_members'] ) ) : ?>
 							<ul class="people-list">
-								<?php foreach ( $team_data['team_members'] as $username => $member ) : ?>
+								<?php foreach ( $group_data['team_members'] as $username => $member ) : ?>
 									<li>
 										<div class="person-row-container">
 											<a href="<?php echo $member->get_profile_url(); ?>" class="person-row">
 												<div class="person-info">
 													<div class="person-name"><?php echo htmlspecialchars( $member->get_display_name_with_nickname() ); ?></div>
 													<div class="person-username">
-														<?php if ( $crm->is_social_group( $current_team ) ) : ?>
+														<?php if ( $crm->is_social_group( $current_group ) ) : ?>
 															<?php if ( ! empty( $member->location ) ) : ?>
 																📍 <?php echo htmlspecialchars( $member->location ); ?>
 															<?php endif; ?>
@@ -167,7 +167,7 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 											<div class="person-links">
 												<?php $crm->render_person_links( $member->links ); ?>
 												<?php
-												do_action( 'personal_crm_person_links', $member, $username, $team_data );
+												do_action( 'personal_crm_person_links', $member, $username, $group_data );
 												?>
 											</div>
 										</div>
@@ -181,10 +181,10 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 
 					<?php if ( $group !== 'group' ) : ?>
 					<div class="section">
-						<h3>Leadership (<?php echo count( $team_data['leadership'] ); ?>)</h3>
-						<?php if ( ! empty( $team_data['leadership'] ) ) : ?>
+						<h3>Leadership (<?php echo count( $group_data['leadership'] ); ?>)</h3>
+						<?php if ( ! empty( $group_data['leadership'] ) ) : ?>
 							<ul class="people-list">
-								<?php foreach ( $team_data['leadership'] as $username => $leader ) : ?>
+								<?php foreach ( $group_data['leadership'] as $username => $leader ) : ?>
 									<li>
 										<div class="person-row-container">
 											<a href="<?php echo $leader->get_profile_url(); ?>" class="person-row">
@@ -212,10 +212,10 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 					</div>
 
 					<div class="section">
-						<h3>Consultants (<?php echo count( $team_data['consultants'] ); ?>)</h3>
-						<?php if ( ! empty( $team_data['consultants'] ) ) : ?>
+						<h3>Consultants (<?php echo count( $group_data['consultants'] ); ?>)</h3>
+						<?php if ( ! empty( $group_data['consultants'] ) ) : ?>
 							<ul class="people-list">
-								<?php foreach ( $team_data['consultants'] as $username => $consultant ) : ?>
+								<?php foreach ( $group_data['consultants'] as $username => $consultant ) : ?>
 									<li>
 										<div class="person-row-container">
 											<a href="<?php echo $consultant->get_profile_url(); ?>" class="person-row">
@@ -242,10 +242,10 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 					</div>
 
 					<div class="section">
-						<h3>Alumni (<?php echo count( $team_data['alumni'] ); ?>)</h3>
-						<?php if ( ! empty( $team_data['alumni'] ) ) : ?>
+						<h3>Alumni (<?php echo count( $group_data['alumni'] ); ?>)</h3>
+						<?php if ( ! empty( $group_data['alumni'] ) ) : ?>
 							<ul class="people-list">
-								<?php foreach ( $team_data['alumni'] as $username => $alumnus ) : ?>
+								<?php foreach ( $group_data['alumni'] as $username => $alumnus ) : ?>
 									<li>
 										<div class="person-row-container">
 											<a href="<?php echo $alumnus->get_profile_url(); ?>" class="person-row">
@@ -284,11 +284,11 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 					</div>
 					<?php endif; ?>
 
-					<?php if ( ! empty( $team_data['deceased'] ) ) : ?>
+					<?php if ( ! empty( $group_data['deceased'] ) ) : ?>
 					<div class="section">
-						<h3>Deceased (<?php echo count( $team_data['deceased'] ); ?>)</h3>
+						<h3>Deceased (<?php echo count( $group_data['deceased'] ); ?>)</h3>
 						<ul class="people-list">
-							<?php foreach ( $team_data['deceased'] as $username => $deceased_person ) : ?>
+							<?php foreach ( $group_data['deceased'] as $username => $deceased_person ) : ?>
 								<li>
 									<div class="person-row-container">
 										<a href="<?php echo $deceased_person->get_profile_url(); ?>" class="person-row">
@@ -315,11 +315,11 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 						<h3 class="sidebar-section-heading">🗓️ Upcoming Events</h3>
 					</a>
 					<?php
-					$crm->render_upcoming_events_sidebar( $team_data );
+					$crm->render_upcoming_events_sidebar( $group_data );
 					?>
 
 					<?php
-					do_action( 'personal_crm_dashboard_sidebar', $team_data, $current_team );
+					do_action( 'personal_crm_dashboard_sidebar', $group_data, $current_group );
 					?>
 				</div>
 			</div>
@@ -328,7 +328,7 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 		<?php else : ?>
 			<div class="header">
 				<h1>Page Not Found</h1>
-				<p><a href="?<?php echo $current_team !== 'team' ? 'team=' . urlencode( $current_team ) : ''; ?>">← Back to <?php echo ucfirst( $group ); ?> Overview</a></p>
+				<p><a href="?<?php echo $current_group !== 'team' ? 'team=' . urlencode( $current_group ) : ''; ?>">← Back to <?php echo ucfirst( $group ); ?> Overview</a></p>
 			</div>
 		<?php endif; ?>
 
@@ -340,9 +340,9 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 			<?php endif; ?>
 			<?php
 			// Allow other plugins to add footer links
-			do_action( 'personal_crm_footer_links', $team_data, $current_team );
+			do_action( 'personal_crm_footer_links', $group_data, $current_group );
 			?>
-			<a href="<?php echo $crm->build_url( 'admin.php', array( 'team' => $current_team ) ); ?>" class="footer-link">⚙️ Admin Panel</a>
+			<a href="<?php echo $crm->build_url( 'admin.php', array( 'team' => $current_group ) ); ?>" class="footer-link">⚙️ Admin Panel</a>
 		</footer>
 	</div>
 
@@ -353,11 +353,11 @@ do_action( 'personal_crm_team_dashboard_init', $team_data, $current_team );
 	}
 	if ( function_exists( '\wp_app_body_close' ) ) \wp_app_body_close();
 	?>
-	<?php $crm->init_cmd_k_js( $privacy_mode ); ?>
+	<?php $crm->init_cmd_k_js(); ?>
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
 			<?php 
-			$all_people = array_merge( $team_data['team_members'], $team_data['leadership'], $team_data['consultants'], $team_data['alumni'] );
+			$all_people = array_merge( $group_data['team_members'], $group_data['leadership'], $group_data['consultants'], $group_data['alumni'] );
 			foreach ( $all_people as $username => $person_obj ) :
 				if ( ! empty( $person_obj->timezone ) && empty( $person_obj->deceased ) ) :
 			?>

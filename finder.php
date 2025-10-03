@@ -1,10 +1,10 @@
 #!/usr/bin/env php
 <?php
+namespace PersonalCRM;
 /**
  * People Finder CLI
  * Search tool for teams and people
  */
-namespace PersonalCRM;
 
 class PeopleFinderCLI {
     private array $teams = [];
@@ -25,11 +25,11 @@ class PeopleFinderCLI {
 
         $crm = PersonalCrm::get_instance();
         $storage = $crm->storage;
-        $available_teams = $storage->get_available_teams();
+        $available_teams = $storage->get_available_groups();
         
         foreach ( $available_teams as $teamSlug ) {
-            $teamName = $storage->get_team_name( $teamSlug );
-            $data = $storage->get_team_config( $teamSlug );
+            $teamName = $storage->get_group_name( $teamSlug );
+            $data = $storage->get_group( $teamSlug );
             
             if ( !$data ) {
                 continue;

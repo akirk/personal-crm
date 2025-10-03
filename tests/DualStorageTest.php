@@ -3,6 +3,7 @@
  * Test for both JSON and SQLite storage backends
  */
 
+require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../includes/sqlite-wpdb.php';
 require_once __DIR__ . '/../includes/storage.php';
 
@@ -31,16 +32,16 @@ class DualStorageTest {
         
         // Test team creation
         $config = $this->getTestConfig();
-        $result = $storage->save_team_config( 'json-test-team', $config );
+        $result = $storage->save_group( 'json-test-team', $config );
         $this->assert( $result === true, 'JSON team creation failed' );
         
         // Test team retrieval
-        $retrieved = $storage->get_team_config( 'json-test-team' );
+        $retrieved = $storage->get_group( 'json-test-team' );
         $this->assert( $retrieved !== null, 'JSON team retrieval failed' );
         $this->assert( $retrieved['team_name'] === 'JSON Test Team', 'JSON team name mismatch' );
         
         // Test team listing
-        $teams = $storage->get_available_teams();
+        $teams = $storage->get_available_groups();
         $this->assert( in_array( 'json-test-team', $teams ), 'JSON team not in listing' );
         
         // Test HR feedback
@@ -77,16 +78,16 @@ class DualStorageTest {
         
         // Test team creation
         $config = $this->getTestConfig();
-        $result = $storage->save_team_config( 'sqlite-test-team', $config );
+        $result = $storage->save_group( 'sqlite-test-team', $config );
         $this->assert( $result === true, 'SQLite team creation failed' );
         
         // Test team retrieval
-        $retrieved = $storage->get_team_config( 'sqlite-test-team' );
+        $retrieved = $storage->get_group( 'sqlite-test-team' );
         $this->assert( $retrieved !== null, 'SQLite team retrieval failed' );
         $this->assert( $retrieved['team_name'] === 'JSON Test Team', 'SQLite team name mismatch' );
         
         // Test team listing
-        $teams = $storage->get_available_teams();
+        $teams = $storage->get_available_groups();
         $this->assert( in_array( 'sqlite-test-team', $teams ), 'SQLite team not in listing' );
         
         // Test HR feedback

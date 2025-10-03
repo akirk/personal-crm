@@ -14,13 +14,13 @@ error_log( 'DEBUG: person.php - Starting, REQUEST_URI: ' . $_SERVER['REQUEST_URI
 
 // Special redirect logic for person.php - needs to happen before main initialization
 $crm = PersonalCrm::get_instance();
-$current_team = $crm->get_current_team_from_params();
-if ( $current_team ) {
+$current_group = $crm->get_current_group_from_params();
+if ( $current_group ) {
 	// Check if person parameter exists in either $_GET or route parameters
 	$has_person_param = isset( $_GET['person'] ) ||
 	                   ( function_exists( 'get_query_var' ) && get_query_var( 'person' ) );
 
-	if ( $current_team === $crm->get_default_team() && ! $has_person_param ) {
+	if ( $current_group === $crm->get_default_group() && ! $has_person_param ) {
 		// Redirect to root if default team is selected and no person specified
 		error_log( 'DEBUG: person.php - REDIRECTING because current_team === get_default_team() && no person param' );
 		header( 'Location: ' . $crm->build_url( 'index.php' ) );
@@ -48,14 +48,14 @@ error_log( 'DEBUG: person.php - person: ' . $person . ', team: ' . $route_team )
 
 // Override current_team with route team if provided (this takes precedence over query params)
 if ( ! empty( $route_team ) ) {
-	$current_team = $route_team;
-} else if ( ! $current_team ) {
+	$current_group = $route_team;
+} else if ( ! $current_group ) {
 	// Fallback if no current team is set
-	$current_team = $crm->get_default_team();
+	$current_group = $crm->get_default_group();
 }
 
 // Load team configuration with Person objects
-$team_data = $crm->load_team_config_with_objects( $current_team );
+$group_data = $crm->load_group_config_with_objects( $current_group );
 
 if ( empty( $person ) ) {
 	// Debug: Check what parameters are available
@@ -72,18 +72,18 @@ if ( empty( $person ) ) {
 
 // Load person data for title
 $person_data = null;
-if ( isset( $team_data['team_members'][ $person ] ) ) {
-	$person_data = $team_data['team_members'][ $person ];
-} elseif ( isset( $team_data['leadership'][ $person ] ) ) {
-	$person_data = $team_data['leadership'][ $person ];
-} elseif ( isset( $team_data['consultants'][ $person ] ) ) {
-	$person_data = $team_data['consultants'][ $person ];
-} elseif ( isset( $team_data['alumni'][ $person ] ) ) {
-	$person_data = $team_data['alumni'][ $person ];
+if ( isset( $group_data['team_members'][ $person ] ) ) {
+	$person_data = $group_data['team_members'][ $person ];
+} elseif ( isset( $group_data['leadership'][ $person ] ) ) {
+	$person_data = $group_data['leadership'][ $person ];
+} elseif ( isset( $group_data['consultants'][ $person ] ) ) {
+	$person_data = $group_data['consultants'][ $person ];
+} elseif ( isset( $group_data['alumni'][ $person ] ) ) {
+	$person_data = $group_data['alumni'][ $person ];
 }
 
 if ( ! $person_data ) {
-	$original_team_data = $crm->load_team_config_with_objects( $current_team );
+	$original_team_data = $crm->load_group_config_with_objects( $current_group );
 	foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $section ) {
 		if ( isset( $original_team_data[$section][ $person ] ) && ! empty( $original_team_data[$section][ $person ]->deceased ) ) {
 			$person_data = $original_team_data[$section][ $person ];
@@ -98,9 +98,9 @@ if ( ! $person_data ) {
 }
 
 // Determine person type
-$is_team_member = isset( $team_data['team_members'][ $person ] );
-$is_consultant = isset( $team_data['consultants'][ $person ] );
-$is_alumni = isset( $team_data['alumni'][ $person ] );
+$is_team_member = isset( $group_data['team_members'][ $person ] );
+$is_consultant = isset( $group_data['consultants'][ $person ] );
+$is_alumni = isset( $group_data['alumni'][ $person ] );
 
 ?>
 <!DOCTYPE html>
@@ -110,7 +110,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="color-scheme" content="light dark">
 	<title><?php
-	$page_title = esc_html( $person_data->get_display_name_with_nickname() ) . ' - ' . esc_html( $crm->get_team_display_title( $current_team ) );
+	$page_title = esc_html( $person_data->get_display_name_with_nickname() ) . ' - ' . esc_html( $crm->get_group_display_title( $current_group ) );
 	echo function_exists( 'wp_app_title' ) ? wp_app_title( $page_title ) : $page_title;
 	?></title>
 	<?php
@@ -151,11 +151,11 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					</span>
 				</h1>
 				<div class="back-nav">
-					<a href="<?php echo $crm->build_url( 'index.php', $privacy_mode ? array( 'privacy' => '1' ) : array() ); ?>">← Back to <?php echo $team_data['team_name'], ' ', ucfirst( $group ); ?> Overview</a>
+					<a href="<?php echo $crm->build_url( 'index.php', $privacy_mode ? array( 'privacy' => '1' ) : array() ); ?>">← Back to <?php echo $group_data['group_name'], ' ', ucfirst( $group ); ?> Overview</a>
 				</div>
 			</div>
 
-			<?php if ( $is_team_member && ! ( isset( $team_data['not_managing_team'] ) && $team_data['not_managing_team'] ) ) : ?>
+			<?php if ( $is_team_member && ! ( isset( $group_data['not_managing_team'] ) && $group_data['not_managing_team'] ) ) : ?>
 				<div class="person-tabs">
 					<a href="<?php echo $crm->build_url( 'person.php', array( 'person' => $person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
 					   class="tab-link active">👤 Member Overview</a>
@@ -442,7 +442,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 						}
 					}
 					$has_other_links = ! empty( $filtered_links );
-					$has_activity_links = $is_team_member && ! empty( $person_data->username ) && isset( $team_data['activity_url_prefix'] ) && ! $crm->is_social_group( $current_team );
+					$has_activity_links = $is_team_member && ! empty( $person_data->username ) && isset( $group_data['activity_url_prefix'] ) && ! $crm->is_social_group( $current_group );
 					$has_add_note_link = ! $privacy_mode && ! $has_notes;
 					?>
 
@@ -469,13 +469,13 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 								</a>
 							<?php endif; ?>
 
-							<?php if ( $is_team_member && ! empty( $person_data->username ) && isset( $team_data['activity_url_prefix'] ) && $group !== 'group' ) : ?>
+							<?php if ( $is_team_member && ! empty( $person_data->username ) && isset( $group_data['activity_url_prefix'] ) && $group !== 'group' ) : ?>
 								<?php
 								$last_month = date( 'Y-m', strtotime( 'last month') );
 								$start_date = $last_month . '-01';
 								$end_date = date( 'Y-m-d', strtotime( $start_date ) );
-								$activity_url_month = $team_data['activity_url_prefix'] . '&member=' . urlencode( $person_data->username ) . "&start={$start_date}&end={$end_date}";
-								$activity_url_week = $team_data['activity_url_prefix'] . '&member=' . urlencode( $person_data->username );
+								$activity_url_month = $group_data['activity_url_prefix'] . '&member=' . urlencode( $person_data->username ) . "&start={$start_date}&end={$end_date}";
+								$activity_url_week = $group_data['activity_url_prefix'] . '&member=' . urlencode( $person_data->username );
 								?>
 									<a href="<?php echo esc_url( $activity_url_month ); ?>" target="_blank" class="activity-link-month">
 										📊 Activity (Month)
@@ -644,7 +644,7 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 					<h3 class="sidebar-section-heading">🗓️ Upcoming Events</h3>
 				</a>
 				<?php
-				$crm->render_upcoming_events_sidebar( $team_data, 365, $person, false );
+				$crm->render_upcoming_events_sidebar( $group_data, 365, $person, false );
 				?>
 
 				<?php
@@ -662,23 +662,14 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 			<?php endif; ?>
 			<?php
 			// Allow other plugins to add footer links
-			do_action( 'personal_crm_footer_links', $team_data, $current_team );
+			do_action( 'personal_crm_footer_links', $group_data, $current_group );
 			?>
 			<a href="<?php echo $crm->build_url( 'admin.php' ); ?>">⚙️ Admin Panel</a>
-			<a href="/crm/admin/<?php echo $current_team; ?>/person/<?php echo $person; ?>/">✏️ Edit Person</a>
+			<a href="/crm/admin/<?php echo $current_group; ?>/person/<?php echo $person; ?>/">✏️ Edit Person</a>
 		</footer>
 	</div>
 
-	<?php
-	if ( function_exists( 'wp_app_enqueue_script' ) ) {
-		wp_app_enqueue_script( 'a8c-hr-cmd-k-js', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js' );
-		wp_app_enqueue_script( 'a8c-hr-script-js', plugin_dir_url( __FILE__ ) . 'assets/script.js' );
-	} else {
-		echo '<script src="assets/cmd-k.js"></script>';
-		echo '<script src="assets/script.js"></script>';
-	}
-	?>
-	<?php $crm->init_cmd_k_js( $privacy_mode ); ?>
+	<?php $crm->init_cmd_k_js(); ?>
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
 			<?php if ( ! empty( $person_data ) && ( ! empty( $person_data->location ) || ! empty( $person_data->timezone ) ) && empty( $person_data->deceased ) ) : ?>
@@ -732,5 +723,6 @@ $is_alumni = isset( $team_data['alumni'][ $person ] );
 			}
 		}
 	</script>
+	<?php if ( function_exists( 'wp_app_footer' ) ) wp_app_footer(); ?>
 </body>
 </html>

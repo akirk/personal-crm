@@ -138,7 +138,7 @@ class A8C_HR_Migrate_Command {
             $wpdb_storage = new WpdbStorage();
             $json_storage = new JsonStorage();
 
-            $teams = $wpdb_storage->get_available_teams();
+            $teams = $wpdb_storage->get_available_groups();
 
             if ( empty( $teams ) ) {
                 WP_CLI::line( "No teams found in WordPress database." );
@@ -209,7 +209,7 @@ class A8C_HR_Migrate_Command {
             $sqlite_storage = new Storage();
             $json_storage = new JsonStorage();
 
-            $teams = $sqlite_storage->get_available_teams();
+            $teams = $sqlite_storage->get_available_groups();
 
             if ( empty( $teams ) ) {
                 WP_CLI::line( "No teams found in SQLite database." );
@@ -258,7 +258,7 @@ class A8C_HR_Migrate_Command {
             $sqlite_storage = new Storage();
             $wpdb_storage = new WpdbStorage();
 
-            $teams = $sqlite_storage->get_available_teams();
+            $teams = $sqlite_storage->get_available_groups();
 
             if ( empty( $teams ) ) {
                 WP_CLI::line( "No teams found in SQLite database." );
@@ -307,7 +307,7 @@ class A8C_HR_Migrate_Command {
             $wpdb_storage = new WpdbStorage();
             $sqlite_storage = new Storage();
 
-            $teams = $wpdb_storage->get_available_teams();
+            $teams = $wpdb_storage->get_available_groups();
 
             if ( empty( $teams ) ) {
                 WP_CLI::line( "No teams found in WordPress database." );

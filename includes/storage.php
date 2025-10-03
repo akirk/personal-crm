@@ -8,47 +8,26 @@
 
 namespace PersonalCRM;
 
-require_once __DIR__ . '/wpdb-polyfill.php';
-require_once __DIR__ . '/sqlite-wpdb.php';
+// Database classes and BaseStorage are now in wp-app
+// They're loaded via wp-app's autoload system
 
 if ( class_exists( '\PersonalCRM\Storage' ) ) {
     return;
 }
 
-class Storage {
-    private $wpdb;
-
-    public function __construct( $wpdb_instance ) {
-        global $wpdb;
-        $this->wpdb = $wpdb_instance;
-
-        // Set global wpdb for dbDelta compatibility
-        if ( ! $wpdb ) {
-            $wpdb = $wpdb_instance;
-        }
-
-        $this->init_database();
-    }
+class Storage extends \WpApp\BaseStorage {
 
     /**
-     * Initialize WordPress database tables using dbDelta
+     * Get migrations table name
      */
-    private function init_database() {
-        if ( ! function_exists( 'dbDelta' ) ) {
-            if ( ! defined( 'ABSPATH' ) ) {
-                throw new \Exception( 'ABSPATH not defined. WpdbStorage requires WordPress environment.' );
-            }
-            require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
-        }
-
-        $this->create_tables();
-        $this->run_migrations();
+    protected function get_migrations_table_name() {
+        return $this->wpdb->prefix . 'personal_crm_migrations';
     }
 
     /**
      * Create database tables using WordPress dbDelta
      */
-    private function create_tables() {
+    protected function create_tables() {
         $charset_collate = $this->wpdb->get_charset_collate();
 
         // Teams table
@@ -129,27 +108,6 @@ class Storage {
 
         dbDelta( $sql );
 
-        // HR Feedback table
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_hr_feedback (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            username varchar(100) NOT NULL,
-            month varchar(10) NOT NULL,
-            feedback_to_person text DEFAULT '',
-            feedback_to_hr text DEFAULT '',
-            submitted_to_hr tinyint(1) DEFAULT 0,
-            draft_complete tinyint(1) DEFAULT 0,
-            google_doc_updated tinyint(1) DEFAULT 0,
-            not_necessary_reason text DEFAULT '',
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_hr_feedback_username (username),
-            KEY idx_hr_feedback_month (month),
-            UNIQUE KEY unique_user_month (username, month)
-        ) $charset_collate;";
-
-        dbDelta( $sql );
-
         // Team links table
         $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_team_links (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -196,19 +154,7 @@ class Storage {
     /**
      * Run database schema migrations
      */
-    private function run_migrations() {
-        // Create migrations table if it doesn't exist
-        $charset_collate = $this->wpdb->get_charset_collate();
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_migrations (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            migration_name varchar(255) NOT NULL,
-            applied_at datetime DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY unique_migration (migration_name)
-        ) $charset_collate;";
-
-        dbDelta( $sql );
-
+    protected function run_migrations() {
         // Run migrations
         $this->run_migration( 'add_linear_column_to_people', function() {
             // Check if linear column already exists
@@ -229,54 +175,35 @@ class Storage {
     }
 
     /**
-     * Run a specific migration
-     */
-    private function run_migration( $migration_name, $migration_callback ) {
-        $migration_exists = $this->wpdb->get_var( $this->wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_migrations WHERE migration_name = %s",
-            $migration_name
-        ) );
-
-        if ( ! $migration_exists ) {
-            call_user_func( $migration_callback );
-
-            $this->wpdb->insert(
-                $this->table_prefix . 'migrations',
-                array( 'migration_name' => $migration_name ),
-                array( '%s' )
-            );
-        }
-    }
-
-    /**
      * Get team configuration data
      */
-    public function get_team_config( $team_slug ) {
-        $team = $this->wpdb->get_row( $this->wpdb->prepare(
+    public function get_group( $group_slug ) {
+        // Note: DB table still named personal_crm_teams for migration compatibility
+        $group = $this->wpdb->get_row( $this->wpdb->prepare(
             "SELECT * FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
-            $team_slug
+            $group_slug
         ), ARRAY_A );
 
-        if ( ! $team ) {
+        if ( ! $group ) {
             return null;
         }
 
-        // Get team members by category
-        $team_members = $this->get_people_by_category( $team_slug, 'team_members' );
-        $leadership = $this->get_people_by_category( $team_slug, 'leadership' );
-        $consultants = $this->get_people_by_category( $team_slug, 'consultants' );
-        $alumni = $this->get_people_by_category( $team_slug, 'alumni' );
+        // Get group members by category
+        $team_members = $this->get_people_by_category( $group_slug, 'team_members' );
+        $leadership = $this->get_people_by_category( $group_slug, 'leadership' );
+        $consultants = $this->get_people_by_category( $group_slug, 'consultants' );
+        $alumni = $this->get_people_by_category( $group_slug, 'alumni' );
 
         // Get events
-        $events = $this->get_team_events( $team_slug );
+        $events = $this->get_group_events( $group_slug );
 
         return array(
-            'activity_url_prefix' => $team['activity_url_prefix'],
-            'team_name' => $team['team_name'],
-            'not_managing_team' => (bool) $team['not_managing_team'],
-            'team_links' => $this->get_team_links( $team_slug ),
-            'type' => $team['type'],
-            'default' => (bool) $team['is_default'],
+            'activity_url_prefix' => $group['activity_url_prefix'],
+            'group_name' => $group['team_name'],  // DB column still team_name
+            'not_managing' => (bool) $group['not_managing_team'],
+            'links' => $this->get_group_links( $group_slug ),
+            'type' => $group['type'] ?: 'team',  // Default to 'team' if null
+            'default' => (bool) $group['is_default'],
             'team_members' => $team_members,
             'leadership' => $leadership,
             'consultants' => $consultants,
@@ -288,10 +215,11 @@ class Storage {
     /**
      * Get people by category
      */
-    private function get_people_by_category( $team_slug, $category ) {
+    private function get_people_by_category( $group_slug, $category ) {
+        // Note: DB column still named team_slug for migration compatibility
         $results = $this->wpdb->get_results( $this->wpdb->prepare(
             "SELECT * FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s AND category = %s ORDER BY name",
-            $team_slug, $category
+            $group_slug, $category
         ), ARRAY_A );
 
         $people = array();
@@ -322,12 +250,13 @@ class Storage {
     }
 
     /**
-     * Get team events
+     * Get group events
      */
-    private function get_team_events( $team_slug ) {
+    private function get_group_events( $group_slug ) {
+        // Note: DB column still named team_slug for migration compatibility
         $results = $this->wpdb->get_results( $this->wpdb->prepare(
             "SELECT * FROM {$this->wpdb->prefix}personal_crm_events WHERE team_slug = %s ORDER BY start_date",
-            $team_slug
+            $group_slug
         ), ARRAY_A );
 
         $events = array();
@@ -342,16 +271,15 @@ class Storage {
     }
 
     /**
-     * Save team configuration data
+     * Save group configuration data
      */
-    public function save_team_config( $team_slug, $config ) {
-        // Start transaction
+    public function save_group( $group_slug, $config ) {
+        // Note: DB table still named personal_crm_teams for migration compatibility
         $this->wpdb->query( 'START TRANSACTION' );
 
         try {
-            // Save/update team info
-            $team_data = array(
-                'slug' => $team_slug,
+            $group_data = array(
+                'slug' => $group_slug,
                 'team_name' => $config['team_name'] ?? '',
                 'activity_url_prefix' => $config['activity_url_prefix'] ?? '',
                 'not_managing_team' => $config['not_managing_team'] ?? 1,
@@ -360,56 +288,54 @@ class Storage {
                 'updated_at' => current_time( 'mysql' )
             );
 
-            $existing_team = $this->wpdb->get_var( $this->wpdb->prepare(
+            // Note: DB column still named team_slug for migration compatibility
+            $existing_group = $this->wpdb->get_var( $this->wpdb->prepare(
                 "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
-                $team_slug
+                $group_slug
             ) );
 
-            if ( $existing_team ) {
+            if ( $existing_group ) {
                 $this->wpdb->update(
-                    $this->table_prefix . 'teams',
-                    $team_data,
-                    array( 'slug' => $team_slug ),
+                    $this->wpdb->prefix . 'personal_crm_teams',
+                    $group_data,
+                    array( 'slug' => $group_slug ),
                     array( '%s', '%s', '%s', '%d', '%s', '%d', '%s' ),
                     array( '%s' )
                 );
             } else {
-                $team_data['created_at'] = current_time( 'mysql' );
+                $group_data['created_at'] = current_time( 'mysql' );
                 $this->wpdb->insert(
-                    $this->table_prefix . 'teams',
-                    $team_data,
+                    $this->wpdb->prefix . 'personal_crm_teams',
+                    $group_data,
                     array( '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s' )
                 );
             }
 
-            // Save team links
-            $this->save_team_links( $team_slug, $config['team_links'] ?? array() );
+            $this->save_group_links( $group_slug, $config['team_links'] ?? array() );
 
-            // Clear existing people for this team
+            // Note: DB column still named team_slug for migration compatibility
             $this->wpdb->delete(
-                $this->table_prefix . 'people',
-                array( 'team_slug' => $team_slug ),
+                $this->wpdb->prefix . 'personal_crm_people',
+                array( 'team_slug' => $group_slug ),
                 array( '%s' )
             );
 
-            // Save people
             $categories = array( 'team_members', 'leadership', 'consultants', 'alumni' );
             foreach ( $categories as $category ) {
                 if ( isset( $config[$category] ) && is_array( $config[$category] ) ) {
-                    $this->save_people( $team_slug, $category, $config[$category] );
+                    $this->save_people( $group_slug, $category, $config[$category] );
                 }
             }
 
-            // Clear existing events for this team
+            // Note: DB column still named team_slug for migration compatibility
             $this->wpdb->delete(
-                $this->table_prefix . 'events',
-                array( 'team_slug' => $team_slug ),
+                $this->wpdb->prefix . 'personal_crm_events',
+                array( 'team_slug' => $group_slug ),
                 array( '%s' )
             );
 
-            // Save events
             if ( isset( $config['events'] ) && is_array( $config['events'] ) ) {
-                $this->save_events( $team_slug, $config['events'] );
+                $this->save_events( $group_slug, $config['events'] );
             }
 
             $this->wpdb->query( 'COMMIT' );
@@ -424,11 +350,12 @@ class Storage {
     /**
      * Save people for a category
      */
-    private function save_people( $team_slug, $category, $people ) {
+    private function save_people( $group_slug, $category, $people ) {
+        // Note: DB column still named team_slug for migration compatibility
         foreach ( $people as $username => $person ) {
             $person_data = array(
                 'username' => $username,
-                'team_slug' => $team_slug,
+                'team_slug' => $group_slug,
                 'category' => $category,
                 'name' => $person['name'] ?? '',
                 'nickname' => $person['nickname'] ?? '',
@@ -461,7 +388,7 @@ class Storage {
             $format = array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s' );
 
             $person_id = $this->wpdb->insert(
-                $this->table_prefix . 'people',
+                $this->wpdb->prefix . 'personal_crm_people',
                 $person_data,
                 $format
             );
@@ -474,12 +401,13 @@ class Storage {
     }
 
     /**
-     * Save events for a team
+     * Save events for a group
      */
-    private function save_events( $team_slug, $events ) {
+    private function save_events( $group_slug, $events ) {
+        // Note: DB column still named team_slug for migration compatibility
         foreach ( $events as $event ) {
             $event_data = array(
-                'team_slug' => $team_slug,
+                'team_slug' => $group_slug,
                 'type' => $event['type'] ?? 'event',
                 'name' => $event['name'] ?? '',
                 'description' => $event['description'] ?? '',
@@ -491,7 +419,7 @@ class Storage {
             );
 
             $event_id = $this->wpdb->insert(
-                $this->table_prefix . 'events',
+                $this->wpdb->prefix . 'personal_crm_events',
                 $event_data,
                 array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
             );
@@ -504,41 +432,43 @@ class Storage {
     }
 
     /**
-     * Get all available team slugs
+     * Get all available group slugs
      */
-    public function get_available_teams() {
+    public function get_available_groups() {
+        // Note: DB table still named personal_crm_teams for migration compatibility
         return $this->wpdb->get_col( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_teams ORDER BY slug" );
     }
 
     /**
-     * Get team name by slug
+     * Get group name by slug
      */
-    public function get_team_name( $team_slug ) {
+    public function get_group_name( $group_slug ) {
+        // Note: DB column still named team_name for migration compatibility
         return $this->wpdb->get_var( $this->wpdb->prepare(
             "SELECT team_name FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
-            $team_slug
+            $group_slug
         ) );
     }
 
     /**
-     * Get team type by slug
+     * Get group type by slug
      */
-    public function get_team_type( $team_slug ) {
+    public function get_group_type( $group_slug ) {
         $type = $this->wpdb->get_var( $this->wpdb->prepare(
             "SELECT type FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
-            $team_slug
+            $group_slug
         ) );
         return $type ?: 'team';
     }
 
     /**
-     * Get default team slug
+     * Get default group slug
      */
-    public function get_default_team() {
+    public function get_default_group() {
+        // Note: DB table still named personal_crm_teams for migration compatibility
         $slug = $this->wpdb->get_var( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_teams WHERE is_default = 1 LIMIT 1" );
 
         if ( ! $slug ) {
-            // If no default team, return first available team
             $slug = $this->wpdb->get_var( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_teams ORDER BY slug LIMIT 1" );
         }
 
@@ -546,149 +476,105 @@ class Storage {
     }
 
     /**
-     * Check if team exists
+     * Check if group exists
      */
-    public function team_exists( $team_slug ) {
+    public function group_exists( $group_slug ) {
         $count = $this->wpdb->get_var( $this->wpdb->prepare(
             "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
-            $team_slug
+            $group_slug
         ) );
         return (bool) $count;
     }
 
     /**
-     * Delete a team and all its data
+     * Delete a group and all its data
      */
-    public function delete_team( $team_slug ) {
+    public function delete_group( $group_slug ) {
+        // Note: DB table still named personal_crm_teams for migration compatibility
         return $this->wpdb->delete(
-            $this->table_prefix . 'teams',
-            array( 'slug' => $team_slug ),
+            $this->wpdb->prefix . 'personal_crm_teams',
+            array( 'slug' => $group_slug ),
             array( '%s' )
         );
     }
 
     /**
      * Get HR feedback for a person
+     * @deprecated Moved to A8cTeamStorage in a8c-team plugin
      */
     public function get_hr_feedback( $username, $month = null ) {
-        if ( $month ) {
-            return $this->wpdb->get_row( $this->wpdb->prepare(
-                "SELECT * FROM {$this->wpdb->prefix}personal_crm_hr_feedback WHERE username = %s AND month = %s",
-                $username, $month
-            ), ARRAY_A );
-        } else {
-            $results = $this->wpdb->get_results( $this->wpdb->prepare(
-                "SELECT * FROM {$this->wpdb->prefix}personal_crm_hr_feedback WHERE username = %s ORDER BY month DESC",
-                $username
-            ), ARRAY_A );
-
-            $feedback = array();
-            foreach ( $results as $row ) {
-                $feedback[$row['month']] = $row;
-            }
-            return $feedback;
-        }
+        trigger_error( 'get_hr_feedback() is deprecated. Use A8cTeamStorage from a8c-team plugin.', E_USER_DEPRECATED );
+        return array();
     }
 
     /**
      * Save HR feedback for a person
+     * @deprecated Moved to A8cTeamStorage in a8c-team plugin
      */
     public function save_hr_feedback( $username, $month, $data ) {
-        $feedback_data = array(
-            'username' => $username,
-            'month' => $month,
-            'feedback_to_person' => $data['feedback_to_person'] ?? '',
-            'feedback_to_hr' => $data['feedback_to_hr'] ?? '',
-            'submitted_to_hr' => $data['submitted_to_hr'] ?? 0,
-            'draft_complete' => $data['draft_complete'] ?? 0,
-            'google_doc_updated' => $data['google_doc_updated'] ?? 0,
-            'not_necessary_reason' => $data['not_necessary_reason'] ?? '',
-            'updated_at' => current_time( 'mysql' )
-        );
-
-        $existing_feedback = $this->wpdb->get_var( $this->wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_hr_feedback WHERE username = %s AND month = %s",
-            $username, $month
-        ) );
-
-        if ( $existing_feedback ) {
-            return $this->wpdb->update(
-                $this->table_prefix . 'hr_feedback',
-                $feedback_data,
-                array( 'username' => $username, 'month' => $month ),
-                array( '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s' ),
-                array( '%s', '%s' )
-            );
-        } else {
-            $feedback_data['created_at'] = current_time( 'mysql' );
-            return $this->wpdb->insert(
-                $this->table_prefix . 'hr_feedback',
-                $feedback_data,
-                array( '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s' )
-            );
-        }
+        trigger_error( 'save_hr_feedback() is deprecated. Use A8cTeamStorage from a8c-team plugin.', E_USER_DEPRECATED );
+        return false;
     }
 
     /**
-     * Get people count from team config
+     * Get people count from group config
      */
-    public function get_team_people_count( $team_slug ) {
+    public function get_group_people_count( $group_slug ) {
+        // Note: DB column still named team_slug for migration compatibility
         return (int) $this->wpdb->get_var( $this->wpdb->prepare(
             "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s",
-            $team_slug
+            $group_slug
         ) );
     }
 
     /**
-     * Get all people names from team config for search purposes
+     * Get all people names from group config for search purposes
      */
-    public function get_team_people_names( $team_slug ) {
+    public function get_group_people_names( $group_slug ) {
+        // Note: DB column still named team_slug for migration compatibility
         return $this->wpdb->get_col( $this->wpdb->prepare(
             "SELECT name FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s ORDER BY name",
-            $team_slug
+            $group_slug
         ) );
     }
 
     /**
-     * Get all people data from team config for search purposes
+     * Get a single person from a group
      */
-    public function get_team_people_data( $team_slug ) {
-        $results = $this->wpdb->get_results( $this->wpdb->prepare(
-            "SELECT * FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s ORDER BY name",
-            $team_slug
+    public function get_person( $group_slug, $username ) {
+        // Note: DB column still named team_slug for migration compatibility
+        $row = $this->wpdb->get_row( $this->wpdb->prepare(
+            "SELECT * FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s AND username = %s",
+            $group_slug, $username
         ), ARRAY_A );
 
-        $people_data = array();
-        foreach ( $results as $row ) {
-            $username = $row['username'];
-            $person_id = $row['id'];
-
-            unset( $row['id'], $row['username'], $row['team_slug'], $row['category'], $row['created_at'], $row['updated_at'] );
-
-            // Convert JSON fields back to arrays and get normalized links
-            $row['links'] = $this->get_person_links( $person_id );
-            $row['kids'] = json_decode( $row['kids'] ?: '[]', true );
-            $row['github_repos'] = json_decode( $row['github_repos'] ?: '[]', true );
-            $row['personal_events'] = json_decode( $row['personal_events'] ?: '[]', true );
-            $row['notes'] = json_decode( $row['notes'] ?: '[]', true );
-
-            // Convert boolean fields
-            $row['left_company'] = (bool) $row['left_company'];
-            $row['deceased'] = (bool) $row['deceased'];
-
-            $people_data[$username] = $row;
+        if ( ! $row ) {
+            return null;
         }
 
-        return $people_data;
+        $person_id = $row['id'];
+        unset( $row['id'], $row['username'], $row['team_slug'], $row['category'], $row['created_at'], $row['updated_at'] );
+
+        $row['links'] = $this->get_person_links( $person_id );
+        $row['kids'] = json_decode( $row['kids'] ?: '[]', true );
+        $row['github_repos'] = json_decode( $row['github_repos'] ?: '[]', true );
+        $row['personal_events'] = json_decode( $row['personal_events'] ?: '[]', true );
+        $row['notes'] = json_decode( $row['notes'] ?: '[]', true );
+
+        $row['left_company'] = (bool) $row['left_company'];
+        $row['deceased'] = (bool) $row['deceased'];
+
+        return $row;
     }
 
     /**
-     * Get team links
+     * Get group links
      */
-    private function get_team_links( $team_slug ) {
+    private function get_group_links( $group_slug ) {
+        // Note: DB column still named team_slug for migration compatibility
         $results = $this->wpdb->get_results( $this->wpdb->prepare(
             "SELECT link_name, link_url FROM {$this->wpdb->prefix}personal_crm_team_links WHERE team_slug = %s ORDER BY link_name",
-            $team_slug
+            $group_slug
         ), ARRAY_A );
 
         $links = array();
@@ -700,23 +586,22 @@ class Storage {
     }
 
     /**
-     * Save team links
+     * Save group links
      */
-    private function save_team_links( $team_slug, $links ) {
-        // Delete existing links
+    private function save_group_links( $group_slug, $links ) {
+        // Note: DB column still named team_slug for migration compatibility
         $this->wpdb->delete(
-            $this->table_prefix . 'team_links',
-            array( 'team_slug' => $team_slug ),
+            $this->wpdb->prefix . 'personal_crm_team_links',
+            array( 'team_slug' => $group_slug ),
             array( '%s' )
         );
 
-        // Insert new links
         if ( is_array( $links ) && ! empty( $links ) ) {
             foreach ( $links as $link_name => $link_url ) {
                 $this->wpdb->insert(
-                    $this->table_prefix . 'team_links',
+                    $this->wpdb->prefix . 'personal_crm_team_links',
                     array(
-                        'team_slug' => $team_slug,
+                        'team_slug' => $group_slug,
                         'link_name' => $link_name,
                         'link_url' => $link_url,
                         'created_at' => current_time( 'mysql' )
@@ -750,7 +635,7 @@ class Storage {
     private function save_person_links( $person_id, $links ) {
         // Delete existing links
         $this->wpdb->delete(
-            $this->table_prefix . 'people_links',
+            $this->wpdb->prefix . 'personal_crm_people_links',
             array( 'person_id' => $person_id ),
             array( '%d' )
         );
@@ -759,7 +644,7 @@ class Storage {
         if ( is_array( $links ) && ! empty( $links ) ) {
             foreach ( $links as $link_name => $link_url ) {
                 $this->wpdb->insert(
-                    $this->table_prefix . 'people_links',
+                    $this->wpdb->prefix . 'personal_crm_people_links',
                     array(
                         'person_id' => $person_id,
                         'link_name' => $link_name,
@@ -795,7 +680,7 @@ class Storage {
     private function save_event_links( $event_id, $links ) {
         // Delete existing links
         $this->wpdb->delete(
-            $this->table_prefix . 'event_links',
+            $this->wpdb->prefix . 'personal_crm_event_links',
             array( 'event_id' => $event_id ),
             array( '%d' )
         );
@@ -804,7 +689,7 @@ class Storage {
         if ( is_array( $links ) && ! empty( $links ) ) {
             foreach ( $links as $link_name => $link_url ) {
                 $this->wpdb->insert(
-                    $this->table_prefix . 'event_links',
+                    $this->wpdb->prefix . 'personal_crm_event_links',
                     array(
                         'event_id' => $event_id,
                         'link_name' => $link_name,
@@ -826,12 +711,11 @@ class Storage {
         }
 
         $json_files = glob( $json_dir . '*.json' );
-        $migrated_teams = 0;
+        $migrated_groups = 0;
 
         foreach ( $json_files as $file ) {
             $basename = basename( $file, '.json' );
 
-            // Skip backup files, hr-feedback file, and composer file
             if ( $basename === 'hr-feedback' || $basename === 'composer' || strpos( $basename, '.bak' ) !== false || strpos( $basename, 'bak-' ) !== false ) {
                 continue;
             }
@@ -840,33 +724,12 @@ class Storage {
             $config = json_decode( $content, true );
 
             if ( json_last_error() === JSON_ERROR_NONE && $config ) {
-                $this->save_team_config( $basename, $config );
-                $migrated_teams++;
+                $this->save_group( $basename, $config );
+                $migrated_groups++;
             }
         }
 
-        // Migrate HR feedback data
-        $feedback_file = $json_dir . 'hr-feedback.json';
-        if ( file_exists( $feedback_file ) ) {
-            $content = file_get_contents( $feedback_file );
-            $feedback_data = json_decode( $content, true );
-
-            if ( json_last_error() === JSON_ERROR_NONE && isset( $feedback_data['feedback'] ) ) {
-                foreach ( $feedback_data['feedback'] as $username => $user_feedback ) {
-                    foreach ( $user_feedback as $month => $data ) {
-                        // Skip "not necessary" entries
-                        if ( strpos( $month, '_not_necessary' ) !== false ) {
-                            $actual_month = str_replace( '_not_necessary', '', $month );
-                            $this->save_hr_feedback( $username, $actual_month, array( 'not_necessary_reason' => $data ) );
-                        } else {
-                            $this->save_hr_feedback( $username, $month, $data );
-                        }
-                    }
-                }
-            }
-        }
-
-        return $migrated_teams;
+        return $migrated_groups;
     }
 
     /**
