@@ -1,12 +1,6 @@
-// Team Management JavaScript functionality
-function switchTeam() {
-    const selector = document.getElementById('team-selector');
-    const selectedTeam = selector.value;
-    const currentUrl = new URL(window.location);
-    currentUrl.searchParams.set('team', selectedTeam);
-    // Remove person parameter when switching teams
-    currentUrl.searchParams.delete('person');
-    window.location = currentUrl.toString();
+function switchGroup() {
+    const selector = document.getElementById('group-selector');
+    window.location = selector.value;
 }
 
 function createTimeUpdater(timezone, personId, options = {}) {
@@ -116,21 +110,21 @@ function initializeDarkMode() {
     if (!sunIcon || !sunForcedIcon || !moonIcon || !moonForcedIcon) {
         return; // Exit if icons don't exist
     }
-    
+
     const getSystemTheme = () => window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    
+
     function getCycleStep() {
         return parseInt(localStorage.getItem('theme-cycle-step') || '0');
     }
-    
+
     function setCycleStep(step) {
         localStorage.setItem('theme-cycle-step', step.toString());
     }
-    
+
     function getCurrentThemeFromCycle() {
         const systemTheme = getSystemTheme();
         const step = getCycleStep();
-        
+
         if (systemTheme === 'light') {
             // Light system mode cycle: light, temp dark, force light, force dark, temp light, temp dark...
             switch (step % 4) {
@@ -149,16 +143,16 @@ function initializeDarkMode() {
             }
         }
     }
-    
+
     function updateDisplay() {
         const { theme, isForced } = getCurrentThemeFromCycle();
-        
+
         // Hide all icons first
         sunIcon.style.display = 'none';
         sunForcedIcon.style.display = 'none';
         moonIcon.style.display = 'none';
         moonForcedIcon.style.display = 'none';
-        
+
         // Show appropriate icon based on theme and forced state
         if (theme === 'dark') {
             if (isForced) {
@@ -173,11 +167,11 @@ function initializeDarkMode() {
                 sunIcon.style.display = 'block';
             }
         }
-        
+
         // Apply the theme
         document.documentElement.style.colorScheme = theme;
     }
-    
+
     // Initialize: if there's an old theme-override, convert it to cycle system
     const oldOverride = localStorage.getItem('theme-override');
     if (oldOverride && !localStorage.getItem('theme-cycle-step')) {
@@ -185,16 +179,16 @@ function initializeDarkMode() {
         setCycleStep(2);
         localStorage.removeItem('theme-override');
     }
-    
+
     updateDisplay();
-    
+
     toggle.addEventListener('click', () => {
         const currentStep = getCycleStep();
         const nextStep = currentStep + 1;
         setCycleStep(nextStep);
         updateDisplay();
     });
-    
+
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
         updateDisplay();
     });

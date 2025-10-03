@@ -30,10 +30,10 @@ class Storage extends \WpApp\BaseStorage {
     protected function create_tables() {
         $charset_collate = $this->wpdb->get_charset_collate();
 
-        // Teams table
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_teams (
+        // Groups table
+        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_groups (
             slug varchar(100) NOT NULL,
-            team_name varchar(255) NOT NULL,
+            group_name varchar(255) NOT NULL,
             activity_url_prefix varchar(255) DEFAULT '',
             not_managing_team tinyint(1) DEFAULT 1,
             type varchar(50) DEFAULT 'team',
@@ -108,16 +108,16 @@ class Storage extends \WpApp\BaseStorage {
 
         dbDelta( $sql );
 
-        // Team links table
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_team_links (
+        // Group links table
+        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_group_links (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            team_slug varchar(100) NOT NULL,
+            group_slug varchar(100) NOT NULL,
             link_name varchar(100) NOT NULL,
             link_url text NOT NULL,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            KEY idx_team_links_team_slug (team_slug),
-            UNIQUE KEY unique_team_link (team_slug, link_name)
+            KEY idx_group_links_group_slug (group_slug),
+            UNIQUE KEY unique_group_link (group_slug, link_name)
         ) $charset_collate;";
 
         dbDelta( $sql );
@@ -178,9 +178,8 @@ class Storage extends \WpApp\BaseStorage {
      * Get team configuration data
      */
     public function get_group( $group_slug ) {
-        // Note: DB table still named personal_crm_teams for migration compatibility
         $group = $this->wpdb->get_row( $this->wpdb->prepare(
-            "SELECT * FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
+            "SELECT * FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
             $group_slug
         ), ARRAY_A );
 
@@ -199,7 +198,7 @@ class Storage extends \WpApp\BaseStorage {
 
         return array(
             'activity_url_prefix' => $group['activity_url_prefix'],
-            'group_name' => $group['team_name'],  // DB column still team_name
+            'group_name' => $group['group_name'],
             'not_managing' => (bool) $group['not_managing_team'],
             'links' => $this->get_group_links( $group_slug ),
             'type' => $group['type'] ?: 'team',  // Default to 'team' if null
@@ -216,7 +215,6 @@ class Storage extends \WpApp\BaseStorage {
      * Get people by category
      */
     private function get_people_by_category( $group_slug, $category ) {
-        // Note: DB column still named team_slug for migration compatibility
         $results = $this->wpdb->get_results( $this->wpdb->prepare(
             "SELECT * FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s AND category = %s ORDER BY name",
             $group_slug, $category
@@ -253,7 +251,6 @@ class Storage extends \WpApp\BaseStorage {
      * Get group events
      */
     private function get_group_events( $group_slug ) {
-        // Note: DB column still named team_slug for migration compatibility
         $results = $this->wpdb->get_results( $this->wpdb->prepare(
             "SELECT * FROM {$this->wpdb->prefix}personal_crm_events WHERE team_slug = %s ORDER BY start_date",
             $group_slug
@@ -274,13 +271,21 @@ class Storage extends \WpApp\BaseStorage {
      * Save group configuration data
      */
     public function save_group( $group_slug, $config ) {
-        // Note: DB table still named personal_crm_teams for migration compatibility
+        // Sort events by date before saving
+        if ( isset( $config['events'] ) && is_array( $config['events'] ) ) {
+            usort( $config['events'], function( $a, $b ) {
+                $dateA = $a['start_date'] ?? '';
+                $dateB = $b['start_date'] ?? '';
+                return strcmp( $dateA, $dateB );
+            } );
+        }
+
         $this->wpdb->query( 'START TRANSACTION' );
 
         try {
             $group_data = array(
                 'slug' => $group_slug,
-                'team_name' => $config['team_name'] ?? '',
+                'group_name' => $config['team_name'] ?? '',
                 'activity_url_prefix' => $config['activity_url_prefix'] ?? '',
                 'not_managing_team' => $config['not_managing_team'] ?? 1,
                 'type' => $config['type'] ?? 'team',
@@ -288,15 +293,14 @@ class Storage extends \WpApp\BaseStorage {
                 'updated_at' => current_time( 'mysql' )
             );
 
-            // Note: DB column still named team_slug for migration compatibility
-            $existing_group = $this->wpdb->get_var( $this->wpdb->prepare(
-                "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
+                $existing_group = $this->wpdb->get_var( $this->wpdb->prepare(
+                "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
                 $group_slug
             ) );
 
             if ( $existing_group ) {
                 $this->wpdb->update(
-                    $this->wpdb->prefix . 'personal_crm_teams',
+                    $this->wpdb->prefix . 'personal_crm_groups',
                     $group_data,
                     array( 'slug' => $group_slug ),
                     array( '%s', '%s', '%s', '%d', '%s', '%d', '%s' ),
@@ -305,7 +309,7 @@ class Storage extends \WpApp\BaseStorage {
             } else {
                 $group_data['created_at'] = current_time( 'mysql' );
                 $this->wpdb->insert(
-                    $this->wpdb->prefix . 'personal_crm_teams',
+                    $this->wpdb->prefix . 'personal_crm_groups',
                     $group_data,
                     array( '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s' )
                 );
@@ -313,8 +317,7 @@ class Storage extends \WpApp\BaseStorage {
 
             $this->save_group_links( $group_slug, $config['team_links'] ?? array() );
 
-            // Note: DB column still named team_slug for migration compatibility
-            $this->wpdb->delete(
+                $this->wpdb->delete(
                 $this->wpdb->prefix . 'personal_crm_people',
                 array( 'team_slug' => $group_slug ),
                 array( '%s' )
@@ -327,8 +330,7 @@ class Storage extends \WpApp\BaseStorage {
                 }
             }
 
-            // Note: DB column still named team_slug for migration compatibility
-            $this->wpdb->delete(
+                $this->wpdb->delete(
                 $this->wpdb->prefix . 'personal_crm_events',
                 array( 'team_slug' => $group_slug ),
                 array( '%s' )
@@ -348,10 +350,70 @@ class Storage extends \WpApp\BaseStorage {
     }
 
     /**
+     * Save a single person
+     */
+    public function save_person( $group_slug, $username, $category, $person_data ) {
+        // Check if person already exists
+        $existing = $this->wpdb->get_var( $this->wpdb->prepare(
+            "SELECT id FROM {$this->wpdb->prefix}personal_crm_people WHERE username = %s AND team_slug = %s",
+            $username, $group_slug
+        ) );
+
+        $data = array(
+            'username' => $username,
+            'team_slug' => $group_slug,
+            'category' => $category,
+            'name' => $person_data['name'] ?? '',
+            'nickname' => $person_data['nickname'] ?? '',
+            'role' => $person_data['role'] ?? '',
+            'email' => $person_data['email'] ?? '',
+            'birthday' => $person_data['birthday'] ?? '',
+            'company_anniversary' => $person_data['company_anniversary'] ?? '',
+            'partner' => $person_data['partner'] ?? '',
+            'partner_birthday' => $person_data['partner_birthday'] ?? '',
+            'location' => $person_data['location'] ?? '',
+            'timezone' => $person_data['timezone'] ?? '',
+            'github' => $person_data['github'] ?? '',
+            'linear' => $person_data['linear'] ?? '',
+            'wordpress' => $person_data['wordpress'] ?? '',
+            'linkedin' => $person_data['linkedin'] ?? '',
+            'website' => $person_data['website'] ?? '',
+            'new_company' => $person_data['new_company'] ?? '',
+            'new_company_website' => $person_data['new_company_website'] ?? '',
+            'deceased_date' => $person_data['deceased_date'] ?? '',
+            'left_company' => $person_data['left_company'] ?? 0,
+            'deceased' => $person_data['deceased'] ?? 0,
+            'kids' => wp_json_encode( $person_data['kids'] ?? array() ),
+            'github_repos' => wp_json_encode( $person_data['github_repos'] ?? array() ),
+            'personal_events' => wp_json_encode( $person_data['personal_events'] ?? array() ),
+            'notes' => wp_json_encode( $person_data['notes'] ?? array() ),
+            'updated_at' => current_time( 'mysql' )
+        );
+
+        $format = array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s' );
+
+        if ( $existing ) {
+            return $this->wpdb->update(
+                $this->wpdb->prefix . 'personal_crm_people',
+                $data,
+                array( 'username' => $username, 'team_slug' => $group_slug ),
+                $format,
+                array( '%s', '%s' )
+            );
+        } else {
+            $data['created_at'] = current_time( 'mysql' );
+            return $this->wpdb->insert(
+                $this->wpdb->prefix . 'personal_crm_people',
+                $data,
+                array_merge( $format, array( '%s' ) )
+            );
+        }
+    }
+
+    /**
      * Save people for a category
      */
     private function save_people( $group_slug, $category, $people ) {
-        // Note: DB column still named team_slug for migration compatibility
         foreach ( $people as $username => $person ) {
             $person_data = array(
                 'username' => $username,
@@ -404,7 +466,6 @@ class Storage extends \WpApp\BaseStorage {
      * Save events for a group
      */
     private function save_events( $group_slug, $events ) {
-        // Note: DB column still named team_slug for migration compatibility
         foreach ( $events as $event ) {
             $event_data = array(
                 'team_slug' => $group_slug,
@@ -435,17 +496,15 @@ class Storage extends \WpApp\BaseStorage {
      * Get all available group slugs
      */
     public function get_available_groups() {
-        // Note: DB table still named personal_crm_teams for migration compatibility
-        return $this->wpdb->get_col( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_teams ORDER BY slug" );
+        return $this->wpdb->get_col( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_groups ORDER BY slug" );
     }
 
     /**
      * Get group name by slug
      */
     public function get_group_name( $group_slug ) {
-        // Note: DB column still named team_name for migration compatibility
         return $this->wpdb->get_var( $this->wpdb->prepare(
-            "SELECT team_name FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
+            "SELECT group_name FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
             $group_slug
         ) );
     }
@@ -455,7 +514,7 @@ class Storage extends \WpApp\BaseStorage {
      */
     public function get_group_type( $group_slug ) {
         $type = $this->wpdb->get_var( $this->wpdb->prepare(
-            "SELECT type FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
+            "SELECT type FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
             $group_slug
         ) );
         return $type ?: 'team';
@@ -465,11 +524,10 @@ class Storage extends \WpApp\BaseStorage {
      * Get default group slug
      */
     public function get_default_group() {
-        // Note: DB table still named personal_crm_teams for migration compatibility
-        $slug = $this->wpdb->get_var( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_teams WHERE is_default = 1 LIMIT 1" );
+        $slug = $this->wpdb->get_var( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_groups WHERE is_default = 1 LIMIT 1" );
 
         if ( ! $slug ) {
-            $slug = $this->wpdb->get_var( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_teams ORDER BY slug LIMIT 1" );
+            $slug = $this->wpdb->get_var( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_groups ORDER BY slug LIMIT 1" );
         }
 
         return $slug ?: '';
@@ -480,7 +538,7 @@ class Storage extends \WpApp\BaseStorage {
      */
     public function group_exists( $group_slug ) {
         $count = $this->wpdb->get_var( $this->wpdb->prepare(
-            "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_teams WHERE slug = %s",
+            "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
             $group_slug
         ) );
         return (bool) $count;
@@ -490,9 +548,8 @@ class Storage extends \WpApp\BaseStorage {
      * Delete a group and all its data
      */
     public function delete_group( $group_slug ) {
-        // Note: DB table still named personal_crm_teams for migration compatibility
         return $this->wpdb->delete(
-            $this->wpdb->prefix . 'personal_crm_teams',
+            $this->wpdb->prefix . 'personal_crm_groups',
             array( 'slug' => $group_slug ),
             array( '%s' )
         );
@@ -520,7 +577,6 @@ class Storage extends \WpApp\BaseStorage {
      * Get people count from group config
      */
     public function get_group_people_count( $group_slug ) {
-        // Note: DB column still named team_slug for migration compatibility
         return (int) $this->wpdb->get_var( $this->wpdb->prepare(
             "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s",
             $group_slug
@@ -531,7 +587,6 @@ class Storage extends \WpApp\BaseStorage {
      * Get all people names from group config for search purposes
      */
     public function get_group_people_names( $group_slug ) {
-        // Note: DB column still named team_slug for migration compatibility
         return $this->wpdb->get_col( $this->wpdb->prepare(
             "SELECT name FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s ORDER BY name",
             $group_slug
@@ -542,7 +597,6 @@ class Storage extends \WpApp\BaseStorage {
      * Get a single person from a group
      */
     public function get_person( $group_slug, $username ) {
-        // Note: DB column still named team_slug for migration compatibility
         $row = $this->wpdb->get_row( $this->wpdb->prepare(
             "SELECT * FROM {$this->wpdb->prefix}personal_crm_people WHERE team_slug = %s AND username = %s",
             $group_slug, $username
@@ -571,9 +625,8 @@ class Storage extends \WpApp\BaseStorage {
      * Get group links
      */
     private function get_group_links( $group_slug ) {
-        // Note: DB column still named team_slug for migration compatibility
         $results = $this->wpdb->get_results( $this->wpdb->prepare(
-            "SELECT link_name, link_url FROM {$this->wpdb->prefix}personal_crm_team_links WHERE team_slug = %s ORDER BY link_name",
+            "SELECT link_name, link_url FROM {$this->wpdb->prefix}personal_crm_group_links WHERE group_slug = %s ORDER BY link_name",
             $group_slug
         ), ARRAY_A );
 
@@ -589,19 +642,18 @@ class Storage extends \WpApp\BaseStorage {
      * Save group links
      */
     private function save_group_links( $group_slug, $links ) {
-        // Note: DB column still named team_slug for migration compatibility
         $this->wpdb->delete(
-            $this->wpdb->prefix . 'personal_crm_team_links',
-            array( 'team_slug' => $group_slug ),
+            $this->wpdb->prefix . 'personal_crm_group_links',
+            array( 'group_slug' => $group_slug ),
             array( '%s' )
         );
 
         if ( is_array( $links ) && ! empty( $links ) ) {
             foreach ( $links as $link_name => $link_url ) {
                 $this->wpdb->insert(
-                    $this->wpdb->prefix . 'personal_crm_team_links',
+                    $this->wpdb->prefix . 'personal_crm_group_links',
                     array(
-                        'team_slug' => $group_slug,
+                        'group_slug' => $group_slug,
                         'link_name' => $link_name,
                         'link_url' => $link_url,
                         'created_at' => current_time( 'mysql' )

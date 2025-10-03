@@ -109,24 +109,6 @@ if ( ! empty( $edit_member ) ) {
 /**
  * Save configuration to storage
  */
-function save_config( $config, $team_slug ) {
-	// Sort events by date before saving
-	if ( isset( $config['events'] ) && is_array( $config['events'] ) ) {
-		usort( $config['events'], function( $a, $b ) {
-			$dateA = $a['start_date'] ?? '';
-			$dateB = $b['start_date'] ?? '';
-			return strcmp( $dateA, $dateB );
-		} );
-	}
-
-	try {
-		$crm = PersonalCrm::get_instance();
-		return $crm->storage->save_team_config( $team_slug, $config );
-	} catch ( \Exception $e ) {
-		error_log( 'Error saving team config: ' . $e->getMessage() );
-		return false;
-	}
-}
 
 $message = '';
 $error = '';
@@ -146,10 +128,10 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			
 			if ( $is_default ) {
 				// If this team is being set as default, clear default from all other teams
-				$available_teams = $crm->storage->get_available_groups();
-				foreach ( $available_teams as $team_slug ) {
-					if ( $team_slug !== $current_group ) {
-						$other_team_file = __DIR__ . '/' . $team_slug . '.json';
+				$available_groups = $crm->storage->get_available_groups();
+				foreach ( $available_groups as $group_slug ) {
+					if ( $group_slug !== $current_group ) {
+						$other_team_file = __DIR__ . '/' . $group_slug . '.json';
 						if ( file_exists( $other_team_file ) ) {
 							$other_config = json_decode( file_get_contents( $other_team_file ), true );
 							if ( json_last_error() === JSON_ERROR_NONE && isset( $other_config['default'] ) ) {
@@ -185,7 +167,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				}
 			}
 
-			if ( save_config( $config, $current_group ) ) {
+			if ( $crm->storage->save_group( $current_group, $config ) ) {
 				$message = 'General settings saved successfully!';
 			} else {
 				$error = 'Failed to save configuration.';
@@ -206,7 +188,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			}
 			$config['team_links'] = $team_links;
 
-			if ( save_config( $config, $current_group ) ) {
+			if ( $crm->storage->save_group( $current_group, $config ) ) {
 				$message = 'Links saved successfully!';
 			} else {
 				$error = 'Failed to save links.';
@@ -279,7 +261,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			);
 			
 			$config['events'][ $event_index ] = $event;
-			if ( save_config( $config, $current_group ) ) {
+			if ( $crm->storage->save_group( $current_group, $config ) ) {
 				$message = 'Event updated successfully!';
 				// Reload the edit data to show updated information
 				$edit_data = $config['events'][ $event_index ];
@@ -324,7 +306,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			);
 			
 			$config['events'][] = $event;
-			if ( save_config( $config, $current_group ) ) {
+			if ( $crm->storage->save_group( $current_group, $config ) ) {
 				$message = 'Event added successfully!';
 				// Reload config to get the latest data
 				$config = $crm->storage->get_group( $current_group );
@@ -389,7 +371,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$config['alumni'][ $username ] = $person_data;
 			}
 
-			if ( save_config( $config, $current_group ) ) {
+			if ( $crm->storage->save_group( $current_group, $config ) ) {
 				$message = 'Person moved to alumni successfully!';
 			} else {
 				$error = 'Failed to move person to alumni.';
@@ -417,7 +399,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				}
 			}
 
-			if ( save_config( $config, $current_group ) ) {
+			if ( $crm->storage->save_group( $current_group, $config ) ) {
 				$message = 'Person restored from alumni successfully!';
 			} else {
 				$error = 'Failed to restore person from alumni.';
@@ -456,8 +438,8 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$has_members = ! empty( $config['team_members'] ) || ! empty( $config['leadership'] );
 				
 				// Save both configs
-				$current_saved = save_config( $config, $current_group );
-				$target_saved = save_config( $target_config, $target_team );
+				$current_saved = $crm->storage->save_group( $current_group, $config );
+				$target_saved = $crm->storage->save_group( $target_team, $target_config );
 				
 				if ( $current_saved && $target_saved ) {
 					// Delete current team if requested and it's empty
@@ -488,7 +470,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			$event_index = (int) ( $_POST['event_index'] ?? -1 );
 			if ( $event_index >= 0 && isset( $config['events'][ $event_index ] ) ) {
 				array_splice( $config['events'], $event_index, 1 );
-				if ( save_config( $config, $current_group ) ) {
+				if ( $crm->storage->save_group( $current_group, $config ) ) {
 					$message = 'Event deleted successfully!';
 				} else {
 					$error = 'Failed to delete event.';
@@ -540,7 +522,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$new_config['default'] = true;
 			}
 			
-			if ( save_config( $new_config, $new_team_file ) ) {
+			if ( $crm->storage->save_group( $new_team_file, $new_config ) ) {
 				$message = ucfirst( $new_team_type ) . ' created successfully!';
 				// Redirect to the new team
 				$redirect_url = 'admin.php' . ( $new_team_slug !== 'team' ? '?team=' . urlencode( $new_team_slug ) : '' );
@@ -756,14 +738,23 @@ function handle_person_action( $action, $config, $person_data ) {
 			return array( 'error' => 'Username is required.' );
 		}
 
-		// If username changed, remove old entry
-		if ( $original_username !== $username ) {
-			unset( $main_config[ $config['section_key'] ][ $original_username ] );
+		// If username changed, delete old entry first
+		if ( $original_username !== $username && ! empty( $original_username ) ) {
+			global $wpdb;
+			$wpdb->delete(
+				$wpdb->prefix . 'personal_crm_people',
+				array( 'username' => $original_username, 'team_slug' => $current_group ),
+				array( '%s', '%s' )
+			);
 		}
 
-		$main_config[ $config['section_key'] ][ $username ] = $person_data;
+		// Save the person directly without loading entire group
+		$result = $crm->storage->save_person( $current_group, $username, $config['section_key'], $person_data );
 
-		if ( save_config( $main_config, $current_group ) ) {
+		if ( $result !== false ) {
+			// Allow plugins to save additional data
+			do_action( 'personal_crm_admin_person_save', $username, $_POST, $config['section_key'] );
+
 			// Redirect to person view using proper route pattern {team}/{person}
 			$redirect_url = '/crm/' . $current_group . '/' . $username;
 			header( 'Location: ' . $redirect_url );
@@ -778,9 +769,13 @@ function handle_person_action( $action, $config, $person_data ) {
 			return array( 'error' => 'Username is required.' );
 		}
 
-		$main_config[ $config['section_key'] ][ $username ] = $person_data;
+		// Save the person directly without loading entire group
+		$result = $crm->storage->save_person( $current_group, $username, $config['section_key'], $person_data );
 
-		if ( save_config( $main_config, $current_group ) ) {
+		if ( $result !== false ) {
+			// Allow plugins to save additional data
+			do_action( 'personal_crm_admin_person_save', $username, $_POST, $config['section_key'] );
+
 			// Redirect back to the appropriate admin section after adding
 			$section = '';
 			if ( $action === 'add_member' ) {
@@ -800,7 +795,7 @@ function handle_person_action( $action, $config, $person_data ) {
 		$username = $_POST['username'] ?? '';
 		if ( isset( $main_config[ $config['section_key'] ][ $username ] ) ) {
 			unset( $main_config[ $config['section_key'] ][ $username ] );
-			if ( save_config( $main_config, $current_group ) ) {
+			if ( $crm->storage->save_group( $current_group, $main_config ) ) {
 				return array( 'message' => $config['display_name'] . ' deleted successfully!' );
 			} else {
 				return array( 'error' => 'Failed to delete ' . strtolower( $config['display_name'] ) . '.' );
@@ -1071,9 +1066,9 @@ function parse_personal_events_data( $events_data ) {
 /**
  * Check which data points are missing for a person
  */
-function get_missing_data_points( $person, $person_type = 'member', $team_slug = null ) {
+function get_missing_data_points( $person, $person_type = 'member', $group_slug = null ) {
 	$missing = array();
-	$is_social_group = PersonalCrm::get_instance()->is_social_group( $team_slug );
+	$is_social_group = PersonalCrm::get_instance()->is_social_group( $group_slug );
 
 	// Core fields (required)
 	if ( empty( $person['name'] ) ) {
@@ -1144,8 +1139,8 @@ function get_missing_data_points( $person, $person_type = 'member', $team_slug =
 /**
  * Get completeness score as percentage
  */
-function get_completeness_score( $missing_data, $person_type = 'member', $team_slug = null ) {
-	$is_social_group = PersonalCrm::get_instance()->is_social_group( $team_slug );
+function get_completeness_score( $missing_data, $person_type = 'member', $group_slug = null ) {
+	$is_social_group = PersonalCrm::get_instance()->is_social_group( $group_slug );
 
 	// Count total fields by priority
 	if ( $is_social_group ) {
@@ -1882,6 +1877,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		<textarea id="<?php echo $prefix; ?>new_note" name="new_note" placeholder="Add what you learned today..."></textarea>
 	</div>
 
+	<?php
+	// Allow plugins to add custom fields
+	do_action( 'personal_crm_admin_person_form_fields', $edit_data, $is_editing, $prefix );
+	?>
+
 	<button type="submit" class="btn"><?php echo $submit_text; ?></button>
 </form>
 
@@ -1907,8 +1907,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<!-- Move to Another <?php echo ucfirst( $group ); ?> -->
 	<?php if ( $is_editing && ( $type === 'member' || $type === 'leader' ) ) : ?>
 		<?php 
-		$available_teams = $crm->storage->get_available_groups();
-		$other_teams = array_filter( $available_teams, function( $team ) use ( $current_group ) {
+		$available_groups = $crm->storage->get_available_groups();
+		$other_teams = array_filter( $available_groups, function( $team ) use ( $current_group ) {
 			return $team !== $current_group;
 		});
 		?>
@@ -1924,17 +1924,17 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 						<label for="target_team" style="display: block; margin-bottom: 5px; font-weight: bold;">Target <?php echo ucfirst( $group ); ?>:</label>
 						<select name="target_team" id="target_team" required style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px;">
 							<option value="">Select a <?php echo $group; ?>...</option>
-							<?php foreach ( $other_teams as $team_slug ) : ?>
+							<?php foreach ( $other_teams as $group_slug ) : ?>
 								<?php
-								$team_name = $crm->storage->get_group_name( $team_slug );
+								$team_name = $crm->storage->get_group_name( $group_slug );
 								
 								// Load target team config to get member count
-								$target_team_config = $crm->storage->get_group( $team_slug );
+								$target_team_config = $crm->storage->get_group( $group_slug );
 								$member_count = count( $target_team_config['team_members'] ?? array() ) + count( $target_team_config['leadership'] ?? array() );
 								
 								$display_name = $team_name . ' (' . $member_count . ' members)';
 								?>
-								<option value="<?php echo htmlspecialchars( $team_slug ); ?>">
+								<option value="<?php echo htmlspecialchars( $group_slug ); ?>">
 									<?php echo htmlspecialchars( $display_name ); ?>
 								</option>
 							<?php endforeach; ?>
@@ -2013,18 +2013,17 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <h1><a href="<?php echo $crm->build_url( 'admin.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo ucfirst( $group ?? 'Team' ); ?> Management Admin</a></h1>
             </div>
             <div class="navigation">
-                <!-- Team Switcher -->
-                <div class="team-switcher" style="display: inline-block; margin-right: 10px;">
+                <div class="group-switcher" style="display: inline-block; margin-right: 10px;">
                     <?php
-                    $available_teams = $crm->storage->get_available_groups();
-                    if ( $available_teams ) :
+                    $available_groups = $crm->storage->get_available_groups();
+                    if ( $available_groups ) :
                     	?>
-                    <select id="team-selector" onchange="switchTeam()">
+                    <select id="group-selector" onchange="switchGroup()">
                         <?php
-                        foreach ( $available_teams as $team_slug ) {
-                            $team_display_name = $crm->storage->get_group_name( $team_slug );
-                            $selected = $team_slug === $current_group ? 'selected' : '';
-                            echo '<option value="' . htmlspecialchars( $team_slug ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
+                        foreach ( $available_groups as $group_slug ) {
+                            $team_display_name = $crm->storage->get_group_name( $group_slug );
+                            $selected = $group_slug === $current_group ? 'selected' : '';
+                            echo '<option value="' . htmlspecialchars( $crm->build_url( $group_slug ) ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
                         }
                         ?>
                     </select>
@@ -3069,41 +3068,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 });
             });
         }
-        
-        // Team switching functionality
-        function switchTeam() {
-            const selector = document.getElementById('team-selector');
-            const selectedTeam = selector.value;
 
-            // Build the proper team URL using PHP routing
-            const teamUrls = {
-                <?php
-                foreach ( $crm->storage->get_available_groups() as $team_slug ) {
-                    $params = array();
-                    if ( get_default_team() !== $team_slug ) {
-                        $params['team'] = $team_slug;
-                    }
-                    // Preserve current tab and other relevant parameters
-                    if ( ! empty( $active_tab ) && $active_tab !== 'general' ) {
-                        $params['tab'] = $active_tab;
-                    }
-                    if ( $is_adding_new ) {
-                        $params['add'] = 'new';
-                    }
-                    if ( $is_creating_team ) {
-                        $params['create_team'] = 'new';
-                    }
-                    echo "'" . esc_js( $team_slug ) . "': '" . esc_js( $crm->build_url( 'admin.php', $params ) ) . "',\n";
-                }
-                ?>
-            };
-
-            if ( teamUrls[selectedTeam] ) {
-                window.location = teamUrls[selectedTeam];
-            }
-        }
-        
-        // Auto-generate slug from team name
+       // Auto-generate slug from team name
         document.addEventListener('DOMContentLoaded', function() {
             const teamNameInput = document.getElementById('new_team_name');
             const teamSlugInput = document.getElementById('new_team_slug');

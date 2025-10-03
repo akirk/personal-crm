@@ -674,7 +674,7 @@ details summary span:last-child {
 }
 
 /* Team selector styling */
-#team-selector {
+#group-selector {
     padding: 8px 12px;
     border: 1px solid light-dark(#ddd, #555);
     border-radius: 4px;
@@ -1338,7 +1338,7 @@ details summary span:last-child {
 }
 
 /* Team selection page styles */
-.team-selection-container {
+.group-selection-container {
     max-width: 800px;
     margin: 0 auto;
     background: light-dark(white, #2d2d2d);
@@ -1391,17 +1391,17 @@ details summary span:last-child {
     transform: translateY(-1px);
 }
 
-.team-selection-header {
+.group-selection-header {
     margin-bottom: 40px;
 }
 
-.team-selection-header h1 {
+.group-selection-header h1 {
     margin: 0 0 10px 0;
     color: light-dark(#333, #e0e0e0);
     font-size: 28px;
 }
 
-.team-selection-header p {
+.group-selection-header p {
     color: light-dark(#666, #b0b0b0);
     font-size: 16px;
     margin: 0;
@@ -1482,7 +1482,7 @@ details summary span:last-child {
     color: light-dark(#007cba, #4a90e2);
 }
 
-.team-search-container {
+.group-search-container {
     position: relative;
     margin: 25px 0;
     max-width: 400px;
@@ -1490,7 +1490,7 @@ details summary span:last-child {
     margin-right: auto;
 }
 
-.team-search-container input {
+.group-search-container input {
     width: 100%;
     padding: 12px 16px;
     font-size: 16px;
@@ -1502,13 +1502,13 @@ details summary span:last-child {
     transition: all 0.3s ease;
 }
 
-.team-search-container input:focus {
+.group-search-container input:focus {
     outline: none;
     border-color: #007cba;
     box-shadow: 0 0 0 3px rgba(0, 124, 186, 0.1);
 }
 
-.team-search-container input::placeholder {
+.group-search-container input::placeholder {
     color: light-dark(#999, #888);
 }
 

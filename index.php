@@ -78,7 +78,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 				do_action( 'personal_crm_header_content', $group_data, $current_group );
 				?>
 				<div class="navigation" style="display: flex; align-items: center; gap: 10px;">
-					<select id="team-selector" onchange="switchTeam()">
+					<select id="group-selector" onchange="switchGroup()">
 						<?php
 						// Separate teams by type and default status
 						$default_teams = array();
@@ -114,7 +114,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 						<?php if ( ! empty( $default_teams ) ) : ?>
 						<optgroup label="Default">
 							<?php foreach ( $default_teams as $item ) : ?>
-								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+								<option value="<?php echo htmlspecialchars( $crm->build_url( $item['slug'] ) ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
 							<?php endforeach; ?>
 						</optgroup>
 						<?php endif; ?>
@@ -122,7 +122,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 						<?php if ( ! empty( $teams ) ) : ?>
 						<optgroup label="Teams">
 							<?php foreach ( $teams as $item ) : ?>
-								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+								<option value="<?php echo htmlspecialchars( $crm->build_url( $item['slug'] ) ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
 							<?php endforeach; ?>
 						</optgroup>
 						<?php endif; ?>
@@ -130,7 +130,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 						<?php if ( ! empty( $groups ) ) : ?>
 						<optgroup label="Groups">
 							<?php foreach ( $groups as $item ) : ?>
-								<option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+								<option value="<?php echo htmlspecialchars( $crm->build_url( $item['slug'] ) ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
 							<?php endforeach; ?>
 						</optgroup>
 						<?php endif; ?>
@@ -367,28 +367,6 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 			endforeach; 
 			?>
 		});
-		
-		function switchTeam() {
-			const selector = document.getElementById('team-selector');
-			const selectedTeam = selector.value;
-			const selectedOption = selector.options[selector.selectedIndex];
-			const selectedType = selectedOption.getAttribute('data-type');
-			
-			const currentUrl = new URL(window.location);
-			
-			// Remove both team and group parameters first
-			currentUrl.searchParams.delete('team');
-			currentUrl.searchParams.delete('group');
-			
-			// Add the appropriate parameter based on the type
-			if (selectedType === 'group') {
-				currentUrl.searchParams.set('group', selectedTeam);
-			} else {
-				currentUrl.searchParams.set('team', selectedTeam);
-			}
-			
-			window.location = currentUrl.toString();
-		}
 	</script>
 </body>
 </html>

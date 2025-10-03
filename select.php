@@ -61,13 +61,13 @@ if ( empty( $available_teams ) ) {
     <?php if ( function_exists( 'wp_app_body_open' ) ) wp_app_body_open(); ?>
     <?php $crm->render_cmd_k_panel(); ?>
 
-    <div class="team-selection-container">
-        <div class="team-selection-header">
+    <div class="group-selection-container">
+        <div class="group-selection-header">
             <h1>Select<?php if ( $type_filter ) echo ' (' . htmlspecialchars( ucfirst( $type_filter ) ) . 's)'; ?></h1>
             <p>Choose which one you'd like to view:</p>
             
-            <div class="team-search-container">
-                <input type="text" id="team-search" placeholder="Search teams or people..." autocomplete="off">
+            <div class="group-search-container">
+                <input type="text" id="group-search" placeholder="Search teams or people..." autocomplete="off">
                 <div id="search-clear" class="search-clear" style="display: none;">&times;</div>
             </div>
             
@@ -96,7 +96,7 @@ if ( empty( $available_teams ) ) {
                 ?>" 
                    class="team-card" 
                    data-team-name="<?php echo htmlspecialchars( $team_name ); ?>"
-                   data-team-slug="<?php echo htmlspecialchars( $team_slug ); ?>"
+                   data-group-slug="<?php echo htmlspecialchars( $team_slug ); ?>"
                    data-team-type="<?php echo htmlspecialchars( $team_type ); ?>"
                    data-people-data="<?php echo htmlspecialchars( json_encode( $people_data ) ); ?>">
                     <h3><?php echo htmlspecialchars( $team_name ); ?></h3>
@@ -105,7 +105,7 @@ if ( empty( $available_teams ) ) {
                         <p class="team-people-count"><?php echo $people_count; ?> <?php echo $people_count === 1 ? 'person' : 'people'; ?></p>
                         <div class="team-matched-person" style="display: none;">
                             <span class="match-label">Found:</span>
-                            <span class="match-name" data-team-slug="<?php echo htmlspecialchars( $team_slug ); ?>" style="cursor: pointer; text-decoration: underline; color: #007cba;"></span>
+                            <span class="match-name" data-group-slug="<?php echo htmlspecialchars( $team_slug ); ?>" style="cursor: pointer; text-decoration: underline; color: #007cba;"></span>
                         </div>
                     </div>
                 </a>
@@ -127,7 +127,7 @@ if ( empty( $available_teams ) ) {
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('team-search');
+        const searchInput = document.getElementById('group-search');
         const clearButton = document.getElementById('search-clear');
         const teamCards = document.querySelectorAll('.team-card');
         const teamGrid = document.getElementById('team-grid');
@@ -155,7 +155,7 @@ if ( empty( $available_teams ) ) {
                 
                 teamCards.forEach(card => {
                     const teamName = card.getAttribute('data-team-name').toLowerCase();
-                    const teamSlug = card.getAttribute('data-team-slug').toLowerCase();
+                    const teamSlug = card.getAttribute('data-group-slug').toLowerCase();
                     const peopleData = JSON.parse(card.getAttribute('data-people-data') || '{}');
                     const matchedPersonElement = card.querySelector('.team-matched-person');
                     const matchNameElement = card.querySelector('.match-name');
@@ -182,7 +182,7 @@ if ( empty( $available_teams ) ) {
                         if (matchedPerson && !matchesTeam && matchedPersonElement && matchNameElement) {
                             matchedPersonElement.style.display = 'block';
                             matchNameElement.textContent = matchedPerson;
-                            const teamSlug = matchNameElement.getAttribute('data-team-slug');
+                            const teamSlug = matchNameElement.getAttribute('data-group-slug');
                             matchNameElement.onclick = function(e) {
                                 e.preventDefault();
                                 e.stopPropagation();

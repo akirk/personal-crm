@@ -115,16 +115,16 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         // Admin interface (admin.php)
         $this->app->route( 'admin', 'admin.php' );
-        $this->app->route( 'admin/{team}', 'admin.php' );
-        $this->app->route( 'admin/{team}/links', 'admin.php' );
-        $this->app->route( 'admin/{team}/members', 'admin.php' );
-        $this->app->route( 'admin/{team}/leadership', 'admin.php' );
-        $this->app->route( 'admin/{team}/consultants', 'admin.php' );
-        $this->app->route( 'admin/{team}/alumni', 'admin.php' );
-        $this->app->route( 'admin/{team}/events', 'admin.php' );
-        $this->app->route( 'admin/{team}/audit', 'admin.php' );
-        $this->app->route( 'admin/{team}/json', 'admin.php' );
-        $this->app->route( 'admin/{team}/person/{person}', 'admin.php' );
+        $this->app->route( 'admin/{group}', 'admin.php' );
+        $this->app->route( 'admin/{group}/links', 'admin.php' );
+        $this->app->route( 'admin/{group}/members', 'admin.php' );
+        $this->app->route( 'admin/{group}/leadership', 'admin.php' );
+        $this->app->route( 'admin/{group}/consultants', 'admin.php' );
+        $this->app->route( 'admin/{group}/alumni', 'admin.php' );
+        $this->app->route( 'admin/{group}/events', 'admin.php' );
+        $this->app->route( 'admin/{group}/audit', 'admin.php' );
+        $this->app->route( 'admin/{group}/json', 'admin.php' );
+        $this->app->route( 'admin/{group}/person/{person}', 'admin.php' );
 
         // Finder/Search (finder.php)
         $this->app->route( 'finder', 'finder.php' );
@@ -132,7 +132,8 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         // Person management (person.php)
         $this->app->route( 'person', 'person.php' );
-        $this->app->route( '{team}/{person}', 'person.php' );
+        $this->app->route( '{group}', 'index.php' );
+        $this->app->route( '{group}/{person}', 'person.php' );
 
         // Events (events.php)
         $this->app->route( 'events', 'events.php' );
@@ -412,7 +413,7 @@ if ( ! function_exists( "dbDelta" ) ) {
         $group_param_alt = $_POST['group'] ?? $_GET['group'] ?? null;
 
         if ( empty( $group_param_from_get ) && function_exists( '\get_query_var' ) ) {
-            $group_param_from_get = \get_query_var( 'team' );
+            $group_param_from_get = \get_query_var( 'group' );
         }
 
         $this->current_group = $group_param_alt ?? $group_param_from_get ?? null;
@@ -817,9 +818,9 @@ if ( ! function_exists( "dbDelta" ) ) {
                 $username = $additional_params['person'];
                 unset( $additional_params['person'] );
 
-                if ( isset( $additional_params['team'] ) ) {
-                    $group = $additional_params['team'];
-                    unset( $additional_params['team'] );
+                if ( isset( $additional_params['group'] ) ) {
+                    $group = $additional_params['group'];
+                    unset( $additional_params['group'] );
                 } else {
                     $group = $this->current_group;
                 }
@@ -831,9 +832,9 @@ if ( ! function_exists( "dbDelta" ) ) {
                     $username = $additional_params['person'];
                     unset( $additional_params['person'] );
                 }
-                if ( isset( $additional_params['team'] ) ) {
-                    $group = $additional_params['team'];
-                    unset( $additional_params['team'] );
+                if ( isset( $additional_params['group'] ) ) {
+                    $group = $additional_params['group'];
+                    unset( $additional_params['group'] );
                 } else {
                     $group = $this->current_group;
                 }

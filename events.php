@@ -293,8 +293,7 @@ $available_teams = $crm->storage->get_available_groups();
                 </div>
             </div>
             <div class="nav-container">
-                <!-- Team Switcher -->
-                <select id="team-selector" onchange="switchTeam()">
+                <select id="group-selector" onchange="switchGroup()">
                     <?php
                     // Add "All Teams" option at the top
                     $selected_all = $all_teams_mode ? 'selected' : '';
@@ -336,7 +335,7 @@ $available_teams = $crm->storage->get_available_groups();
                     <?php if ( ! empty( $default_teams ) ) : ?>
                     <optgroup label="Default">
                         <?php foreach ( $default_teams as $item ) : ?>
-                            <option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+                            <option value="<?php echo htmlspecialchars( $crm->build_ul( $item['slug'] ) ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
                         <?php endforeach; ?>
                     </optgroup>
                     <?php endif; ?>
@@ -723,24 +722,5 @@ $available_teams = $crm->storage->get_available_groups();
     }
     ?>
     <?php $crm->init_cmd_k_js(); ?>
-    <script>
-        
-        // Team switching functionality
-        function switchTeam() {
-            const selector = document.getElementById('team-selector');
-            const selectedTeam = selector.value;
-            const currentUrl = new URL(window.location);
-            currentUrl.searchParams.set('team', selectedTeam);
-            window.location = currentUrl.toString();
-        }
-        
-        // Calendar month navigation functionality
-        function navigateToMonth(year, month) {
-            const currentUrl = new URL(window.location);
-            currentUrl.searchParams.set('cal_month', month);
-            currentUrl.searchParams.set('cal_year', year);
-            window.location = currentUrl.toString();
-        }
-    </script>
 </body>
 </html>

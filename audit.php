@@ -321,8 +321,7 @@ $available_teams = $crm->storage->get_available_groups();
                 <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Identify missing data points and improve team profiles</p>
             </div>
             <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
-                <!-- Team Switcher -->
-                <select id="team-selector" onchange="switchTeam()">
+                <select id="group-selector" onchange="switchGroup()">
                     <?php
                     foreach ( $available_teams as $team_slug ) {
                         $team_display_name = $crm->storage->get_group_name( $team_slug );
@@ -438,16 +437,6 @@ $available_teams = $crm->storage->get_available_groups();
     </div>
 
     <script>
-        // Team switching functionality
-        function switchTeam() {
-            const selector = document.getElementById('team-selector');
-            const selectedTeam = selector.value;
-            const currentUrl = new URL(window.location);
-            currentUrl.searchParams.set('team', selectedTeam);
-            window.location = currentUrl.toString();
-        }
-
-        // Filter functionality
         function filterTable() {
             const typeFilter = document.getElementById('type-filter').value;
             const scoreFilter = document.getElementById('score-filter').value;
