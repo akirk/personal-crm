@@ -150,23 +150,6 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				}
 			}
 			
-			// Handle not managing team setting
-			if ( $config['type'] === 'group' ) {
-				// Groups are always not managed (no HR feedback, etc.)
-				$config['not_managing_team'] = true;
-			} else {
-				$not_managing_team = isset( $_POST['not_managing_team'] ) && $_POST['not_managing_team'] === '1';
-
-				if ( $not_managing_team ) {
-					// Remove not managing team flag if unchecked
-					if ( isset( $config['not_managing_team'] ) ) {
-						unset( $config['not_managing_team'] );
-					}
-				} else {
-					$config['not_managing_team'] = false;
-				}
-			}
-
 			if ( $crm->storage->save_group( $current_group, $config ) ) {
 				$message = 'General settings saved successfully!';
 			} else {
@@ -510,11 +493,6 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				'alumni' => array(),
 				'events' => array()
 			);
-			
-			// Groups are always not managed (no HR feedback, etc.)
-			if ( $new_team_type === 'group' ) {
-				$new_config['not_managing_team'] = true;
-			}
 
 			// If this is the first team being created, make it the default
 			$existing_teams = $crm->storage->get_available_groups();
@@ -535,94 +513,149 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			
 		case 'add_note':
 			$username = sanitize_text_field( $_POST['username'] ?? '' );
+			$group_slug = sanitize_text_field( $_POST['group'] ?? $current_group );
 			$new_note = sanitize_textarea_field( $_POST['new_note'] ?? '' );
-			
-			if ( ! empty( $username ) && ! empty( $new_note ) ) {
-				// Find the person in any section and add the note
-				$person_found = false;
-				foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $type ) {
-					if ( isset( $config[$type][$username] ) ) {
-						// Initialize notes array if it doesn't exist or isn't an array
-						if ( ! isset( $config[$type][$username]['notes'] ) || ! is_array( $config[$type][$username]['notes'] ) ) {
-							$config[$type][$username]['notes'] = array();
-						}
-						
-						// Add the new note
-						$config[$type][$username]['notes'][] = array(
-							'date' => date( 'Y-m-d H:i' ),
-							'text' => $new_note
-						);
-						
-						$person_found = true;
-						break;
+
+			if ( ! empty( $username ) && ! empty( $new_note ) && ! empty( $group_slug ) ) {
+				// Get person data from storage
+				$person_data = $crm->storage->get_person( $group_slug, $username );
+
+				if ( $person_data ) {
+					// Initialize notes array if it doesn't exist or isn't an array
+					if ( ! isset( $person_data['notes'] ) || ! is_array( $person_data['notes'] ) ) {
+						$person_data['notes'] = array();
 					}
-				}
-				
-				if ( $person_found ) {
-					$json = json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
-					if ( file_put_contents( $config_file, $json ) !== false ) {
-						$message = 'Note added successfully!';
-						// Redirect back to person.php
-						$redirect_params = array( 'person' => $username );
-						if ( isset( $_POST['privacy'] ) ) $redirect_params['privacy'] = '1';
-						if ( isset( $_POST['notes_view'] ) ) $redirect_params['notes_view'] = $_POST['notes_view'];
-						header( 'Location: ' . $crm->build_url( 'person.php', $redirect_params ) );
-						exit;
+
+					// Add the new note
+					$person_data['notes'][] = array(
+						'date' => date( 'Y-m-d H:i' ),
+						'text' => $new_note
+					);
+
+					// Get category from config
+					$config = $crm->storage->get_group( $group_slug );
+					$category = null;
+					foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $type ) {
+						if ( isset( $config[$type][$username] ) ) {
+							$category = $type;
+							break;
+						}
+					}
+
+					if ( $category ) {
+						if ( $crm->storage->save_person( $group_slug, $username, $category, $person_data ) ) {
+							$message = 'Note added successfully!';
+							// Redirect back to person.php
+							$redirect_params = array( 'person' => $username );
+							if ( isset( $_POST['privacy'] ) ) $redirect_params['privacy'] = '1';
+							if ( isset( $_POST['notes_view'] ) ) $redirect_params['notes_view'] = $_POST['notes_view'];
+							header( 'Location: ' . $crm->build_url( 'person.php', $redirect_params ) );
+							exit;
+						} else {
+							$error = 'Failed to save note.';
+						}
 					} else {
-						$error = 'Failed to save note.';
+						$error = 'Could not determine person category.';
 					}
 				} else {
 					$error = 'Person not found.';
 				}
 			} else {
-				$error = 'Username and note are required.';
+				$error = 'Username, group, and note are required.';
 			}
 			break;
 			
 		case 'edit_note':
 			$username = sanitize_text_field( $_POST['username'] ?? '' );
+			$group_slug = sanitize_text_field( $_POST['group'] ?? $current_group );
 			$note_index = intval( $_POST['note_index'] ?? -1 );
 			$edit_note_text = sanitize_textarea_field( $_POST['edit_note_text'] ?? '' );
-			
-			if ( ! empty( $username ) && $note_index >= 0 && ! empty( $edit_note_text ) ) {
-				// Find the person in any section and edit the note
-				$person_found = false;
-				foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $type ) {
-					if ( isset( $config[$type][$username] ) ) {
-						// Check if notes array exists and has the specified index
-						if ( isset( $config[$type][$username]['notes'] ) && 
-							 is_array( $config[$type][$username]['notes'] ) && 
-							 isset( $config[$type][$username]['notes'][$note_index] ) ) {
-							
-							// Update the note text (keep original date)
-							$config[$type][$username]['notes'][$note_index]['text'] = $edit_note_text;
-							$person_found = true;
+
+			if ( ! empty( $username ) && $note_index >= 0 && ! empty( $edit_note_text ) && ! empty( $group_slug ) ) {
+				// Get person data from storage
+				$person_data = $crm->storage->get_person( $group_slug, $username );
+
+				if ( $person_data && isset( $person_data['notes'] ) && is_array( $person_data['notes'] ) && isset( $person_data['notes'][$note_index] ) ) {
+					// Update the note text (keep original date)
+					$person_data['notes'][$note_index]['text'] = $edit_note_text;
+
+					// Get category from config
+					$config = $crm->storage->get_group( $group_slug );
+					$category = null;
+					foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $type ) {
+						if ( isset( $config[$type][$username] ) ) {
+							$category = $type;
 							break;
 						}
 					}
-				}
-				
-				if ( $person_found ) {
-					$json = json_encode( $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
-					if ( file_put_contents( $config_file, $json ) !== false ) {
-						$message = 'Note updated successfully!';
-						// Redirect back to person.php
-						$redirect_params = array( 'person' => $username );
-						if ( isset( $_POST['privacy'] ) ) $redirect_params['privacy'] = '1';
-						if ( isset( $_POST['notes_view'] ) ) $redirect_params['notes_view'] = $_POST['notes_view'];
-						header( 'Location: ' . $crm->build_url( 'person.php', $redirect_params ) );
-						exit;
+
+					if ( $category ) {
+						if ( $crm->storage->save_person( $group_slug, $username, $category, $person_data ) ) {
+							$message = 'Note updated successfully!';
+							// Redirect back to person.php
+							$redirect_params = array( 'person' => $username );
+							if ( isset( $_POST['privacy'] ) ) $redirect_params['privacy'] = '1';
+							if ( isset( $_POST['notes_view'] ) ) $redirect_params['notes_view'] = $_POST['notes_view'];
+							header( 'Location: ' . $crm->build_url( 'person.php', $redirect_params ) );
+							exit;
+						} else {
+							$error = 'Failed to save note.';
+						}
 					} else {
-						$error = 'Failed to save note.';
+						$error = 'Could not determine person category.';
 					}
 				} else {
 					$error = 'Person or note not found.';
 				}
 			} else {
-				$error = 'Username, note index, and note text are required.';
+				$error = 'Username, group, note index, and note text are required.';
 			}
 			break;
-			
+
+		case 'delete_note':
+			if ( ! empty( $_POST['username'] ) && isset( $_POST['note_index'] ) ) {
+				$username = sanitize_text_field( $_POST['username'] );
+				$group_slug = sanitize_text_field( $_POST['group'] ?? $current_group );
+				$note_index = intval( $_POST['note_index'] );
+
+				$person_data = $crm->storage->get_person( $group_slug, $username );
+				if ( $person_data && isset( $person_data['notes'][ $note_index ] ) ) {
+					array_splice( $person_data['notes'], $note_index, 1 );
+
+					$category = null;
+					$config = $crm->storage->get_group( $group_slug );
+					if ( isset( $config['team_members'][ $username ] ) ) {
+						$category = 'team_members';
+					} elseif ( isset( $config['leadership'][ $username ] ) ) {
+						$category = 'leadership';
+					} elseif ( isset( $config['consultants'][ $username ] ) ) {
+						$category = 'consultants';
+					} elseif ( isset( $config['alumni'][ $username ] ) ) {
+						$category = 'alumni';
+					}
+
+					if ( $category ) {
+						if ( $crm->storage->save_person( $group_slug, $username, $category, $person_data ) ) {
+							header( 'Location: ' . $crm->build_url( 'person.php', array(
+								'group' => $group_slug,
+								'person' => $username,
+								'privacy' => $privacy_mode ? '1' : '0',
+							) ) );
+							exit;
+						} else {
+							$error = 'Failed to delete note.';
+						}
+					} else {
+						$error = 'Could not determine person category.';
+					}
+				} else {
+					$error = 'Person or note not found.';
+				}
+			} else {
+				$error = 'Username, group, and note index are required.';
+			}
+			break;
+
 	}
 }
 
@@ -637,7 +670,6 @@ $config = $crm->storage->get_group( $current_group ) ?: array(
 	'events' => array(),
 	'type' => 'team',
 	'default' => false,
-	'not_managing' => true,
 	'links' => array(),
 );
 
@@ -2185,11 +2217,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     <input type="text" id="team_name" name="team_name" value="<?php echo htmlspecialchars( $config['group_name'] ); ?>" required autofocus>
                 </div>
                 
-                <div class="form-group">
-                    <label for="activity_url_prefix">Activity URL Prefix</label>
-                    <input type="url" id="activity_url_prefix" name="activity_url_prefix" value="<?php echo htmlspecialchars( $config['activity_url_prefix'] ); ?>">
-                </div>
-                
+                <?php
+                // Allow plugins to add fields after the name field
+                do_action( 'personal_crm_admin_team_general_fields', $config, $group, $current_group );
+                ?>
+
                 <div class="form-group">
                     <label for="team_type">Type</label>
                     <select id="team_type" name="team_type">
@@ -2209,17 +2241,10 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     </small>
                 </div>
 
-                <?php if ( $group !== 'group' ) : ?>
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 600;">
-                        <input type="checkbox" id="not_managing_team" name="not_managing_team" value="1" <?php echo isset( $config['not_managing'] ) && $config['not_managing'] ? 'checked' : ''; ?> style="width: auto;">
-                        <span>Not managing this <?php echo $group; ?></span>
-                    </label>
-                    <small class="text-small-muted" style="margin-left: 20px;">
-                        Check this if you are not currently responsible for HR feedbacks and <?php echo $group; ?> management.
-                    </small>
-                </div>
-                <?php endif; ?>
+                <?php
+                // Allow plugins to add team management options
+                do_action( 'personal_crm_admin_team_management_options', $config, $group, $current_group );
+                ?>
 
                 
                 <button type="submit" class="btn">Save General Settings</button>

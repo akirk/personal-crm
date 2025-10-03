@@ -2652,7 +2652,13 @@ a.calendar-event:hover {
     margin-bottom: 8px;
 }
 
-.edit-note-btn {
+.note-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.edit-note-btn,
+.delete-note-btn {
     background: none;
     border: 1px solid light-dark(#ddd, #555);
     border-radius: 4px;
@@ -2666,6 +2672,17 @@ a.calendar-event:hover {
 .edit-note-btn:hover {
     background: light-dark(#f0f0f0, #3a3a3a);
     color: light-dark(#333, #e0e0e0);
+}
+
+.delete-note-btn {
+    color: light-dark(#c33, #e66);
+    border-color: light-dark(#fdd, #633);
+}
+
+.delete-note-btn:hover {
+    background: light-dark(#fee, #4a2222);
+    color: light-dark(#a00, #ff6666);
+    border-color: light-dark(#fcc, #833);
 }
 
 .edit-note-form {

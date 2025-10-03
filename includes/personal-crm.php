@@ -509,6 +509,34 @@ if ( ! function_exists( "dbDelta" ) ) {
     /**
      * Load group configuration from storage and convert to Person objects
      */
+    /**
+     * Get a single person by username and group
+     * Returns a Person object with category information
+     */
+    public function get_person_with_category( $group_slug, $username ) {
+        $person_data_raw = $this->storage->get_person( $group_slug, $username );
+
+        if ( ! $person_data_raw ) {
+            return null;
+        }
+
+        $person_obj = $this->create_person_from_data( $username, $person_data_raw );
+        $person_obj->team = $group_slug;
+
+        $config = $this->storage->get_group( $group_slug );
+        if ( isset( $config['team_members'][ $username ] ) ) {
+            $person_obj->category = 'team_members';
+        } elseif ( isset( $config['leadership'][ $username ] ) ) {
+            $person_obj->category = 'leadership';
+        } elseif ( isset( $config['consultants'][ $username ] ) ) {
+            $person_obj->category = 'consultants';
+        } elseif ( isset( $config['alumni'][ $username ] ) ) {
+            $person_obj->category = 'alumni';
+        }
+
+        return $person_obj;
+    }
+
     public function load_group_config_with_objects( $group_slug = 'team' ) {
         if ( ! $this->storage->group_exists( $group_slug ) ) {
             $create_group_url = $this->build_url( 'admin.php', array( 'create_team' => 'new' ) );
@@ -554,8 +582,10 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         return array(
             'activity_url_prefix' => $config['activity_url_prefix'],
+            'group_name' => $config['group_name'],
             'team_name' => $config['group_name'],
             'not_managing_team' => $config['not_managing'] ?? true,
+            'links' => $config['links'] ?? array(),
             'team_links' => $config['links'] ?? array(),
             'team_members' => $group_members,
             'leadership' => $leadership,

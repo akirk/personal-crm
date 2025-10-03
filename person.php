@@ -9,20 +9,14 @@ namespace PersonalCRM;
 
 require_once __DIR__ . '/personal-crm.php';
 
-// Debug: Log entry to person.php
-error_log( 'DEBUG: person.php - Starting, REQUEST_URI: ' . $_SERVER['REQUEST_URI'] );
-
-// Special redirect logic for person.php - needs to happen before main initialization
 $crm = PersonalCrm::get_instance();
 $current_group = $crm->get_current_group_from_params();
+
 if ( $current_group ) {
-	// Check if person parameter exists in either $_GET or route parameters
 	$has_person_param = isset( $_GET['person'] ) ||
 	                   ( function_exists( 'get_query_var' ) && get_query_var( 'person' ) );
 
 	if ( $current_group === $crm->get_default_group() && ! $has_person_param ) {
-		// Redirect to root if default team is selected and no person specified
-		error_log( 'DEBUG: person.php - REDIRECTING because current_team === get_default_team() && no person param' );
 		header( 'Location: ' . $crm->build_url( 'index.php' ) );
 		exit;
 	}
@@ -30,12 +24,9 @@ if ( $current_group ) {
 
 extract( PersonalCrm::get_globals() );
 
-// Get current person and team from route parameters or query parameters first
-// Check $_GET first for backward compatibility
 $person = $_GET['person'] ?? null;
 $route_team = $_GET['team'] ?? null;
 
-// Check wp-app route parameters using WordPress query vars
 if ( empty( $person ) && function_exists( 'get_query_var' ) ) {
 	$person = get_query_var( 'person' );
 }
@@ -43,64 +34,29 @@ if ( empty( $route_team ) && function_exists( 'get_query_var' ) ) {
 	$route_team = get_query_var( 'team' );
 }
 
-// Debug: Log what we found
-error_log( 'DEBUG: person.php - person: ' . $person . ', team: ' . $route_team );
-
-// Override current_team with route team if provided (this takes precedence over query params)
 if ( ! empty( $route_team ) ) {
 	$current_group = $route_team;
-} else if ( ! $current_group ) {
-	// Fallback if no current team is set
+} elseif ( ! $current_group ) {
 	$current_group = $crm->get_default_group();
 }
 
-// Load team configuration with Person objects
+if ( empty( $person ) ) {
+	header( 'Location: ' . $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
+	exit;
+}
+
+$person_data = $crm->get_person_with_category( $current_group, $person );
+
+if ( ! $person_data ) {
+	header( 'Location: ' . $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
+	exit;
+}
+
 $group_data = $crm->load_group_config_with_objects( $current_group );
 
-if ( empty( $person ) ) {
-	// Debug: Check what parameters are available
-	error_log( 'DEBUG: person.php - person parameter is empty' );
-	error_log( 'DEBUG: $_GET = ' . print_r( $_GET, true ) );
-	if ( function_exists( 'wp_app_get_route_param' ) ) {
-		error_log( 'DEBUG: wp_app_get_route_param(person) = ' . wp_app_get_route_param( 'person' ) );
-		error_log( 'DEBUG: wp_app_get_route_param(team) = ' . wp_app_get_route_param( 'team' ) );
-	}
-
-	header( 'Location: ' . $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
-	exit;
-}
-
-// Load person data for title
-$person_data = null;
-if ( isset( $group_data['team_members'][ $person ] ) ) {
-	$person_data = $group_data['team_members'][ $person ];
-} elseif ( isset( $group_data['leadership'][ $person ] ) ) {
-	$person_data = $group_data['leadership'][ $person ];
-} elseif ( isset( $group_data['consultants'][ $person ] ) ) {
-	$person_data = $group_data['consultants'][ $person ];
-} elseif ( isset( $group_data['alumni'][ $person ] ) ) {
-	$person_data = $group_data['alumni'][ $person ];
-}
-
-if ( ! $person_data ) {
-	$original_team_data = $crm->load_group_config_with_objects( $current_group );
-	foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $section ) {
-		if ( isset( $original_team_data[$section][ $person ] ) && ! empty( $original_team_data[$section][ $person ]->deceased ) ) {
-			$person_data = $original_team_data[$section][ $person ];
-			break;
-		}
-	}
-}
-
-if ( ! $person_data ) {
-	header( 'Location: ' . $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
-	exit;
-}
-
-// Determine person type
-$is_team_member = isset( $group_data['team_members'][ $person ] );
-$is_consultant = isset( $group_data['consultants'][ $person ] );
-$is_alumni = isset( $group_data['alumni'][ $person ] );
+$is_team_member = ( $person_data->category === 'team_members' );
+$is_consultant = ( $person_data->category === 'consultants' );
+$is_alumni = ( $person_data->category === 'alumni' );
 
 ?>
 <!DOCTYPE html>
@@ -151,17 +107,11 @@ $is_alumni = isset( $group_data['alumni'][ $person ] );
 					</span>
 				</h1>
 				<div class="back-nav">
-					<a href="<?php echo $crm->build_url( 'index.php', $privacy_mode ? array( 'privacy' => '1' ) : array() ); ?>">← Back to <?php echo $group_data['group_name'], ' ', ucfirst( $group ); ?> Overview</a>
+					<a href="<?php echo $crm->build_url($current_group ); ?>">← Back to <?php echo $group_data['group_name'], ' ', ucfirst( $group ); ?> Overview</a>
 				</div>
 			</div>
 
-			<?php if ( $is_team_member && ! ( isset( $group_data['not_managing_team'] ) && $group_data['not_managing_team'] ) ) : ?>
-				<div class="person-tabs">
-					<a href="<?php echo $crm->build_url( 'person.php', array( 'person' => $person, 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
-					   class="tab-link active">👤 Member Overview</a>
-						<?php do_action( 'personal_crm_person_tabs', $person_data ); ?>
-				</div>
-			<?php endif; ?>
+			<?php do_action( 'personal_crm_person_header_tabs', $person_data, $is_team_member, $current_group, $group_data ); ?>
 		</div>
 
 		<?php
@@ -469,21 +419,10 @@ $is_alumni = isset( $group_data['alumni'][ $person ] );
 								</a>
 							<?php endif; ?>
 
-							<?php if ( $is_team_member && ! empty( $person_data->username ) && isset( $group_data['activity_url_prefix'] ) && $group !== 'group' ) : ?>
-								<?php
-								$last_month = date( 'Y-m', strtotime( 'last month') );
-								$start_date = $last_month . '-01';
-								$end_date = date( 'Y-m-d', strtotime( $start_date ) );
-								$activity_url_month = $group_data['activity_url_prefix'] . '&member=' . urlencode( $person_data->username ) . "&start={$start_date}&end={$end_date}";
-								$activity_url_week = $group_data['activity_url_prefix'] . '&member=' . urlencode( $person_data->username );
-								?>
-									<a href="<?php echo esc_url( $activity_url_month ); ?>" target="_blank" class="activity-link-month">
-										📊 Activity (Month)
-									</a>
-									<a href="<?php echo esc_url( $activity_url_week ); ?>" target="_blank" class="activity-link-week">
-										📊 Activity (Week)
-									</a>
-							<?php endif; ?>
+							<?php
+							// Allow plugins to add quick links
+							do_action( 'personal_crm_person_quick_links', $person_data, $is_team_member, $group, $group_data, $privacy_mode );
+							?>
 							</div>
 						</div>
 					<?php endif; ?>
@@ -514,7 +453,10 @@ $is_alumni = isset( $group_data['alumni'][ $person ] );
 											<div class="note">
 												<div class="note-header">
 													<small class="note-date"><?php echo esc_html( $note['date'] ); ?></small>
-													<button type="button" onclick="toggleEditNote(<?php echo $note_index; ?>)" class="edit-note-btn">✏️ Edit</button>
+													<div class="note-actions">
+														<button type="button" onclick="toggleEditNote(<?php echo $note_index; ?>)" class="edit-note-btn">✏️ Edit</button>
+														<button type="button" onclick="deleteNote(<?php echo $note_index; ?>)" class="delete-note-btn">🗑️ Delete</button>
+													</div>
 												</div>
 												<div class="note-display" id="note-display-<?php echo $note_index; ?>">
 													<p class="note-text"><?php echo nl2br( esc_html( $note['text'] ) ); ?></p>
@@ -522,6 +464,7 @@ $is_alumni = isset( $group_data['alumni'][ $person ] );
 												<form method="post" action="<?php echo $crm->build_url( 'admin.php' ); ?>" class="edit-note-form" id="edit-note-form-<?php echo $note_index; ?>" style="display: none;">
 													<input type="hidden" name="action" value="edit_note">
 													<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
+													<input type="hidden" name="group" value="<?php echo esc_attr( $current_group ); ?>">
 													<input type="hidden" name="note_index" value="<?php echo $note_index; ?>">
 													<input type="hidden" name="return_to_person" value="1">
 													<?php if ( $privacy_mode ) : ?>
@@ -554,6 +497,7 @@ $is_alumni = isset( $group_data['alumni'][ $person ] );
 								<form method="post" action="<?php echo $crm->build_url( 'admin.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
 									<input type="hidden" name="action" value="add_note">
 									<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
+									<input type="hidden" name="group" value="<?php echo esc_attr( $current_group ); ?>">
 									<input type="hidden" name="return_to_person" value="1">
 									<?php if ( $privacy_mode ) : ?>
 										<input type="hidden" name="privacy" value="1">
@@ -575,6 +519,7 @@ $is_alumni = isset( $group_data['alumni'][ $person ] );
 							<form method="post" action="<?php echo $crm->build_url( 'admin.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
 								<input type="hidden" name="action" value="add_note">
 								<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
+								<input type="hidden" name="group" value="<?php echo esc_attr( $current_group ); ?>">
 								<input type="hidden" name="return_to_person" value="1">
 								<?php if ( $privacy_mode ) : ?>
 									<input type="hidden" name="privacy" value="1">
@@ -669,6 +614,13 @@ $is_alumni = isset( $group_data['alumni'][ $person ] );
 		</footer>
 	</div>
 
+	<?php
+	if ( ! function_exists( '\wp_app_enqueue_script' ) ) {
+		echo '<script src="assets/cmd-k.js"></script>';
+		echo '<script src="assets/script.js"></script>';
+	}
+	if ( function_exists( '\wp_app_body_close' ) ) \wp_app_body_close();
+	?>
 	<?php $crm->init_cmd_k_js(); ?>
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
@@ -722,7 +674,41 @@ $is_alumni = isset( $group_data['alumni'][ $person ] );
 				form.querySelector('textarea').focus(); // Focus textarea when showing
 			}
 		}
+
+		// Delete note with confirmation
+		function deleteNote(noteIndex) {
+			if (confirm('Are you sure you want to delete this note?')) {
+				const form = document.createElement('form');
+				form.method = 'post';
+				form.action = '<?php echo addslashes( $crm->build_url( 'admin.php' ) ); ?>';
+
+				const fields = {
+					'action': 'delete_note',
+					'username': '<?php echo addslashes( $person ); ?>',
+					'group': '<?php echo addslashes( $current_group ); ?>',
+					'note_index': noteIndex,
+					'return_to_person': '1'
+				};
+
+				<?php if ( $privacy_mode ) : ?>
+				fields.privacy = '1';
+				<?php endif; ?>
+				<?php if ( isset( $_GET['notes_view'] ) ) : ?>
+				fields.notes_view = '<?php echo addslashes( $_GET['notes_view'] ); ?>';
+				<?php endif; ?>
+
+				for (const key in fields) {
+					const input = document.createElement('input');
+					input.type = 'hidden';
+					input.name = key;
+					input.value = fields[key];
+					form.appendChild(input);
+				}
+
+				document.body.appendChild(form);
+				form.submit();
+			}
+		}
 	</script>
-	<?php if ( function_exists( 'wp_app_footer' ) ) wp_app_footer(); ?>
 </body>
 </html>

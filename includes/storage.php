@@ -35,7 +35,6 @@ class Storage extends \WpApp\BaseStorage {
             slug varchar(100) NOT NULL,
             group_name varchar(255) NOT NULL,
             activity_url_prefix varchar(255) DEFAULT '',
-            not_managing_team tinyint(1) DEFAULT 1,
             type varchar(50) DEFAULT 'team',
             is_default tinyint(1) DEFAULT 0,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
@@ -199,7 +198,6 @@ class Storage extends \WpApp\BaseStorage {
         return array(
             'activity_url_prefix' => $group['activity_url_prefix'],
             'group_name' => $group['group_name'],
-            'not_managing' => (bool) $group['not_managing_team'],
             'links' => $this->get_group_links( $group_slug ),
             'type' => $group['type'] ?: 'team',  // Default to 'team' if null
             'default' => (bool) $group['is_default'],
@@ -287,7 +285,6 @@ class Storage extends \WpApp\BaseStorage {
                 'slug' => $group_slug,
                 'group_name' => $config['team_name'] ?? '',
                 'activity_url_prefix' => $config['activity_url_prefix'] ?? '',
-                'not_managing_team' => $config['not_managing_team'] ?? 1,
                 'type' => $config['type'] ?? 'team',
                 'is_default' => $config['default'] ?? 0,
                 'updated_at' => current_time( 'mysql' )

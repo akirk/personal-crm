@@ -167,7 +167,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 											<div class="person-links">
 												<?php $crm->render_person_links( $member->links ); ?>
 												<?php
-												do_action( 'personal_crm_person_links', $member, $username, $group_data );
+												do_action( 'personal_crm_person_links', $member, $username, $current_group, $group_data );
 												?>
 											</div>
 										</div>

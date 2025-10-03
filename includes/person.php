@@ -35,6 +35,8 @@ class Person {
 	public $new_company_website; // New company website (for alumni)
 	public $deceased; // Boolean indicating if person is deceased (excludes from birthday reminders)
 	public $deceased_date; // Date of passing (YYYY-MM-DD format)
+	public $team; // Team/group slug this person belongs to
+	public $category; // Category: team_members, leadership, consultants, or alumni
 	private $original_username; // Store original username for data lookups
 
 	public function __construct( $name, $username = '', $links = array(), $role = '', $privacy_mode = false ) {
