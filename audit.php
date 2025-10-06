@@ -337,7 +337,7 @@ $available_teams = $crm->storage->get_available_groups();
                     <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
                 <?php endif; ?>
                 <a href="<?php echo $crm->build_url( 'index.php' ); ?>" class="nav-link">👥 Team Overview</a>
-                <a href="<?php echo $crm->build_url( 'admin.php' ); ?>" class="nav-link">⚙️ Admin Panel</a>
+                <a href="<?php echo $crm->build_url( 'admin/index.php' ); ?>" class="nav-link">⚙️ Admin Panel</a>
             </div>
         </div>
 
@@ -427,7 +427,7 @@ $available_teams = $crm->storage->get_available_groups();
                             <?php endif; ?>
                         </td>
                         <td>
-                            <a href="<?php echo $crm->build_url( 'admin.php', array( 'edit_member' => $item['username'] ) ); ?>" class="edit-link">✏️ Edit</a>
+                            <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'edit_member' => $item['username'] ) ); ?>" class="edit-link">✏️ Edit</a>
                             <a href="<?php echo $crm->build_url( 'index.php', array( 'person' => $item['username'] ) ); ?>" class="edit-link" style="margin-left: 8px;">👁️ View</a>
                         </td>
                     </tr>

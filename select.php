@@ -31,7 +31,7 @@ if ( $type_filter ) {
 
 // If there's only one team or no teams, redirect appropriately
 if ( empty( $available_teams ) ) {
-	header( 'Location: ' . $crm->build_url( 'admin.php', array( 'create_team' => 'new' ) ) );
+	header( 'Location: ' . $crm->build_url( 'admin/index.php', array( 'create_team' => 'new' ) ) );
 	exit;
 } elseif ( count( $available_teams ) === 1 ) {
 	header( 'Location: ' . $crm->build_url( 'index.php' ) );
@@ -117,7 +117,7 @@ if ( empty( $available_teams ) ) {
         </div>
 
         <div class="admin-link-section">
-            <a href="<?php echo $crm->build_url( 'admin.php', array( 'create_team' => 'new' ) ); ?>">⚙️ Create New</a>
+            <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'create_team' => 'new' ) ); ?>">⚙️ Create New</a>
         </div>
     </div>
     

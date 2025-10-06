@@ -164,7 +164,7 @@ class Person {
 		}
 		
 		$params = array_merge( $params, $additional_params );
-		return 'admin.php?' . http_build_query( $params );
+		return 'admin/index.php?' . http_build_query( $params );
 	}
 
 	/**

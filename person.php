@@ -461,7 +461,7 @@ $is_alumni = ( $person_data->category === 'alumni' );
 												<div class="note-display" id="note-display-<?php echo $note_index; ?>">
 													<p class="note-text"><?php echo nl2br( esc_html( $note['text'] ) ); ?></p>
 												</div>
-												<form method="post" action="<?php echo $crm->build_url( 'admin.php' ); ?>" class="edit-note-form" id="edit-note-form-<?php echo $note_index; ?>" style="display: none;">
+												<form method="post" action="<?php echo $crm->build_url( 'admin/index.php' ); ?>" class="edit-note-form" id="edit-note-form-<?php echo $note_index; ?>" style="display: none;">
 													<input type="hidden" name="action" value="edit_note">
 													<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
 													<input type="hidden" name="group" value="<?php echo esc_attr( $current_group ); ?>">
@@ -494,7 +494,7 @@ $is_alumni = ( $person_data->category === 'alumni' );
 									</div>
 								<?php endif; ?>
 								
-								<form method="post" action="<?php echo $crm->build_url( 'admin.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
+								<form method="post" action="<?php echo $crm->build_url( 'admin/index.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
 									<input type="hidden" name="action" value="add_note">
 									<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
 									<input type="hidden" name="group" value="<?php echo esc_attr( $current_group ); ?>">
@@ -516,7 +516,7 @@ $is_alumni = ( $person_data->category === 'alumni' );
 						
 						<?php if ( ! $privacy_mode && ! $has_notes ) : ?>
 							<!-- Hidden form for adding notes when no notes exist -->
-							<form method="post" action="<?php echo $crm->build_url( 'admin.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
+							<form method="post" action="<?php echo $crm->build_url( 'admin/index.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
 								<input type="hidden" name="action" value="add_note">
 								<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
 								<input type="hidden" name="group" value="<?php echo esc_attr( $current_group ); ?>">
@@ -609,7 +609,7 @@ $is_alumni = ( $person_data->category === 'alumni' );
 			// Allow other plugins to add footer links
 			do_action( 'personal_crm_footer_links', $group_data, $current_group );
 			?>
-			<a href="<?php echo $crm->build_url( 'admin.php' ); ?>">⚙️ Admin Panel</a>
+			<a href="<?php echo $crm->build_url( 'admin/index.php' ); ?>">⚙️ Admin Panel</a>
 			<a href="/crm/admin/<?php echo $current_group; ?>/person/<?php echo $person; ?>/">✏️ Edit Person</a>
 		</footer>
 	</div>
@@ -680,7 +680,7 @@ $is_alumni = ( $person_data->category === 'alumni' );
 			if (confirm('Are you sure you want to delete this note?')) {
 				const form = document.createElement('form');
 				form.method = 'post';
-				form.action = '<?php echo addslashes( $crm->build_url( 'admin.php' ) ); ?>';
+				form.action = '<?php echo addslashes( $crm->build_url( 'admin/index.php' ) ); ?>';
 
 				const fields = {
 					'action': 'delete_note',

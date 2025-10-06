@@ -358,7 +358,7 @@ $available_teams = $crm->storage->get_available_groups();
                 </select>
                 
                 <?php if ( ! $all_teams_mode ) : ?>
-                    <a href="<?php echo $crm->build_url( 'admin.php', array( 'tab' => 'events', 'add' => 'new' ) ); ?>" class="nav-link green">+ Add Event</a>
+                    <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'events', 'add' => 'new' ) ); ?>" class="nav-link green">+ Add Event</a>
                 <?php endif; ?>
             </div>
         </div>
@@ -462,7 +462,7 @@ $available_teams = $crm->storage->get_available_groups();
                                                 }
                                                 if ( $event_index !== null ) : ?>
                                                     <div class="event-edit-container">
-                                                        <a href="<?php echo $crm->build_url( 'admin.php', array( 'tab' => 'events', 'edit_event' => $event_index ) ); ?>"
+                                                        <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'events', 'edit_event' => $event_index ) ); ?>"
                                                            class="event-edit-link">
                                                             ✏️ Edit
                                                         </a>
@@ -484,7 +484,7 @@ $available_teams = $crm->storage->get_available_groups();
                         <p>There are no scheduled events across all teams.</p>
                     <?php else : ?>
                         <p>There are no scheduled events for this team.</p>
-                        <a href="<?php echo $crm->build_url( 'admin.php', array( 'tab' => 'events' ) ); ?>" class="nav-link inline">
+                        <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'events' ) ); ?>" class="nav-link inline">
                             Add an Event →
                         </a>
                     <?php endif; ?>
@@ -685,7 +685,7 @@ $available_teams = $crm->storage->get_available_groups();
                                             }
                                             if ( $event_index !== null ) : ?>
                                                 <div style="font-size: 12px; margin-top: 4px;">
-                                                    <a href="<?php echo $crm->build_url( 'admin.php', array( 'tab' => 'events', 'edit_event' => $event_index ) ); ?>"
+                                                    <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'events', 'edit_event' => $event_index ) ); ?>"
                                                        style="color: #666; text-decoration: none; font-size: 11px;">
                                                         ✏️ Edit
                                                     </a>
@@ -708,7 +708,7 @@ $available_teams = $crm->storage->get_available_groups();
             <?php else : ?>
                 <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>">🔓 Privacy Mode OFF</a>
             <?php endif; ?>
-            <a href="<?php echo $crm->build_url( 'admin.php' ); ?>">⚙️ Admin Panel</a>
+            <a href="<?php echo $crm->build_url( 'admin/index.php' ); ?>">⚙️ Admin Panel</a>
         </footer>
     </div>
     

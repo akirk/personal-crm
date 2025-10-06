@@ -175,7 +175,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 								<?php endforeach; ?>
 							</ul>
 						<?php else : ?>
-							<p class="empty-state-message">No <?php echo $group; ?> members yet. <a href="<?php echo $crm->build_url( 'admin.php', array( 'tab' => 'members', 'add' => 'new' ) ); ?>" class="action-link">Add your first <?php echo $group; ?> member →</a></p>
+							<p class="empty-state-message">No <?php echo $group; ?> members yet. <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'members', 'add' => 'new' ) ); ?>" class="action-link">Add your first <?php echo $group; ?> member →</a></p>
 						<?php endif; ?>
 					</div>
 
@@ -207,7 +207,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 								<?php endforeach; ?>
 							</ul>
 						<?php else : ?>
-							<p class="empty-state-message">No leadership yet. <a href="<?php echo $crm->build_url( 'admin.php', array( 'tab' => 'leadership', 'add' => 'new' ) ); ?>" class="action-link">Add your first leader →</a></p>
+							<p class="empty-state-message">No leadership yet. <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'leadership', 'add' => 'new' ) ); ?>" class="action-link">Add your first leader →</a></p>
 						<?php endif; ?>
 					</div>
 
@@ -237,7 +237,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 								<?php endforeach; ?>
 							</ul>
 						<?php else : ?>
-							<p class="empty-state-message">No consultants yet. <a href="<?php echo $crm->build_url( 'admin.php', array( 'tab' => 'consultants', 'add' => 'new' ) ); ?>" class="action-link">Add your first consultant →</a></p>
+							<p class="empty-state-message">No consultants yet. <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'consultants', 'add' => 'new' ) ); ?>" class="action-link">Add your first consultant →</a></p>
 						<?php endif; ?>
 					</div>
 
@@ -342,7 +342,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 			// Allow other plugins to add footer links
 			do_action( 'personal_crm_footer_links', $group_data, $current_group );
 			?>
-			<a href="<?php echo $crm->build_url( 'admin.php', array( 'team' => $current_group ) ); ?>" class="footer-link">⚙️ Admin Panel</a>
+			<a href="<?php echo $crm->build_url( 'admin/index.php', array( 'team' => $current_group ) ); ?>" class="footer-link">⚙️ Admin Panel</a>
 		</footer>
 	</div>
 

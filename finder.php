@@ -602,7 +602,7 @@ class PeopleFinderCLI {
                 }
             } else { // 'e'
                 // Edit team page
-                $url = $baseUrl . '/admin.php?team=' . urlencode( $item['slug'] );
+                $url = $baseUrl . '/admin/index.php?team=' . urlencode( $item['slug'] );
             }
         } else {
             // Person
@@ -614,7 +614,7 @@ class PeopleFinderCLI {
                 }
             } else { // 'e'
                 // Edit person page
-                $url = $baseUrl . '/admin.php?person=' . urlencode( $item['username'] );
+                $url = $baseUrl . '/admin/index.php?person=' . urlencode( $item['username'] );
                 if ( $item['team_slug'] !== 'team' ) {
                     $url .= '&team=' . urlencode( $item['team_slug'] );
                 }

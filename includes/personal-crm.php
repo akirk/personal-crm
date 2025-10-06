@@ -113,18 +113,17 @@ if ( ! function_exists( "dbDelta" ) ) {
         // Main dashboard (index.php)
         // Default route handled automatically by wp-app
 
-        // Admin interface (admin.php)
-        $this->app->route( 'admin', 'admin.php' );
-        $this->app->route( 'admin/{group}', 'admin.php' );
-        $this->app->route( 'admin/{group}/links', 'admin.php' );
-        $this->app->route( 'admin/{group}/members', 'admin.php' );
-        $this->app->route( 'admin/{group}/leadership', 'admin.php' );
-        $this->app->route( 'admin/{group}/consultants', 'admin.php' );
-        $this->app->route( 'admin/{group}/alumni', 'admin.php' );
-        $this->app->route( 'admin/{group}/events', 'admin.php' );
-        $this->app->route( 'admin/{group}/audit', 'admin.php' );
-        $this->app->route( 'admin/{group}/json', 'admin.php' );
-        $this->app->route( 'admin/{group}/person/{person}', 'admin.php' );
+        // Admin interface (admin/index.php)
+        $this->app->route( 'admin', 'admin/index.php' );
+        $this->app->route( 'admin/{group}', 'admin/index.php' );
+        $this->app->route( 'admin/{group}/links', 'admin/index.php' );
+        $this->app->route( 'admin/{group}/members', 'admin/index.php' );
+        $this->app->route( 'admin/{group}/leadership', 'admin/index.php' );
+        $this->app->route( 'admin/{group}/consultants', 'admin/index.php' );
+        $this->app->route( 'admin/{group}/alumni', 'admin/index.php' );
+        $this->app->route( 'admin/{group}/events', 'admin/index.php' );
+        $this->app->route( 'admin/{group}/audit', 'admin/index.php' );
+        $this->app->route( 'admin/{group}/person/{person}', 'admin/index.php' );
 
         // Finder/Search (finder.php)
         $this->app->route( 'finder', 'finder.php' );
@@ -266,7 +265,7 @@ if ( ! function_exists( "dbDelta" ) ) {
     public static function get_globals() {
         $crm = self::get_instance();
         $current_group = $crm->get_current_group_from_params();
-
+// var_dump( $current_group );exit;
         if ( ! $current_group ) {
             $current_group = $crm->use_default_group();
             $available_groups = $crm->storage->get_available_groups();
@@ -537,9 +536,10 @@ if ( ! function_exists( "dbDelta" ) ) {
         return $person_obj;
     }
 
-    public function load_group_config_with_objects( $group_slug = 'team' ) {
+    public function load_group_config_with_objects( $group_slug ) {
         if ( ! $this->storage->group_exists( $group_slug ) ) {
-            $create_group_url = $this->build_url( 'admin.php', array( 'create_team' => 'new' ) );
+            // var_dump(debug_backtrace());
+            $create_group_url = $this->build_url( 'admin/index.php', array( 'create_team' => 'new' ) );
             header( 'Location: ' . $create_group_url );
             exit;
         }

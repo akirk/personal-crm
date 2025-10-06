@@ -20,6 +20,11 @@ if ( ! $current_group && ! ( isset( $_GET['create_team'] ) && $_GET['create_team
 	exit;
 }
 
+if ( $current_group === 'team' ) {
+	header( 'Location: ' . $crm->build_url( 'select.php' ) );
+	exit;
+}
+
 extract( PersonalCrm::get_globals() );
 
 $config_file = $current_group ? __DIR__ . '/' . $current_group . '.json' : null;
@@ -122,10 +127,10 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			$config['group_name'] = sanitize_text_field( $_POST['team_name'] ?? '' );
 			$config['activity_url_prefix'] = sanitize_url( $_POST['activity_url_prefix'] ?? '' );
 			$config['type'] = sanitize_text_field( $_POST['team_type'] ?? 'team' );
-			
+
 			// Handle default team setting
 			$is_default = isset( $_POST['is_default'] ) && $_POST['is_default'] === '1';
-			
+
 			if ( $is_default ) {
 				// If this team is being set as default, clear default from all other teams
 				$available_groups = $crm->storage->get_available_groups();
@@ -149,14 +154,14 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 					unset( $config['default'] );
 				}
 			}
-			
+
 			if ( $crm->storage->save_group( $current_group, $config ) ) {
 				$message = 'General settings saved successfully!';
 			} else {
 				$error = 'Failed to save configuration.';
 			}
 			break;
-			
+
 		case 'save_team_links':
 			// Handle team links
 			$team_links = array();
@@ -189,7 +194,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$message = $result['message'];
 			}
 			break;
-			
+
 		case 'edit_leadership':
 		case 'add_leadership':
 			$leader_config = get_person_type_config( 'leader' );
@@ -201,7 +206,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$message = $result['message'];
 			}
 			break;
-			
+
 		case 'edit_consultants':
 		case 'add_consultants':
 			$consultant_config = get_person_type_config( 'consultants' );
@@ -213,14 +218,14 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$message = $result['message'];
 			}
 			break;
-			
+
 		case 'edit_event':
 			$event_index = (int) ( $_POST['event_index'] ?? -1 );
 			if ( $event_index < 0 || ! isset( $config['events'][ $event_index ] ) ) {
 				$error = 'Invalid event.';
 				break;
 			}
-			
+
 			// Process links
 			$links = array();
 			if ( ! empty( $_POST['event_links'] ) && is_array( $_POST['event_links'] ) ) {
@@ -242,7 +247,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				'description' => sanitize_textarea_field( $_POST['description'] ?? '' ),
 				'links' => $links
 			);
-			
+
 			$config['events'][ $event_index ] = $event;
 			if ( $crm->storage->save_group( $current_group, $config ) ) {
 				$message = 'Event updated successfully!';
@@ -253,7 +258,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$error = 'Failed to update event.';
 			}
 			break;
-			
+
 		case 'edit_alumni':
 			$alumni_config = get_person_type_config( 'alumni' );
 			$person_data = create_person_data_from_form();
@@ -287,7 +292,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				'description' => sanitize_textarea_field( $_POST['description'] ?? '' ),
 				'links' => $links
 			);
-			
+
 			$config['events'][] = $event;
 			if ( $crm->storage->save_group( $current_group, $config ) ) {
 				$message = 'Event added successfully!';
@@ -297,7 +302,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$error = 'Failed to save event.';
 			}
 			break;
-			
+
 		case 'delete_member':
 			$member_config = get_person_type_config( 'member' );
 			$result = handle_person_action( $action, $member_config, array() );
@@ -307,7 +312,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$message = $result['message'];
 			}
 			break;
-			
+
 		case 'delete_consultant':
 			$consultant_config = get_person_type_config( 'consultants' );
 			$result = handle_person_action( $action, $consultant_config, array() );
@@ -317,7 +322,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$message = $result['message'];
 			}
 			break;
-			
+
 		case 'delete_leader':
 			$leader_config = get_person_type_config( 'leader' );
 			$result = handle_person_action( $action, $leader_config, array() );
@@ -388,18 +393,18 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$error = 'Failed to restore person from alumni.';
 			}
 			break;
-			
+
 		case 'move_to_team':
 			$username = $_POST['username'] ?? '';
 			$from_section = $_POST['from_section'] ?? '';
 			$target_team = $_POST['target_team'] ?? '';
 			$delete_if_empty = isset( $_POST['delete_if_empty'] );
-			
+
 			if ( empty( $target_team ) || $target_team === $current_group ) {
 				$error = 'Please select a different team to move to.';
 				break;
 			}
-			
+
 			// Get person data from current team
 			$person_data = null;
 			if ( $from_section === 'team_members' && isset( $config['team_members'][ $username ] ) ) {
@@ -409,21 +414,21 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$person_data = $config['leadership'][ $username ];
 				unset( $config['leadership'][ $username ] );
 			}
-			
+
 			if ( $person_data ) {
 				// Load target team config
 				$target_config = $crm->storage->get_group( $target_team );
-				
+
 				// Add person to target team (default to team_members)
 				$target_config['team_members'][ $username ] = $person_data;
-				
+
 				// Check if current team will be empty (excluding alumni)
 				$has_members = ! empty( $config['team_members'] ) || ! empty( $config['leadership'] );
-				
+
 				// Save both configs
 				$current_saved = $crm->storage->save_group( $current_group, $config );
 				$target_saved = $crm->storage->save_group( $target_team, $target_config );
-				
+
 				if ( $current_saved && $target_saved ) {
 					// Delete current team if requested and it's empty
 					if ( $delete_if_empty && ! $has_members && $current_group !== 'team' ) {
@@ -448,7 +453,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$error = 'Person not found in current team.';
 			}
 			break;
-			
+
 		case 'delete_event':
 			$event_index = (int) ( $_POST['event_index'] ?? -1 );
 			if ( $event_index >= 0 && isset( $config['events'][ $event_index ] ) ) {
@@ -465,25 +470,25 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			$new_team_slug = sanitize_text_field( $_POST['new_team_slug'] ?? '' );
 			$new_team_name = sanitize_text_field( $_POST['new_team_name'] ?? '' );
 			$new_team_type = sanitize_text_field( $_POST['new_team_type'] ?? 'team' );
-			
+
 			if ( empty( $new_team_slug ) || empty( $new_team_name ) ) {
 				$error = 'Slug and name are required.';
 				break;
 			}
-			
+
 			// Validate slug format
 			if ( ! preg_match( '/^[a-z0-9_-]+$/', $new_team_slug ) ) {
 				$error = 'Slug can only contain lowercase letters, numbers, hyphens and underscores.';
 				break;
 			}
-			
+
 			$new_team_file = __DIR__ . '/' . $new_team_slug . '.json';
-			
+
 			if ( file_exists( $new_team_file ) ) {
 				$error = 'A ' . $new_team_type . ' with this slug already exists.';
 				break;
 			}
-			
+
 			$new_config = array(
 				'activity_url_prefix' => '',
 				'team_name' => $new_team_name,
@@ -499,7 +504,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			if ( empty( $existing_teams ) ) {
 				$new_config['default'] = true;
 			}
-			
+
 			if ( $crm->storage->save_group( $new_team_file, $new_config ) ) {
 				$message = ucfirst( $new_team_type ) . ' created successfully!';
 				// Redirect to the new team
@@ -510,7 +515,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$error = 'Failed to create team.';
 			}
 			break;
-			
+
 		case 'add_note':
 			$username = sanitize_text_field( $_POST['username'] ?? '' );
 			$group_slug = sanitize_text_field( $_POST['group'] ?? $current_group );
@@ -564,7 +569,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				$error = 'Username, group, and note are required.';
 			}
 			break;
-			
+
 		case 'edit_note':
 			$username = sanitize_text_field( $_POST['username'] ?? '' );
 			$group_slug = sanitize_text_field( $_POST['group'] ?? $current_group );
@@ -681,7 +686,7 @@ function mask_date_input( $date, $privacy_mode ) {
 	if ( ! $privacy_mode || empty( $date ) ) {
 		return $date;
 	}
-	
+
 	return ''; // Hide the date input value in privacy mode
 }
 
@@ -788,7 +793,7 @@ function handle_person_action( $action, $config, $person_data ) {
 			do_action( 'personal_crm_admin_person_save', $username, $_POST, $config['section_key'] );
 
 			// Redirect to person view using proper route pattern {team}/{person}
-			$redirect_url = '/crm/' . $current_group . '/' . $username;
+			$redirect_url = '/crm/' . sanitize_key( $current_group ) . '/' . sanitize_key( $username );
 			header( 'Location: ' . $redirect_url );
 			exit;
 		} else {
@@ -845,13 +850,13 @@ function generate_username_from_name( $name ) {
 	if ( empty( $name ) ) {
 		return null;
 	}
-	
+
 	// Convert to lowercase, remove special characters, replace spaces with hyphens
 	$username = strtolower( $name );
 	$username = iconv( 'UTF-8', 'ASCII//TRANSLIT', $username ); // Remove accents
 	$username = preg_replace( '/[^a-z0-9\s]/', '', $username );
 	$username = preg_replace( '/\s+/', '-', trim( $username ) );
-	
+
 	return $username;
 }
 
@@ -860,7 +865,7 @@ function generate_username_from_name( $name ) {
  */
 function create_person_data_from_form() {
 	global $current_group, $crm;
-	$is_social_group = common->is_social_group( $current_group );
+	$is_social_group = $crm->is_social_group( $current_group );
 
 	// Parse links data from form
 	$links = array();
@@ -885,7 +890,7 @@ function create_person_data_from_form() {
 	$day = sanitize_text_field( $_POST['birthday_day'] ?? '' );
 	$month = sanitize_text_field( $_POST['birthday_month'] ?? '' );
 	$year = sanitize_text_field( $_POST['birthday_year'] ?? '' );
-	
+
 	if ( ! empty( $day ) && ! empty( $month ) ) {
 		if ( ! empty( $year ) ) {
 			$birthday = $year . '-' . $month . '-' . $day;
@@ -969,13 +974,13 @@ function create_person_data_from_form() {
 function create_notes_from_form() {
 	global $config_file;
 	$notes = array();
-	
+
 	// Get existing notes if we're editing
 	if ( isset( $_POST['action'] ) && in_array( $_POST['action'], array( 'edit_member', 'edit_leadership', 'edit_consultants', 'edit_alumni' ) ) && isset( $_POST['username'] ) ) {
 		global $current_group;
 		$team_data = $crm->storage->get_group( $current_group );
 		$username = sanitize_text_field( $_POST['username'] );
-		
+
 		// Check all person types for existing data
 		foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $type ) {
 			if ( isset( $team_data[$type][$username] ) ) {
@@ -987,7 +992,7 @@ function create_notes_from_form() {
 			}
 		}
 	}
-	
+
 	// Add new note if provided
 	$new_note = sanitize_textarea_field( $_POST['new_note'] ?? '' );
 	if ( ! empty( $new_note ) ) {
@@ -996,7 +1001,7 @@ function create_notes_from_form() {
 			'text' => $new_note
 		);
 	}
-	
+
 	return $notes;
 }
 
@@ -1156,7 +1161,7 @@ function get_missing_data_points( $person, $person_type = 'member', $group_slug 
 	if ( empty( $person['partner'] ) ) {
 		$missing[] = array( 'field' => 'Partner', 'priority' => 'recommended' );
 	}
-	
+
 	// Optional fields - often rightfully stay empty
 	if ( empty( $person['kids'] ) ) {
 		$missing[] = array( 'field' => 'Kids info', 'priority' => 'optional' );
@@ -1182,12 +1187,12 @@ function get_completeness_score( $missing_data, $person_type = 'member', $group_
 	}
 	$total_recommended = 3; // wordpress.org, linkedin, partner
 	$total_optional = 2; // kids, notes
-	
+
 	// Count missing fields by priority
 	$missing_required = 0;
 	$missing_recommended = 0;
 	$missing_optional = 0;
-	
+
 	foreach ( $missing_data as $missing_item ) {
 		if ( is_array( $missing_item ) ) {
 			switch ( $missing_item['priority'] ) {
@@ -1210,17 +1215,17 @@ function get_completeness_score( $missing_data, $person_type = 'member', $group_
 			}
 		}
 	}
-	
+
 	// Calculate weighted score
 	// Required fields: 70% weight
-	// Recommended fields: 25% weight  
+	// Recommended fields: 25% weight
 	// Optional fields: 5% weight
 	$required_score = ( ( $total_required - $missing_required ) / $total_required ) * 70;
 	$recommended_score = ( ( $total_recommended - $missing_recommended ) / $total_recommended ) * 25;
 	$optional_score = ( ( $total_optional - $missing_optional ) / $total_optional ) * 5;
-	
+
 	$total_score = $required_score + $recommended_score + $optional_score;
-	
+
 	return max( 0, round( $total_score ) );
 }
 
@@ -1335,7 +1340,8 @@ function get_person_checkbox_checked( $field_name, $edit_data = array(), $is_edi
  * Render a person form (team member, leader, or alumni)
  */
 function render_person_form( $type, $edit_data = null, $is_editing = false ) {
-	global $group;
+	global $group, $current_group;
+
 	$crm = PersonalCrm::get_instance();
 	$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
@@ -1363,9 +1369,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 <form method="post" action="" id="<?php echo $form_id; ?>">
 	<input type="hidden" name="action" value="<?php echo $action; ?>">
 	<input type="hidden" name="original_username" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['username'] ?? '' ) : ''; ?>">
-	<?php global $current_group; if ( $current_group !== 'team' ) : ?>
-		<input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
-	<?php endif; ?>
+	<input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ?? '' ); ?>">
 	<button type="submit" class="btn btn-primary" style="float: right; margin-top: -3em"><?php echo $submit_text; ?></button>
 
 	<!-- Personal Information -->
@@ -1438,13 +1442,13 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 							</option>
 						<?php endfor; ?>
 					</select>
-					
+
 					<select name="birthday_month" class="form-select">
 						<option value="">Month</option>
-						<?php 
+						<?php
 						$months = array(
 							'01' => 'January', '02' => 'February', '03' => 'March', '04' => 'April',
-							'05' => 'May', '06' => 'June', '07' => 'July', '08' => 'August', 
+							'05' => 'May', '06' => 'June', '07' => 'July', '08' => 'August',
 							'09' => 'September', '10' => 'October', '11' => 'November', '12' => 'December'
 						);
 						foreach ( $months as $num => $name ) : ?>
@@ -1453,7 +1457,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 							</option>
 						<?php endforeach; ?>
 					</select>
-					
+
 					<select name="birthday_year" class="form-select">
 						<option value="">Year (optional)</option>
 						<?php for ( $y = 1900; $y <= date( 'Y' ); $y++ ) : ?>
@@ -1660,7 +1664,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		<div style="margin: 5px 0 10px 0;">
 			<button type="button" onclick="addRepoField('<?php echo $prefix; ?>')" class="btn-add-repo">+ Add Repository</button>
 		</div>
-		
+
 		<div id="<?php echo $prefix; ?>repo_fields">
 			<?php
 			// Get existing repos for editing
@@ -1668,7 +1672,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			if ( $is_editing && ! empty( $edit_data['github_repos'] ) ) {
 				$existing_repos = is_array( $edit_data['github_repos'] ) ? $edit_data['github_repos'] : array_filter( array_map( 'trim', explode( ',', $edit_data['github_repos'] ) ) );
 			}
-			
+
 			if ( empty( $existing_repos ) ) {
 				// Show one empty field for new entries
 				?>
@@ -1689,7 +1693,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			}
 			?>
 		</div>
-		
+
 		<?php
 		// Get all repos used across the team for tag display
 		global $config_file;
@@ -1703,7 +1707,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			}
 		}
 		$all_repos = array_unique( array_filter( $all_repos ) );
-		
+
 		// Filter out repos the current user already has
 		$user_repos = array();
 		if ( $is_editing && ! empty( $edit_data['github_repos'] ) ) {
@@ -1711,14 +1715,14 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		}
 		$available_repos = array_diff( $all_repos, $user_repos );
 		sort( $available_repos );
-		
+
 		if ( ! empty( $available_repos ) ) :
 		?>
 			<div style="margin-top: 12px;">
 				<small class="text-small-muted">Potential repositories (click to add):</small>
 				<div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
 					<?php foreach ( $available_repos as $repo ) : ?>
-						<button type="button" onclick="addRepoToField('<?php echo $prefix; ?>', '<?php echo htmlspecialchars( $repo, ENT_QUOTES ); ?>')" 
+						<button type="button" onclick="addRepoToField('<?php echo $prefix; ?>', '<?php echo htmlspecialchars( $repo, ENT_QUOTES ); ?>')"
 								class="event-type-tag">
 							<?php echo htmlspecialchars( $repo ); ?>
 						</button>
@@ -1737,35 +1741,35 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			div.style.display = 'flex';
 			div.style.gap = '8px';
 			div.style.marginBottom = '8px';
-			
+
 			div.innerHTML = '<input type="text" name="github_repos[]" placeholder="org/repo-name" style="width: 300px;">' +
 							'<button type="button" onclick="removeRepoField(this)" class="btn-remove-small">×</button>';
-			
+
 			container.appendChild(div);
 		}
-		
+
 		function removeRepoField(button) {
 			const container = button.closest('.repo-field').parentNode;
 			button.closest('.repo-field').remove();
-			
+
 			// Ensure at least one field remains
 			if (container.children.length === 0) {
 				addRepoField('<?php echo $prefix; ?>');
 			}
 		}
-		
+
 		function addRepoToField(prefix, repo) {
 			// Find an empty field or create a new one
 			const container = document.getElementById(prefix + 'repo_fields');
 			const inputs = container.querySelectorAll('input[name="github_repos[]"]');
-			
+
 			// Check if repo already exists
 			for (let input of inputs) {
 				if (input.value.trim() === repo) {
 					return; // Already exists
 				}
 			}
-			
+
 			// Find empty field
 			for (let input of inputs) {
 				if (input.value.trim() === '') {
@@ -1773,7 +1777,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 					return;
 				}
 			}
-			
+
 			// No empty field found, add new one
 			addRepoField(prefix);
 			const newInputs = container.querySelectorAll('input[name="github_repos[]"]');
@@ -1785,7 +1789,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<h4 class="section-heading" style="margin-top: 30px;">Personal Events</h4>
 	<div class="form-group">
 		<div id="personal-events-container">
-			<?php 
+			<?php
 			$personal_events = $is_editing && isset( $edit_data['personal_events'] ) ? $edit_data['personal_events'] : array();
 			if ( ! empty( $personal_events ) ) :
 				foreach ( $personal_events as $index => $event ) :
@@ -1796,7 +1800,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 					<input type="text" name="personal_events[<?php echo $index; ?>][description]" value="<?php echo htmlspecialchars( $event['description'] ?? '' ); ?>" placeholder="Event description" style="flex: 1;">
 					<button type="button" onclick="removePersonalEvent(this)" class="btn-remove-personal">×</button>
 				</div>
-			<?php 
+			<?php
 				endforeach;
 			endif;
 			?>
@@ -1811,14 +1815,14 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			const container = document.getElementById('personal-events-container');
 			const eventRow = document.createElement('div');
 			eventRow.className = 'personal-event-row';
-			
+
 			eventRow.innerHTML = `
 				<input type="date" name="personal_events[${personalEventIndex}][date]" style="flex: 0 0 150px;">
 				<input type="hidden" name="personal_events[${personalEventIndex}][type]" value="other">
 				<input type="text" name="personal_events[${personalEventIndex}][description]" placeholder="Event description" style="flex: 1;">
 				<button type="button" onclick="removePersonalEvent(this)" class="btn-remove-personal">×</button>
 			`;
-			
+
 			container.appendChild(eventRow);
 			personalEventIndex++;
 		}
@@ -1841,12 +1845,12 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 				Check if this person is no longer with the company
 			</small>
 		</div>
-		
+
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>new_company">New Company</label>
 			<input type="text" id="<?php echo $prefix; ?>new_company" name="new_company" value="<?php echo get_person_form_value( 'new_company', $edit_data, $is_editing ); ?>" placeholder="e.g., Google, Microsoft, etc.">
 		</div>
-		
+
 		<div class="form-group">
 			<label for="<?php echo $prefix; ?>new_company_website">New Company Website</label>
 			<input type="url" id="<?php echo $prefix; ?>new_company_website" name="new_company_website" value="<?php echo get_person_form_value( 'new_company_website', $edit_data, $is_editing ); ?>" placeholder="https://example.com">
@@ -1863,10 +1867,10 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		<small class="text-small-muted" style="margin-left: 20px; color: #888;">
 			This will remove them from birthday reminders
 		</small>
-		
-		<div id="deceased-date-container" style="margin-top: 10px; margin-left: 20px; <?php 
-			global $error; 
-			echo (!empty($error) && isset($_POST['deceased'])) || ($is_editing && !empty($edit_data['deceased'])) ? '' : 'display: none;'; 
+
+		<div id="deceased-date-container" style="margin-top: 10px; margin-left: 20px; <?php
+			global $error;
+			echo (!empty($error) && isset($_POST['deceased'])) || ($is_editing && !empty($edit_data['deceased'])) ? '' : 'display: none;';
 		?>">
 			<label for="<?php echo $prefix; ?>deceased_date">Date of passing:</label>
 			<input type="date" id="<?php echo $prefix; ?>deceased_date" name="deceased_date" value="<?php echo get_person_form_value( 'deceased_date', $edit_data, $is_editing ); ?>">
@@ -1881,7 +1885,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		const checkbox = document.getElementById('<?php echo $prefix; ?>deceased');
 		const container = document.getElementById('deceased-date-container');
 		const dateInput = document.getElementById('<?php echo $prefix; ?>deceased_date');
-		
+
 		if (checkbox.checked) {
 			container.style.display = 'block';
 		} else {
@@ -1893,7 +1897,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
 	<div class="form-group">
 		<label>Notes</label>
-		
+
 		<?php if ( $is_editing && ! empty( $edit_data['notes'] ) && is_array( $edit_data['notes'] ) ) : ?>
 			<div class="existing-notes">
 				<?php foreach ( $edit_data['notes'] as $note ) : ?>
@@ -1904,7 +1908,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 				<?php endforeach; ?>
 			</div>
 		<?php endif; ?>
-		
+
 		<label for="<?php echo $prefix; ?>new_note">Add new note</label>
 		<textarea id="<?php echo $prefix; ?>new_note" name="new_note" placeholder="Add what you learned today..."></textarea>
 	</div>
@@ -1924,9 +1928,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			<input type="hidden" name="action" value="move_to_alumni">
 			<input type="hidden" name="username" value="<?php echo htmlspecialchars( $edit_data['username'] ?? '' ); ?>">
 			<input type="hidden" name="from_section" value="<?php echo $config['section_key']; ?>">
-			<?php if ( $current_group !== 'team' ) : ?>
-				<input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
-			<?php endif; ?>
+			<input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
 			<button type="submit" class="btn btn-warning">
 				📚 Move to Alumni
 			</button>
@@ -1938,7 +1940,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
 	<!-- Move to Another <?php echo ucfirst( $group ); ?> -->
 	<?php if ( $is_editing && ( $type === 'member' || $type === 'leader' ) ) : ?>
-		<?php 
+		<?php
 		$available_groups = $crm->storage->get_available_groups();
 		$other_teams = array_filter( $available_groups, function( $team ) use ( $current_group ) {
 			return $team !== $current_group;
@@ -1951,7 +1953,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 					<input type="hidden" name="action" value="move_to_team">
 					<input type="hidden" name="username" value="<?php echo htmlspecialchars( $edit_data['username'] ?? '' ); ?>">
 					<input type="hidden" name="from_section" value="<?php echo $config['section_key']; ?>">
-					
+
 					<div style="margin-bottom: 10px;">
 						<label for="target_team" style="display: block; margin-bottom: 5px; font-weight: bold;">Target <?php echo ucfirst( $group ); ?>:</label>
 						<select name="target_team" id="target_team" required style="padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px;">
@@ -1959,11 +1961,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 							<?php foreach ( $other_teams as $group_slug ) : ?>
 								<?php
 								$team_name = $crm->storage->get_group_name( $group_slug );
-								
+
 								// Load target team config to get member count
 								$target_team_config = $crm->storage->get_group( $group_slug );
 								$member_count = count( $target_team_config['team_members'] ?? array() ) + count( $target_team_config['leadership'] ?? array() );
-								
+
 								$display_name = $team_name . ' (' . $member_count . ' members)';
 								?>
 								<option value="<?php echo htmlspecialchars( $group_slug ); ?>">
@@ -1972,15 +1974,15 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 							<?php endforeach; ?>
 						</select>
 					</div>
-					
-					<?php 
+
+					<?php
 					// Check if moving this person would leave current team empty (excluding alumni)
 					global $config_file;
 					$team_config = $crm->storage->get_group( $current_group );
 					$current_username = $edit_data['username'] ?? '';
 					$temp_members = $team_config['team_members'] ?? array();
 					$temp_leadership = $team_config['leadership'] ?? array();
-					
+
 					// Remove this person from the appropriate section
 					if ( isset( $temp_members[ $current_username ] ) ) {
 						unset( $temp_members[ $current_username ] );
@@ -1988,11 +1990,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 					if ( isset( $temp_leadership[ $current_username ] ) ) {
 						unset( $temp_leadership[ $current_username ] );
 					}
-					
+
 					$would_be_empty = empty( $temp_members ) && empty( $temp_leadership );
 					$has_alumni = ! empty( $team_config['alumni'] );
 					?>
-					
+
 					<?php if ( $would_be_empty && ! $has_alumni && $current_group !== 'team' ) : ?>
 						<div style="margin-bottom: 10px;">
 							<label>
@@ -2004,7 +2006,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 							</p>
 						</div>
 					<?php endif; ?>
-					
+
 					<button type="submit" class="btn btn-primary">
 						🔄 Move to <?php echo ucfirst( $group ); ?>
 					</button>
@@ -2062,7 +2064,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 <?php endif; ?>
                     <a href="<?php echo $crm->build_url( 'admin.php', array( 'create_team' => 'new' ) ); ?>" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Team</a>
                 </div>
-                
+
             </div>
         </div>
 
@@ -2079,12 +2081,12 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <div style="margin-bottom: 20px;">
                 <a href="<?php echo $crm->build_url( 'admin.php' ); ?>" class="back-link-admin">← Back to Admin Dashboard</a>
             </div>
-            
+
             <h2>Create New</h2>
             <form method="post">
                 <input type="hidden" name="action" value="create_team">
-                <?php if ( $current_group && $current_group !== 'team' ) : ?>
-                    <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
+                <?php if ( $current_group ) : ?>
+                    <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                 <?php endif; ?>
                 <div class="form-group">
                     <label for="new_team_name">Name *</label>
@@ -2092,7 +2094,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 </div>
                 <div class="form-group">
                     <label for="new_team_slug">Slug *</label>
-                    <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing" pattern="[a-z0-9_-]+" value="<?php echo ( $current_group && $current_group !== 'team' ) ? htmlspecialchars( $current_group ) : ''; ?>">
+                    <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing" pattern="[a-z0-9_-]+" value="<?php echo $current_group ? htmlspecialchars( $current_group ) : ''; ?>">
                     <small class="text-small-muted">Only lowercase letters, numbers, hyphens, and underscores allowed. This will be used as the filename.</small>
                 </div>
                 <div class="form-group">
@@ -2132,7 +2134,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <a href="/crm/admin/<?php echo $current_group; ?>/audit/" class="nav-tab <?php echo $active_tab === 'audit' ? 'active' : ''; ?>">Audit</a>
             <a href="/crm/admin/<?php echo $current_group; ?>/json/" class="nav-tab <?php echo $active_tab === 'json' ? 'active' : ''; ?>">JSON</a>
         </div>
-        
+
         <style>
         .nav-dropdown {
             position: relative;
@@ -2140,7 +2142,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             vertical-align: top;
             margin: 0;
         }
-        
+
         .nav-dropdown-trigger {
             cursor: pointer;
             display: inline-block;
@@ -2148,7 +2150,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             margin: 0;
             line-height: inherit;
         }
-        
+
         .nav-dropdown-menu {
             display: none;
             position: absolute;
@@ -2161,11 +2163,11 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             min-width: 180px;
             z-index: 1000;
         }
-        
+
         .nav-dropdown:hover .nav-dropdown-menu {
             display: block;
         }
-        
+
         .nav-dropdown-item {
             display: block;
             padding: 8px 12px;
@@ -2173,30 +2175,30 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             text-decoration: none;
             border-bottom: 1px solid #eee;
         }
-        
+
         .nav-dropdown-item:last-child {
             border-bottom: none;
         }
-        
+
         .nav-dropdown-item:hover {
             background-color: #f5f5f5;
         }
-        
+
         .nav-dropdown-item.active {
             background-color: #007cba;
             color: white;
         }
-        
+
         @media (prefers-color-scheme: dark) {
             .nav-dropdown-menu {
                 background: #2c3338;
                 border-color: #50575e;
             }
-            
+
             .nav-dropdown-item:hover {
                 background-color: #3c434a;
             }
-            
+
             .nav-dropdown-item {
                 border-color: #50575e;
             }
@@ -2208,15 +2210,13 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
             <h2>General Settings</h2>
             <form method="post">
                 <input type="hidden" name="action" value="save_general">
-                <?php if ( $current_group !== 'team' ) : ?>
-                    <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                <?php endif; ?>
-                
+                <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
+
                 <div class="form-group">
                     <label for="team_name">Name</label>
                     <input type="text" id="team_name" name="team_name" value="<?php echo htmlspecialchars( $config['group_name'] ); ?>" required autofocus>
                 </div>
-                
+
                 <?php
                 // Allow plugins to add fields after the name field
                 do_action( 'personal_crm_admin_team_general_fields', $config, $group, $current_group );
@@ -2230,7 +2230,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     </select>
                     <small class="text-small-muted">Choose "Group" for personal friends/acquaintances, or "Team" for work/business contexts.</small>
                 </div>
-                
+
                 <div class="form-group" style="margin-bottom: 15px;">
                     <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 600;">
                         <input type="checkbox" id="is_default" name="is_default" value="1" <?php echo isset( $config['default'] ) && $config['default'] ? 'checked' : ''; ?> style="width: auto;">
@@ -2246,7 +2246,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                 do_action( 'personal_crm_admin_team_management_options', $config, $group, $current_group );
                 ?>
 
-                
+
                 <button type="submit" class="btn">Save General Settings</button>
             </form>
         </div>
@@ -2258,9 +2258,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
             <form method="post">
                 <input type="hidden" name="action" value="save_team_links">
-                <?php if ( $current_group !== 'team' ) : ?>
-                    <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                <?php endif; ?>
+                <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
 
                 <div class="form-group">
                     <div id="team-links-container">
@@ -2330,9 +2328,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this team member?')">
                                         <input type="hidden" name="action" value="delete_member">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
-                                        <?php if ( $current_group !== 'team' ) : ?>
-                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                                        <?php endif; ?>
+                                        <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
                                 </div>
@@ -2397,9 +2393,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this leader?')">
                                         <input type="hidden" name="action" value="delete_leader">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
-                                        <?php if ( $current_group !== 'team' ) : ?>
-                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                                        <?php endif; ?>
+                                        <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
                                 </div>
@@ -2476,9 +2470,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this consultant?')">
                                         <input type="hidden" name="action" value="delete_consultant">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
-                                        <?php if ( $current_group !== 'team' ) : ?>
-                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                                        <?php endif; ?>
+                                        <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
                                 </div>
@@ -2522,9 +2514,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     <form method="post" style="display: inline;">
                                         <input type="hidden" name="action" value="restore_from_alumni">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
-                                        <?php if ( $current_group !== 'team' ) : ?>
-                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                                        <?php endif; ?>
+                                        <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                                         <?php
                                         $original_section = $alumni_member['original_section'] ?? 'team_members'; // Default to team_members for legacy data
                                         $display_name = $original_section === 'leadership' ? 'Leadership' : ucfirst( $group ) . ' Member';
@@ -2534,9 +2524,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this alumni member?')">
                                         <input type="hidden" name="action" value="delete_alumni">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
-                                        <?php if ( $current_group !== 'team' ) : ?>
-                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                                        <?php endif; ?>
+                                        <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
                                 </div>
@@ -2589,9 +2577,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this event?')">
                                         <input type="hidden" name="action" value="delete_event">
                                         <input type="hidden" name="event_index" value="<?php echo $index; ?>">
-                                        <?php if ( $current_group !== 'team' ) : ?>
-                                            <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                                        <?php endif; ?>
+                                        <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
                                 </div>
@@ -2602,14 +2588,12 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                     <p>No events added yet.</p>
                 <?php endif; ?>
             <?php endif; ?>
-            
+
             <h3 id="event-form-title"><?php echo $is_editing_event ? 'Edit Event' : 'Add New Event'; ?></h3>
             <form method="post" id="event-form">
                 <input type="hidden" id="event-action" name="action" value="<?php echo $is_editing_event ? 'edit_event' : 'add_event'; ?>">
                 <input type="hidden" id="event-index" name="event_index" value="<?php echo $is_editing_event ? htmlspecialchars( $edit_data['event_index'] ) : ''; ?>">
-                <?php if ( $current_group !== 'team' ) : ?>
-                    <input type="hidden" name="team" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                <?php endif; ?>
+                <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                 
                 <div class="form-grid">
                     <div class="form-group">
