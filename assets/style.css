@@ -1032,7 +1032,19 @@ details summary span:last-child {
     color: light-dark(#333, #e0e0e0);
 }
 
-.form-group input,
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="url"],
+.form-group input[type="tel"],
+.form-group input[type="number"],
+.form-group input[type="date"],
+.form-group input[type="datetime-local"],
+.form-group input[type="month"],
+.form-group input[type="week"],
+.form-group input[type="time"],
+.form-group input[type="search"],
+.form-group input[type="password"],
+.form-group select,
 .form-group textarea {
     width: 100%;
     padding: 8px 12px;
@@ -1178,6 +1190,10 @@ details summary span:last-child {
     color: light-dark(#333, #e0e0e0);
     border-bottom: 1px solid light-dark(#ddd, #555);
     padding-bottom: 5px;
+}
+
+.section-heading:not(:first-child) {
+    margin-top: 50px;
 }
 
 .text-muted {
@@ -1761,6 +1777,40 @@ details summary span:last-child {
     border-radius: 12px;
     font-size: 13px;
     margin-left: 6px;
+}
+
+.teams-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.team-badge {
+    display: inline-flex;
+    align-items: center;
+    background: light-dark(#f0f7ff, #1e2836);
+    color: light-dark(#0052cc, #6ba3d8);
+    padding: 8px 14px;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid light-dark(#d4e5ff, #2a3a4a);
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.2));
+}
+
+.team-badge:hover {
+    background: light-dark(#e3f0ff, #2a3a4a);
+    border-color: light-dark(#b3d4ff, #3a4a5a);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.3));
+}
+
+.team-badge:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.2));
 }
 
 .external-account-links {

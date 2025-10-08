@@ -13,88 +13,106 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 	switch ( $action ) {
 		case 'move_to_alumni':
 			$username = $_POST['username'] ?? '';
-			$from_section = $_POST['from_section'] ?? '';
+			$from_group_id = intval( $_POST['from_group_id'] ?? 0 );
 
-			if ( $from_section === 'team_members' && isset( $config['team_members'][ $username ] ) ) {
-				$person_data = $config['team_members'][ $username ];
-				$person_data['original_section'] = 'team_members';
-				unset( $config['team_members'][ $username ] );
-				$config['alumni'][ $username ] = $person_data;
-			} elseif ( $from_section === 'leadership' && isset( $config['leadership'][ $username ] ) ) {
-				$person_data = $config['leadership'][ $username ];
-				$person_data['original_section'] = 'leadership';
-				unset( $config['leadership'][ $username ] );
-				$config['alumni'][ $username ] = $person_data;
+			if ( empty( $username ) || empty( $from_group_id ) ) {
+				$error = 'Username and group ID are required.';
+				break;
 			}
 
-			if ( $crm->storage->save_group( $current_group, $config ) ) {
-				$message = 'Person moved to alumni successfully!';
-			} else {
-				$error = 'Failed to move person to alumni.';
+			// Find alumni subgroup for this team
+			$parent_config = $crm->storage->get_group( $current_group );
+			$parent_group_id = $parent_config['id'];
+			$child_groups = $crm->storage->get_child_groups( $parent_group_id );
+			$alumni_group_id = null;
+			foreach ( $child_groups as $child ) {
+				if ( stripos( $child['slug'], 'alumni' ) !== false || stripos( $child['group_name'], 'alumni' ) !== false ) {
+					$alumni_group_id = $child['id'];
+					break;
+				}
 			}
+
+			if ( ! $alumni_group_id ) {
+				$error = 'Alumni group not found. Please create an alumni subgroup first.';
+				break;
+			}
+
+			// Get person
+			$person = $crm->storage->get_person( $username );
+			if ( ! $person ) {
+				$error = 'Person not found.';
+				break;
+			}
+
+			// Remove from current group and add to alumni
+			$crm->storage->remove_person_from_group( $person['id'], $from_group_id );
+			$crm->storage->add_person_to_group( $person['id'], $alumni_group_id );
+
+			$message = 'Person moved to alumni successfully!';
 			break;
 
 		case 'restore_from_alumni':
 			$username = $_POST['username'] ?? '';
-			$to_section = $_POST['to_section'] ?? null;
+			$to_group_id = intval( $_POST['to_group_id'] ?? 0 );
+			$alumni_group_id = intval( $_POST['alumni_group_id'] ?? 0 );
 
-			if ( isset( $config['alumni'][ $username ] ) ) {
-				$person_data = $config['alumni'][ $username ];
-				$target_section = $person_data['original_section'] ?? $to_section ?? 'team_members';
-				unset( $person_data['original_section'] );
-				unset( $config['alumni'][ $username ] );
-
-				if ( $target_section === 'leadership' ) {
-					$config['leadership'][ $username ] = $person_data;
-				} else {
-					$config['team_members'][ $username ] = $person_data;
-				}
+			if ( empty( $username ) || empty( $to_group_id ) || empty( $alumni_group_id ) ) {
+				$error = 'Username, target group ID, and alumni group ID are required.';
+				break;
 			}
 
-			if ( $crm->storage->save_group( $current_group, $config ) ) {
-				$message = 'Person restored from alumni successfully!';
-			} else {
-				$error = 'Failed to restore person from alumni.';
+			// Get person
+			$person = $crm->storage->get_person( $username );
+			if ( ! $person ) {
+				$error = 'Person not found.';
+				break;
 			}
+
+			// Remove from alumni and add back to original group
+			$crm->storage->remove_person_from_group( $person['id'], $alumni_group_id );
+			$crm->storage->add_person_to_group( $person['id'], $to_group_id );
+
+			$message = 'Person restored from alumni successfully!';
 			break;
 
 		case 'move_to_team':
 			$username = $_POST['username'] ?? '';
-			$from_section = $_POST['from_section'] ?? '';
-			$target_team = $_POST['target_team'] ?? '';
-			$delete_if_empty = isset( $_POST['delete_if_empty'] );
+			$from_group_id = intval( $_POST['from_group_id'] ?? 0 );
+			$target_team_slug = $_POST['target_team'] ?? '';
 
-			if ( empty( $target_team ) || $target_team === $current_group ) {
+			if ( empty( $target_team_slug ) || $target_team_slug === $current_group ) {
 				$error = 'Please select a different team to move to.';
 				break;
 			}
 
-			$person_data = null;
-			if ( $from_section === 'team_members' && isset( $config['team_members'][ $username ] ) ) {
-				$person_data = $config['team_members'][ $username ];
-				unset( $config['team_members'][ $username ] );
-			} elseif ( $from_section === 'leadership' && isset( $config['leadership'][ $username ] ) ) {
-				$person_data = $config['leadership'][ $username ];
-				unset( $config['leadership'][ $username ] );
+			if ( empty( $username ) || empty( $from_group_id ) ) {
+				$error = 'Username and group ID are required.';
+				break;
 			}
 
-			if ( $person_data ) {
-				$target_config = $crm->storage->get_group( $target_team );
-				$target_config['team_members'][ $username ] = $person_data;
-				$has_members = ! empty( $config['team_members'] ) || ! empty( $config['leadership'] );
-				$current_saved = $crm->storage->save_group( $current_group, $config );
-				$target_saved = $crm->storage->save_group( $target_team, $target_config );
-
-				if ( $current_saved && $target_saved ) {
-					$redirect_url = $crm->build_url( 'index.php', array( 'team' => $target_team, 'person' => $username ) );
-					header( 'Location: ' . $redirect_url );
-					exit;
-				} else {
-					$error = 'Failed to move person to target team.';
-				}
-			} else {
-				$error = 'Person not found in current team.';
+			// Get person
+			$person = $crm->storage->get_person( $username );
+			if ( ! $person ) {
+				$error = 'Person not found.';
+				break;
 			}
+
+			// Get target team
+			$target_config = $crm->storage->get_group( $target_team_slug );
+			if ( ! $target_config ) {
+				$error = 'Target team not found.';
+				break;
+			}
+
+			$target_group_id = $target_config['id'];
+
+			// Move person: remove from current group, add to target group
+			$crm->storage->remove_person_from_group( $person['id'], $from_group_id );
+			$crm->storage->add_person_to_group( $person['id'], $target_group_id );
+
+			$redirect_url = $crm->build_url( 'person.php', array( 'person' => $username ) );
+			header( 'Location: ' . $redirect_url );
+			exit;
 			break;
 
 		case 'create_team':
@@ -118,163 +136,120 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				break;
 			}
 
-			$new_config = array(
-				'activity_url_prefix' => '',
+			// Create the parent group
+			$parent_group_data = array(
+				'slug' => $new_team_slug,
+				'parent_id' => null,
 				'group_name' => $new_team_name,
+				'activity_url_prefix' => '',
 				'type' => $new_team_type,
-				'team_members' => array(),
-				'leadership' => array(),
-				'alumni' => array(),
-				'events' => array()
+				'display_icon' => '',
+				'sort_order' => 0,
+				'is_default' => empty( $existing_groups ) ? 1 : 0
 			);
 
-			if ( empty( $existing_groups ) ) {
-				$new_config['default'] = true;
+			$parent_group_id = $crm->storage->wpdb->insert(
+				$crm->storage->wpdb->prefix . 'personal_crm_groups',
+				$parent_group_data,
+				array( '%s', '%d', '%s', '%s', '%s', '%s', '%d', '%d' )
+			);
+
+			if ( ! $parent_group_id ) {
+				$error = 'Failed to create team.';
+				break;
 			}
 
-			if ( $crm->storage->save_group( $new_team_slug, $new_config ) ) {
-				$message = ucfirst( $new_team_type ) . ' created successfully!';
-				$redirect_url = 'admin/index.php' . ( $new_team_slug !== 'team' ? '?team=' . urlencode( $new_team_slug ) : '' );
-				header( 'Location: ' . $redirect_url );
-				exit;
-			} else {
-				$error = 'Failed to create team.';
+			$parent_group_id = $crm->storage->wpdb->insert_id;
+
+			// Create default subgroups (Leadership, Consultants, Alumni)
+			$default_subgroups = array(
+				array( 'slug' => $new_team_slug . '_leadership', 'name' => 'Leadership', 'icon' => '👑', 'order' => 1 ),
+				array( 'slug' => $new_team_slug . '_consultants', 'name' => 'Consultants', 'icon' => '🤝', 'order' => 2 ),
+				array( 'slug' => $new_team_slug . '_alumni', 'name' => 'Alumni', 'icon' => '🎓', 'order' => 3 )
+			);
+
+			foreach ( $default_subgroups as $subgroup ) {
+				$crm->storage->wpdb->insert(
+					$crm->storage->wpdb->prefix . 'personal_crm_groups',
+					array(
+						'slug' => $subgroup['slug'],
+						'parent_id' => $parent_group_id,
+						'group_name' => $subgroup['name'],
+						'display_icon' => $subgroup['icon'],
+						'sort_order' => $subgroup['order'],
+						'type' => $new_team_type
+					),
+					array( '%s', '%d', '%s', '%s', '%d', '%s' )
+				);
 			}
+
+			$message = ucfirst( $new_team_type ) . ' created successfully!';
+			$redirect_url = 'admin/index.php' . ( $new_team_slug !== 'team' ? '?team=' . urlencode( $new_team_slug ) : '' );
+			header( 'Location: ' . $redirect_url );
+			exit;
 			break;
 
 		case 'add_note':
 			$username = sanitize_text_field( $_POST['username'] ?? '' );
-			$group_slug = sanitize_text_field( $_POST['group'] ?? $current_group );
 			$new_note = sanitize_textarea_field( $_POST['new_note'] ?? '' );
 
-			if ( ! empty( $username ) && ! empty( $new_note ) && ! empty( $group_slug ) ) {
-				$person_data = $crm->storage->get_person( $group_slug, $username );
+			if ( ! empty( $username ) && ! empty( $new_note ) ) {
+				$person_id = $crm->storage->get_person_id( $username );
 
-				if ( $person_data ) {
-					if ( ! isset( $person_data['notes'] ) || ! is_array( $person_data['notes'] ) ) {
-						$person_data['notes'] = array();
-					}
-
-					$person_data['notes'][] = array(
-						'date' => date( 'Y-m-d H:i' ),
-						'text' => $new_note
-					);
-
-					$config = $crm->storage->get_group( $group_slug );
-					$category = null;
-					foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $type ) {
-						if ( isset( $config[$type][$username] ) ) {
-							$category = $type;
-							break;
-						}
-					}
-
-					if ( $category ) {
-						if ( $crm->storage->save_person( $group_slug, $username, $category, $person_data ) ) {
-							$message = 'Note added successfully!';
-							$redirect_params = array( 'person' => $username );
-							if ( isset( $_POST['privacy'] ) ) $redirect_params['privacy'] = '1';
-							if ( isset( $_POST['notes_view'] ) ) $redirect_params['notes_view'] = $_POST['notes_view'];
-							header( 'Location: ' . $crm->build_url( 'person.php', $redirect_params ) );
-							exit;
-						} else {
-							$error = 'Failed to save note.';
-						}
+				if ( $person_id ) {
+					if ( $crm->storage->add_person_note( $person_id, $new_note ) ) {
+						$message = 'Note added successfully!';
+						$redirect_params = array( 'person' => $username );
+						if ( isset( $_POST['notes_view'] ) ) $redirect_params['notes_view'] = $_POST['notes_view'];
+						header( 'Location: ' . $crm->build_url( 'person.php', $redirect_params ) );
+						exit;
 					} else {
-						$error = 'Could not determine person category.';
+						$error = 'Failed to save note.';
 					}
 				} else {
 					$error = 'Person not found.';
 				}
 			} else {
-				$error = 'Username, group, and note are required.';
+				$error = 'Username and note are required.';
 			}
 			break;
 
 		case 'edit_note':
 			$username = sanitize_text_field( $_POST['username'] ?? '' );
-			$group_slug = sanitize_text_field( $_POST['group'] ?? $current_group );
-			$note_index = intval( $_POST['note_index'] ?? -1 );
+			$note_id = intval( $_POST['note_id'] ?? 0 );
 			$edit_note_text = sanitize_textarea_field( $_POST['edit_note_text'] ?? '' );
 
-			if ( ! empty( $username ) && $note_index >= 0 && ! empty( $edit_note_text ) && ! empty( $group_slug ) ) {
-				$person_data = $crm->storage->get_person( $group_slug, $username );
-
-				if ( $person_data && isset( $person_data['notes'] ) && is_array( $person_data['notes'] ) && isset( $person_data['notes'][$note_index] ) ) {
-					$person_data['notes'][$note_index]['text'] = $edit_note_text;
-
-					$config = $crm->storage->get_group( $group_slug );
-					$category = null;
-					foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $type ) {
-						if ( isset( $config[$type][$username] ) ) {
-							$category = $type;
-							break;
-						}
-					}
-
-					if ( $category ) {
-						if ( $crm->storage->save_person( $group_slug, $username, $category, $person_data ) ) {
-							$message = 'Note updated successfully!';
-							$redirect_params = array( 'person' => $username );
-							if ( isset( $_POST['privacy'] ) ) $redirect_params['privacy'] = '1';
-							if ( isset( $_POST['notes_view'] ) ) $redirect_params['notes_view'] = $_POST['notes_view'];
-							header( 'Location: ' . $crm->build_url( 'person.php', $redirect_params ) );
-							exit;
-						} else {
-							$error = 'Failed to save note.';
-						}
-					} else {
-						$error = 'Could not determine person category.';
-					}
+			if ( ! empty( $username ) && $note_id > 0 && ! empty( $edit_note_text ) ) {
+				if ( $crm->storage->update_person_note( $note_id, $edit_note_text ) ) {
+					$message = 'Note updated successfully!';
+					$redirect_params = array( 'person' => $username );
+					if ( isset( $_POST['notes_view'] ) ) $redirect_params['notes_view'] = $_POST['notes_view'];
+					header( 'Location: ' . $crm->build_url( 'person.php', $redirect_params ) );
+					exit;
 				} else {
-					$error = 'Person or note not found.';
+					$error = 'Failed to update note.';
 				}
 			} else {
-				$error = 'Username, group, note index, and note text are required.';
+				$error = 'Username, note ID, and note text are required.';
 			}
 			break;
 
 		case 'delete_note':
-			if ( ! empty( $_POST['username'] ) && isset( $_POST['note_index'] ) ) {
+			if ( ! empty( $_POST['username'] ) && isset( $_POST['note_id'] ) ) {
 				$username = sanitize_text_field( $_POST['username'] );
-				$group_slug = sanitize_text_field( $_POST['group'] ?? $current_group );
-				$note_index = intval( $_POST['note_index'] );
+				$note_id = intval( $_POST['note_id'] );
 
-				$person_data = $crm->storage->get_person( $group_slug, $username );
-				if ( $person_data && isset( $person_data['notes'][ $note_index ] ) ) {
-					array_splice( $person_data['notes'], $note_index, 1 );
-
-					$category = null;
-					$config = $crm->storage->get_group( $group_slug );
-					if ( isset( $config['team_members'][ $username ] ) ) {
-						$category = 'team_members';
-					} elseif ( isset( $config['leadership'][ $username ] ) ) {
-						$category = 'leadership';
-					} elseif ( isset( $config['consultants'][ $username ] ) ) {
-						$category = 'consultants';
-					} elseif ( isset( $config['alumni'][ $username ] ) ) {
-						$category = 'alumni';
-					}
-
-					if ( $category ) {
-						if ( $crm->storage->save_person( $group_slug, $username, $category, $person_data ) ) {
-							header( 'Location: ' . $crm->build_url( 'person.php', array(
-								'group' => $group_slug,
-								'person' => $username,
-								'privacy' => $privacy_mode ? '1' : '0',
-							) ) );
-							exit;
-						} else {
-							$error = 'Failed to delete note.';
-						}
-					} else {
-						$error = 'Could not determine person category.';
-					}
+				if ( $crm->storage->delete_person_note( $note_id ) ) {
+					$message = 'Note deleted successfully!';
+					$redirect_params = array( 'person' => $username );
+					if ( isset( $_POST['notes_view'] ) ) $redirect_params['notes_view'] = $_POST['notes_view'];
+					header( 'Location: ' . $crm->build_url( 'person.php', $redirect_params ) );
+					exit;
 				} else {
-					$error = 'Person or note not found.';
+					$error = 'Failed to delete note.';
 				}
 			} else {
-				$error = 'Username, group, and note index are required.';
+				$error = 'Username and note ID are required.';
 			}
 			break;
 

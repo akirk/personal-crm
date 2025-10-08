@@ -115,24 +115,23 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         // Admin interface (admin/index.php)
         $this->app->route( 'admin', 'admin/index.php' );
-        $this->app->route( 'admin/{group}', 'admin/index.php' );
-        $this->app->route( 'admin/{group}/links', 'admin/index.php' );
-        $this->app->route( 'admin/{group}/members', 'admin/index.php' );
-        $this->app->route( 'admin/{group}/leadership', 'admin/index.php' );
-        $this->app->route( 'admin/{group}/consultants', 'admin/index.php' );
-        $this->app->route( 'admin/{group}/alumni', 'admin/index.php' );
-        $this->app->route( 'admin/{group}/events', 'admin/index.php' );
-        $this->app->route( 'admin/{group}/audit', 'admin/index.php' );
-        $this->app->route( 'admin/{group}/person/{person}', 'admin/index.php' );
+        $this->app->route( 'admin/group/{group}', 'admin/index.php' );
+        $this->app->route( 'admin/group/{group}/links', 'admin/index.php' );
+        $this->app->route( 'admin/group/{group}/members', 'admin/index.php' );
+        $this->app->route( 'admin/group/{group}/leadership', 'admin/index.php' );
+        $this->app->route( 'admin/group/{group}/consultants', 'admin/index.php' );
+        $this->app->route( 'admin/group/{group}/alumni', 'admin/index.php' );
+        $this->app->route( 'admin/group/{group}/events', 'admin/index.php' );
+        $this->app->route( 'admin/group/{group}/audit', 'admin/index.php' );
+        $this->app->route( 'admin/person/{person}', 'admin/index.php' );
 
         // Finder/Search (finder.php)
         $this->app->route( 'finder', 'finder.php' );
         $this->app->route( 'search', 'finder.php' );
 
         // Person management (person.php)
-        $this->app->route( 'person', 'person.php' );
-        $this->app->route( '{group}', 'index.php' );
-        $this->app->route( '{group}/{person}', 'person.php' );
+        $this->app->route( 'person/{person}', 'person.php' );
+        $this->app->route( 'group/{group}', 'index.php' );
 
         // Events (events.php)
         $this->app->route( 'events', 'events.php' );
@@ -265,8 +264,12 @@ if ( ! function_exists( "dbDelta" ) ) {
     public static function get_globals() {
         $crm = self::get_instance();
         $current_group = $crm->get_current_group_from_params();
-// var_dump( $current_group );exit;
-        if ( ! $current_group ) {
+
+        // Check if we're on select.php to prevent redirect loops
+        $current_script = basename( $_SERVER['PHP_SELF'] );
+        $is_select_page = ( $current_script === 'select.php' );
+
+        if ( ! $current_group && ! $is_select_page ) {
             $current_group = $crm->use_default_group();
             $available_groups = $crm->storage->get_available_groups();
             if ( count( $available_groups ) > 1 && ! $current_group ) {
@@ -276,30 +279,27 @@ if ( ! function_exists( "dbDelta" ) ) {
         }
 
         $group = $crm->is_social_group( $current_group ) ? 'group' : 'team';
-        $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
-        $group_data = $crm->load_group_config_with_objects( $current_group );
+        // Load group object - members and events will be lazy loaded
+        $group_data = $crm->storage->get_group( $current_group );
 
-        $expected_sections = array( 'team_members', 'leadership', 'consultants', 'alumni' );
-        foreach ( $expected_sections as $section ) {
-            if ( ! isset( $group_data[$section] ) || ! is_array( $group_data[$section] ) ) {
-                $group_data[$section] = array();
+        // Handle case where group doesn't exist
+        if ( ! $group_data && ! $is_select_page ) {
+            $available_groups = $crm->storage->get_available_groups();
+            if ( ! empty( $available_groups ) ) {
+                header( 'Location: ' . $crm->build_url( 'select.php' ) );
+                exit;
             }
+            // No groups exist at all - will show create team page
+            $group_data = null;
+        } elseif ( $group_data ) {
+            // Set as current group for static access
+            Group::set_current( $group_data );
         }
 
-        $deceased_people = array();
-        foreach ( $expected_sections as $section ) {
-            foreach ( $group_data[$section] as $username => $person ) {
-                if ( ! empty( $person->deceased ) ) {
-                    $deceased_people[$username] = $person;
-                    unset( $group_data[$section][$username] );
-                }
-            }
-        }
-        $group_data['deceased'] = $deceased_people;
         $available_groups = $crm->storage->get_available_groups();
 
-        return compact( 'crm', 'current_group', 'group', 'privacy_mode', 'group_data', 'available_groups' );
+        return compact( 'crm', 'current_group', 'group', 'group_data', 'available_groups' );
     }
 
     /**
@@ -417,56 +417,15 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         $this->current_group = $group_param_alt ?? $group_param_from_get ?? null;
 
+        // Exclude page names from being treated as group slugs
+        $reserved_names = array( 'select', 'admin', 'person', 'events' );
+        if ( in_array( $this->current_group, $reserved_names, true ) ) {
+            $this->current_group = null;
+        }
+
         $this->group = $this->get_type_display_word( $this->current_group );
         return $this->current_group;
     }
-    /**
-     * Privacy mode helper functions
-     */
-    public function mask_name( $full_name, $privacy_mode ) {
-        if ( ! $privacy_mode ) {
-            return $full_name;
-        }
-
-        $parts = explode( ' ', trim( $full_name ) );
-        if ( count( $parts ) <= 1 ) {
-            return $full_name; // Only first name, no masking needed
-        }
-
-        // Return first name + masked last name
-        $first_name = $parts[0];
-        $last_name_initial = isset( $parts[ count( $parts ) - 1 ] ) ? substr( $parts[ count( $parts ) - 1 ], 0, 1 ) . '.' : '';
-
-        return $first_name . ' ' . $last_name_initial;
-    }
-
-    public function mask_username( $username, $privacy_mode ) {
-        if ( ! $privacy_mode ) {
-            return $username;
-        }
-
-        if ( strlen( $username ) <= 3 ) {
-            return $username; // Too short to mask meaningfully
-        }
-
-        return substr( $username, 0, 3 ) . '...';
-    }
-
-    public function mask_date( $date, $privacy_mode, $show_year = false ) {
-        if ( ! $privacy_mode || empty( $date ) ) {
-            return $date;
-        }
-
-        if ( $show_year ) {
-            // For birthdays, show just the year
-            if ( preg_match( '/^(\d{4})-\d{2}-\d{2}$/', $date, $matches ) ) {
-                return $matches[1];
-            }
-        }
-
-        return '****-**-**';
-    }
-
     /**
      * Get the default group slug (group marked with default: true)
      */
@@ -513,7 +472,7 @@ if ( ! function_exists( "dbDelta" ) ) {
      * Returns a Person object with category information
      */
     public function get_person_with_category( $group_slug, $username ) {
-        $person_data_raw = $this->storage->get_person( $group_slug, $username );
+        $person_data_raw = $this->storage->get_person( $username );
 
         if ( ! $person_data_raw ) {
             return null;
@@ -522,77 +481,30 @@ if ( ! function_exists( "dbDelta" ) ) {
         $person_obj = $this->create_person_from_data( $username, $person_data_raw );
         $person_obj->team = $group_slug;
 
+        // Get the parent group config
         $config = $this->storage->get_group( $group_slug );
-        if ( isset( $config['team_members'][ $username ] ) ) {
-            $person_obj->category = 'team_members';
-        } elseif ( isset( $config['leadership'][ $username ] ) ) {
-            $person_obj->category = 'leadership';
-        } elseif ( isset( $config['consultants'][ $username ] ) ) {
-            $person_obj->category = 'consultants';
-        } elseif ( isset( $config['alumni'][ $username ] ) ) {
-            $person_obj->category = 'alumni';
+        if ( ! $config ) {
+            return null;
+        }
+
+        // Check if person is in direct members
+        if ( isset( $config['members'][ $username ] ) ) {
+            $person_obj->category = 'members';
+            $person_obj->category_group = $config['group_name'];
+        } else {
+            // Check if they're in any child groups
+            $child_groups = $this->storage->get_child_groups( $config['id'] );
+            foreach ( $child_groups as $child ) {
+                $child_slug = $child['slug'];
+                if ( isset( $config[$child_slug][ $username ] ) ) {
+                    $person_obj->category = $child_slug;
+                    $person_obj->category_group = $child['group_name'];
+                    break;
+                }
+            }
         }
 
         return $person_obj;
-    }
-
-    public function load_group_config_with_objects( $group_slug ) {
-        if ( ! $this->storage->group_exists( $group_slug ) ) {
-            // var_dump(debug_backtrace());
-            $create_group_url = $this->build_url( 'admin/index.php', array( 'create_team' => 'new' ) );
-            header( 'Location: ' . $create_group_url );
-            exit;
-        }
-
-        $config = $this->storage->get_group( $group_slug );
-
-        if ( ! $config ) {
-            die( 'Error: Unable to load group configuration' );
-        }
-
-        $group_members = array();
-        foreach ( $config['team_members'] as $username => $member_data ) {
-            $group_members[$username] = $this->create_person_from_data( $username, $member_data );
-        }
-
-        $leadership = array();
-        foreach ( $config['leadership'] as $username => $leader_data ) {
-            $leadership[$username] = $this->create_person_from_data( $username, $leader_data );
-        }
-
-        $consultants = array();
-        foreach ( $config['consultants'] ?? array() as $username => $consultant_data ) {
-            $consultants[$username] = $this->create_person_from_data( $username, $consultant_data );
-        }
-
-        $alumni = array();
-        foreach ( $config['alumni'] ?? array() as $username => $alumni_data ) {
-            $alumni[$username] = $this->create_person_from_data( $username, $alumni_data );
-        }
-
-        $group_members = apply_filters( 'personal_crm_sort_people', $group_members, 'team_members', $group_slug );
-        $leadership = apply_filters( 'personal_crm_sort_people', $leadership, 'leadership', $group_slug );
-        $consultants = apply_filters( 'personal_crm_sort_people', $consultants, 'consultants', $group_slug );
-        $alumni = apply_filters( 'personal_crm_sort_people', $alumni, 'alumni', $group_slug );
-
-        $events = array();
-        foreach ( $config['events'] ?? array() as $event_data ) {
-            $events[] = Event::from_team_event( $event_data );
-        }
-
-        return array(
-            'activity_url_prefix' => $config['activity_url_prefix'],
-            'group_name' => $config['group_name'],
-            'team_name' => $config['group_name'],
-            'not_managing_team' => $config['not_managing'] ?? true,
-            'links' => $config['links'] ?? array(),
-            'team_links' => $config['links'] ?? array(),
-            'team_members' => $group_members,
-            'leadership' => $leadership,
-            'consultants' => $consultants,
-            'alumni' => $alumni,
-            'events' => $events,
-        );
     }
 
     /**
@@ -666,33 +578,35 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         $all_events = array();
 
+        // Collect all people from direct members and child groups
         $all_people = array();
-        if ( isset( $group_data['team_members'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['team_members'] );
+        if ( isset( $group_data['members'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['members'] );
         }
-        if ( isset( $group_data['leadership'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['leadership'] );
-        }
-        if ( isset( $group_data['consultants'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['consultants'] );
+
+        // Add people from all child groups
+        if ( ! empty( $group_data['id'] ) ) {
+            $child_groups = $this->storage->get_child_groups( $group_data['id'] );
+            foreach ( $child_groups as $child ) {
+                $child_slug = $child['slug'];
+                if ( isset( $group_data[$child_slug] ) ) {
+                    $all_people = array_merge( $all_people, $group_data[$child_slug] );
+                }
+            }
         }
         foreach ( $all_people as $person ) {
             if ( is_object( $person ) && method_exists( $person, 'get_upcoming_events' ) ) {
-                error_log( 'DEBUG: CrmCore - Checking person: ' . $person->username . ', filter_person: ' . ( $filter_person ?: 'null' ) );
 
                 // Skip if filtering by person and this isn't the person
                 if ( $filter_person && $person->username !== $filter_person ) {
-                    error_log( 'DEBUG: CrmCore - Skipping ' . $person->username . ' (not matching ' . $filter_person . ')' );
                     continue;
                 }
 
                 $personal_events = $person->get_upcoming_events();
-                error_log( 'DEBUG: CrmCore - Personal events for ' . $person->username . ': ' . count( $personal_events ) );
                 $all_events = array_merge( $all_events, $personal_events );
             }
         }
 
-        error_log( 'DEBUG: CrmCore - Total personal events collected: ' . count( $all_events ) );
 
         if ( $include_team_events && isset( $group_data['events'] ) ) {
             foreach ( $group_data['events'] as $event ) {
@@ -702,14 +616,11 @@ if ( ! function_exists( "dbDelta" ) ) {
                 // Include event if it's upcoming or currently ongoing
                 if ( $event_end >= $current_date && $event_start <= $cutoff_date ) {
                     $all_events[] = $event;
-                    error_log( 'DEBUG: CrmCore - Including team event: ' . $event->get_title() . ' (ends: ' . $event_end->format('Y-m-d') . ')' );
                 } else {
-                    error_log( 'DEBUG: CrmCore - Excluding team event: ' . $event->get_title() . ' (ends: ' . $event_end->format('Y-m-d') . ')' );
                 }
             }
         }
 
-        error_log( 'DEBUG: CrmCore - Total events after adding team events: ' . count( $all_events ) );
 
         // Sort all events by date
         usort( $all_events, function( $a, $b ) {
@@ -725,22 +636,23 @@ if ( ! function_exists( "dbDelta" ) ) {
             // Include event if it's upcoming or currently ongoing
             if ( $event_end >= $current_date && $event_start <= $cutoff_date ) {
                 $upcoming_events[] = $event;
-                error_log( 'DEBUG: CrmCore - Including upcoming event: ' . $event->get_title() . ' on ' . $event->date->format('Y-m-d') . ' (ends: ' . $event_end->format('Y-m-d') . ')' );
             } else {
-                error_log( 'DEBUG: CrmCore - Excluding event: ' . $event->get_title() . ' on ' . $event->date->format('Y-m-d') . ' (ends: ' . $event_end->format('Y-m-d') . ')' );
             }
         }
 
-        error_log( 'DEBUG: CrmCore - Final upcoming events count: ' . count( $upcoming_events ) );
 
-        $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
-
-        error_log( 'DEBUG: CrmCore - Privacy mode: ' . ( $privacy_mode ? 'true' : 'false' ) );
-        error_log( 'DEBUG: CrmCore - About to render events, count: ' . count( $upcoming_events ) );
+        // Find next event after the cutoff date
+        $next_event_after = null;
+        foreach ( $all_events as $event ) {
+            if ( $event->date > $cutoff_date ) {
+                $next_event_after = $event;
+                break;
+            }
+        }
 
         if ( ! empty( $upcoming_events ) ) {
             foreach ( $upcoming_events as $event ) {
-                $formatted_date = $privacy_mode ? '[Hidden]' : $event->date->format( 'M j, Y' );
+                $formatted_date = $event->date->format( 'M j, Y' );
                 $days_until = $current_date->diff( $event->date )->days;
                 $is_past = $event->date < $current_date;
                 ?>
@@ -750,36 +662,21 @@ if ( ! function_exists( "dbDelta" ) ) {
                         <?php if ( ! $is_past && $days_until <= 120 ) : // Show for events within 120 days ?>
                             <div style="font-size: 11px; color: #999; font-weight: normal;">
                                 <?php
-                                if ( $privacy_mode ) {
-                                    if ( $days_until == 0 ) {
-                                        echo 'today';
-                                    } else {
-                                        echo 'in x days';
-                                    }
+                                if ( $days_until == 0 ) {
+                                    echo 'today';
+                                } elseif ( $days_until == 1 ) {
+                                    echo 'in 1d';
+                                } elseif ( $days_until > 60 ) {
+                                    echo 'in ' . floor( $days_until / 30 ) . 'mo';
                                 } else {
-                                    if ( $days_until == 0 ) {
-                                        echo 'today';
-                                    } elseif ( $days_until == 1 ) {
-                                        echo 'in 1d';
-                                    } elseif ( $days_until > 60 ) {
-                                        echo 'in ' . floor( $days_until / 30 ) . 'mo';
-                                    } else {
-                                        echo 'in ' . $days_until . 'd';
-                                    }
+                                    echo 'in ' . $days_until . 'd';
                                 }
                                 ?>
                             </div>
                         <?php endif; ?>
                     </div>
                     <div class="event-description"><?php
-                        // Get the event title
                         $description = $event->get_title();
-
-                        // Apply privacy masking to description if needed
-                        if ( $privacy_mode ) {
-                            // Replace age numbers with [Hidden]
-                            $description = preg_replace( '/\d+(st|nd|rd|th)/', '[Hidden]', $description );
-                        }
 
                         // If filtering by person (on person page), don't show person name
                         if ( $filter_person && $event->person && $event->person->username === $filter_person ) {
@@ -789,8 +686,8 @@ if ( ! function_exists( "dbDelta" ) ) {
                             $description = str_replace( $person_name . ' ', '', $description );
                             echo esc_html( $description );
                         } elseif ( $event->person && ! $filter_person ) {
-                            // Show clickable person name for team pages (but apply privacy masking to names)
-                            $person_name = $privacy_mode ? '[Hidden]' : $event->person->name;
+                            // Show clickable person name for team pages
+                            $person_name = $event->person->name;
                             $person_username = $event->person->username;
                             $person_link = $this->build_url( 'person.php', array( 'person' => $person_username ) );
 
@@ -818,8 +715,23 @@ if ( ! function_exists( "dbDelta" ) ) {
                 </div>
                 <?php
             }
+
+            // Show next event after the window
+            if ( $next_event_after ) {
+                $days_until_next = $current_date->diff( $next_event_after->date )->days;
+                ?>
+                <p style="color: #999; font-size: 12px; margin: 12px 0 0 0; font-style: italic;">
+                    Then <?php echo $days_until_next; ?> days until next event
+                </p>
+                <?php
+            }
         } else {
-            echo '<p style="color: #666; font-style: italic; margin: 0;">No upcoming events</p>';
+            if ( $next_event_after ) {
+                $days_until_next = $current_date->diff( $next_event_after->date )->days;
+                echo '<p style="color: #666; font-style: italic; margin: 0;">No upcoming events in the next ' . $days_ahead . ' days<br><span style="font-size: 12px; color: #999;">Next event in ' . $days_until_next . ' days</span></p>';
+            } else {
+                echo '<p style="color: #666; font-style: italic; margin: 0;">No upcoming events</p>';
+            }
         }
     }
 
@@ -848,28 +760,47 @@ if ( ! function_exists( "dbDelta" ) ) {
                 $username = $additional_params['person'];
                 unset( $additional_params['person'] );
 
+                // Remove group parameter if present (no longer needed with M:N relationships)
+                if ( isset( $additional_params['group'] ) ) {
+                    unset( $additional_params['group'] );
+                }
+                if ( isset( $additional_params['team'] ) ) {
+                    unset( $additional_params['team'] );
+                }
+
+                $url = home_url( '/crm/person/' . $username );
+            } elseif ( $route === 'admin/person' && isset( $additional_params['person'] ) ) {
+                $username = $additional_params['person'];
+                unset( $additional_params['person'] );
+
+                $url = home_url( '/crm/admin/person/' . $username );
+            } elseif ( $route === 'admin' || $route === 'admin/index' ) {
                 if ( isset( $additional_params['group'] ) ) {
                     $group = $additional_params['group'];
                     unset( $additional_params['group'] );
+                } elseif ( isset( $additional_params['team'] ) ) {
+                    $group = $additional_params['team'];
+                    unset( $additional_params['team'] );
                 } else {
                     $group = $this->current_group;
                 }
 
-                $url = home_url( '/crm/' . $group . '/' . $username );
-            } elseif ( $route === 'admin' ) {
-                $username = '';
-                if ( isset( $additional_params['person'] ) ) {
-                    $username = $additional_params['person'];
-                    unset( $additional_params['person'] );
+                if ( $group ) {
+                    $url = home_url( '/crm/admin/group/' . $group );
+                } else {
+                    $url = home_url( '/crm/admin' );
                 }
+            } elseif ( $route === '' && ( isset( $additional_params['group'] ) || isset( $additional_params['team'] ) ) ) {
+                // Index page with group parameter
                 if ( isset( $additional_params['group'] ) ) {
                     $group = $additional_params['group'];
                     unset( $additional_params['group'] );
                 } else {
-                    $group = $this->current_group;
+                    $group = $additional_params['team'];
+                    unset( $additional_params['team'] );
                 }
 
-                $url = home_url( '/crm/admin/' . $group . '/' . $username );
+                $url = home_url( '/crm/group/' . $group );
             } else {
                 $url = home_url( '/crm/' . ltrim( $route, '/' ) );
             }
@@ -880,17 +811,6 @@ if ( ! function_exists( "dbDelta" ) ) {
             $additional_params = $url_data['params'];
 
             $additional_params = apply_filters( 'personal_crm_build_url_params', $additional_params, $base_url );
-
-            // Automatically add privacy mode if active and not already set
-            if ( ! isset( $additional_params['privacy'] ) ) {
-                $privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
-                if ( $privacy_mode ) {
-                    $additional_params['privacy'] = '1';
-                }
-            } elseif ( $additional_params['privacy'] === '0' ) {
-                // Remove privacy=0 since it's the default
-                unset( $additional_params['privacy'] );
-            }
 
             if ( ! empty( $additional_params ) ) {
                 $url .= '?' . http_build_query( $additional_params );
@@ -960,45 +880,68 @@ if ( ! function_exists( "dbDelta" ) ) {
         ) );
     }
 
-    public function init_cmd_k_js( $privacy_mode = false ) {
+    public function init_cmd_k_js() {
         $available_groups = $this->storage->get_available_groups();
         $groups = array();
         $search_index = array();
 
         foreach ( $available_groups as $group_slug ) {
             $group_name = $this->storage->get_group_name( $group_slug ) ?: ucfirst( str_replace( '_', ' ', $group_slug ) );
-            $group_config = $this->storage->get_group( $group_slug );
+            $group_obj = $this->storage->get_group( $group_slug );
 
-            $group_members_count = count( $group_config['team_members'] ?? array() );
-            $leadership_count = count( $group_config['leadership'] ?? array() );
-            $alumni_count = count( $group_config['alumni'] ?? array() );
+            if ( ! $group_obj ) {
+                continue;
+            }
+
+            // Count members from direct members and child groups
+            $members = $group_obj->get_members();
+            $members_count = count( $members );
+            $total_count = $members_count;
+            $child_counts = array();
+
+            $child_groups = $group_obj->get_child_groups();
+            foreach ( $child_groups as $child_group ) {
+                $child_members = $child_group->get_members();
+                $child_count = count( $child_members );
+                $child_counts[$child_group->slug] = $child_count;
+                $total_count += $child_count;
+            }
 
             $groups[] = array(
                 'slug' => $group_slug,
                 'name' => $group_name,
-                'team_members' => $group_members_count,
-                'leadership' => $leadership_count,
-                'alumni' => $alumni_count,
-                'total_people' => $group_members_count + $leadership_count + $alumni_count,
-                'url' => $this->build_url( 'index.php', array( 'team' => $group_slug ) )
+                'members' => $members_count,
+                'child_counts' => $child_counts,
+                'total_people' => $total_count,
+                'url' => $this->build_url( 'index.php', array( 'group' => $group_slug ) )
             );
 
-            foreach ( array( 'team_members', 'leadership', 'alumni' ) as $type ) {
-                if ( isset( $group_config[ $type ] ) ) {
-                    foreach ( $group_config[ $type ] as $username => $person ) {
-                        $type_label = $type === 'team_members' ? 'Team Member' :
-                                    ( $type === 'leadership' ? 'Leadership' : 'Alumni' );
+            // Index direct members
+            foreach ( $members as $username => $person ) {
+                $search_index[] = array(
+                    'username' => $username,
+                    'name' => $person->name ?? '',
+                    'nickname' => $person->nickname ?? '',
+                    'team_slug' => $group_slug,
+                    'team_name' => $group_name,
+                    'type' => 'Member',
+                    'url' => $this->build_url( 'person.php', array( 'person' => $username ) )
+                );
+            }
 
-                        $search_index[] = array(
-                            'username' => $username,
-                            'name' => $person['name'] ?? '',
-                            'nickname' => $person['nickname'] ?? '',
-                            'team_slug' => $group_slug,
-                            'team_name' => $group_name,
-                            'type' => $type_label,
-                            'url' => $this->build_url( 'index.php', array( 'person' => $username, 'team' => $group_slug ) )
-                        );
-                    }
+            // Index child group members
+            foreach ( $child_groups as $child_group ) {
+                $child_members = $child_group->get_members();
+                foreach ( $child_members as $username => $person ) {
+                    $search_index[] = array(
+                        'username' => $username,
+                        'name' => $person->name ?? '',
+                        'nickname' => $person->nickname ?? '',
+                        'team_slug' => $group_slug,
+                        'team_name' => $group_name,
+                        'type' => $child_group->group_name,
+                        'url' => $this->build_url( 'person.php', array( 'person' => $username ) )
+                    );
                 }
             }
         }
@@ -1011,10 +954,9 @@ if ( ! function_exists( "dbDelta" ) ) {
                 if (typeof CmdK !== 'undefined') {
                     const teams = <?php echo json_encode( $groups ); ?>;
                     const searchIndex = <?php echo json_encode( $search_index ); ?>;
-                    const privacyMode = <?php echo $privacy_mode ? 'true' : 'false'; ?>;
                     const ajaxUrl = <?php echo json_encode( $ajax_url ); ?>;
                     const baseUrl = <?php echo json_encode( $base_url ); ?>;
-                    CmdK.init(teams, searchIndex, privacyMode, ajaxUrl, baseUrl);
+                    CmdK.init(teams, searchIndex, ajaxUrl, baseUrl);
                 }
             });
         </script>
@@ -1030,15 +972,21 @@ if ( ! function_exists( "dbDelta" ) ) {
     public function get_calendar_events( $group_data, $start_date, $end_date ) {
         $all_events = array();
 
+        // Collect all people from direct members and child groups
         $all_people = array();
-        if ( isset( $group_data['team_members'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['team_members'] );
+        if ( isset( $group_data['members'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['members'] );
         }
-        if ( isset( $group_data['leadership'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['leadership'] );
-        }
-        if ( isset( $group_data['consultants'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['consultants'] );
+
+        // Add people from all child groups
+        if ( ! empty( $group_data['id'] ) ) {
+            $child_groups = $this->storage->get_child_groups( $group_data['id'] );
+            foreach ( $child_groups as $child ) {
+                $child_slug = $child['slug'];
+                if ( isset( $group_data[$child_slug] ) ) {
+                    $all_people = array_merge( $all_people, $group_data[$child_slug] );
+                }
+            }
         }
 
         foreach ( $all_people as $person ) {
@@ -1082,15 +1030,21 @@ if ( ! function_exists( "dbDelta" ) ) {
         $cutoff_date->add( new \DateInterval( 'P3M' ) );
         $all_events = array();
 
+        // Collect all people from direct members and child groups
         $all_people = array();
-        if ( isset( $group_data['team_members'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['team_members'] );
+        if ( isset( $group_data['members'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['members'] );
         }
-        if ( isset( $group_data['leadership'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['leadership'] );
-        }
-        if ( isset( $group_data['consultants'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['consultants'] );
+
+        // Add people from all child groups
+        if ( ! empty( $group_data['id'] ) ) {
+            $child_groups = $this->storage->get_child_groups( $group_data['id'] );
+            foreach ( $child_groups as $child ) {
+                $child_slug = $child['slug'];
+                if ( isset( $group_data[$child_slug] ) ) {
+                    $all_people = array_merge( $all_people, $group_data[$child_slug] );
+                }
+            }
         }
 
         foreach ( $all_people as $person ) {
@@ -1126,9 +1080,28 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         $include_alumni = isset( $_GET['alumni'] ) && $_GET['alumni'] === '1';
 
-        $all_people = array_merge( $group_data['team_members'], $group_data['leadership'], $group_data['consultants'] ?? array() );
-        if ( $include_alumni ) {
-            $all_people = array_merge( $all_people, $group_data['alumni'] );
+        // Collect all people from direct members
+        $all_people = array();
+        if ( isset( $group_data['members'] ) ) {
+            $all_people = array_merge( $all_people, $group_data['members'] );
+        }
+
+        // Add people from child groups (optionally excluding alumni)
+        if ( ! empty( $group_data['id'] ) ) {
+            $child_groups = $this->storage->get_child_groups( $group_data['id'] );
+            foreach ( $child_groups as $child ) {
+                $child_slug = $child['slug'];
+                $is_alumni = stripos( $child_slug, 'alumni' ) !== false || stripos( $child['group_name'], 'alumni' ) !== false;
+
+                // Skip alumni groups if not explicitly included
+                if ( $is_alumni && ! $include_alumni ) {
+                    continue;
+                }
+
+                if ( isset( $group_data[$child_slug] ) ) {
+                    $all_people = array_merge( $all_people, $group_data[$child_slug] );
+                }
+            }
         }
         foreach ( $all_people as $person ) {
             $personal_events = $person->get_upcoming_events();

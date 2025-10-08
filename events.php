@@ -22,7 +22,6 @@ if ( ! $current_group ) {
     }
 }
 
-$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
 // Events-specific logic
 $all_teams_mode = $current_group === 'all-teams';
@@ -33,27 +32,7 @@ if ( $all_teams_mode ) {
     $group_data = null;
 } else {
     $group = $crm->is_social_group( $current_group ) ? 'group' : 'team';
-    $group_data = $crm->load_group_config_with_objects( $current_group );
-
-    // Ensure all expected sections exist as arrays
-    $expected_sections = array( 'team_members', 'leadership', 'consultants', 'alumni' );
-    foreach ( $expected_sections as $section ) {
-        if ( ! isset( $group_data[$section] ) || ! is_array( $group_data[$section] ) ) {
-            $group_data[$section] = array();
-        }
-    }
-
-    // Separate deceased people from their original sections
-    $deceased_people = array();
-    foreach ( $expected_sections as $section ) {
-        foreach ( $group_data[$section] as $username => $person ) {
-            if ( ! empty( $person->deceased ) ) {
-                $deceased_people[$username] = $person;
-                unset( $group_data[$section][$username] );
-            }
-        }
-    }
-    $group_data['deceased'] = $deceased_people;
+    $group_data = $crm->storage->get_group( $current_group );
 }
 
 $available_teams = $crm->storage->get_available_groups();
@@ -80,10 +59,10 @@ if ( $calendar_year < 2000 || $calendar_year > 2100 ) {
 if ( $all_teams_mode ) {
 	$group = 'team'; // Default for all-teams mode
 
-	// Load events from all teams
-	$all_teams_data = array();
+	// Load events from all teams (lazy loaded)
+	$all_teams_groups = array();
 	foreach ( $available_teams as $team_slug ) {
-		$all_teams_data[$team_slug] = $crm->load_group_config_with_objects( $team_slug );
+		$all_teams_groups[$team_slug] = $crm->storage->get_group( $team_slug );
 	}
 	// Create a combined team_data structure
 	$group_data = array(
@@ -98,13 +77,17 @@ if ( $all_teams_mode ) {
 	);
 
 	// Combine all events and people from all teams
-	foreach ( $all_teams_data as $team_slug => $data ) {
-		$group_data['events'] = array_merge( $group_data['events'], $data['events'] ?? array() );
-		$group_data['team_members'] = array_merge( $group_data['team_members'], $data['team_members'] ?? array() );
-		$group_data['leadership'] = array_merge( $group_data['leadership'], $data['leadership'] ?? array() );
-		$group_data['consultants'] = array_merge( $group_data['consultants'], $data['consultants'] ?? array() );
-		$group_data['alumni'] = array_merge( $group_data['alumni'], $data['alumni'] ?? array() );
-		$group_data['deceased'] = array_merge( $group_data['deceased'], $data['deceased'] ?? array() );
+	foreach ( $all_teams_groups as $team_slug => $group_obj ) {
+		$group_data['events'] = array_merge( $group_data['events'], $group_obj->get_events() );
+		$group_data['team_members'] = array_merge( $group_data['team_members'], $group_obj->get_members() );
+		// Child groups would need to be loaded separately if needed
+		foreach ( $group_obj->get_child_groups() as $child_group ) {
+			$section_name = str_replace( $team_slug . '_', '', $child_group->slug );
+			if ( ! isset( $group_data[$section_name] ) ) {
+				$group_data[$section_name] = array();
+			}
+			$group_data[$section_name] = array_merge( $group_data[$section_name], $child_group->get_members() );
+		}
 	}
 }
 
@@ -143,9 +126,6 @@ if ( $view_mode === 'list' ) {
 function build_calendar_url( $params = array() ) {
     global $current_group, $all_teams_mode;
     $base_params = array( 'team' => $all_teams_mode ? 'all-teams' : $current_group );
-    if ( isset( $_GET['privacy'] ) ) {
-        $base_params['privacy'] = $_GET['privacy'];
-    }
     return '?' . http_build_query( array_merge( $base_params, $params ) );
 }
 
@@ -288,7 +268,7 @@ $available_teams = $crm->storage->get_available_groups();
                     <?php if ( $all_teams_mode ) : ?>
                         <a href="<?php echo $crm->build_url( 'select.php' ); ?>">← Back to Team Selection</a>
                     <?php else : ?>
-                    <a href="<?php echo $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>">← Back to <?php echo $group_data['group_name'], ' ', ucfirst( $group ); ?> Overview</a>
+                    <a href="<?php echo $crm->build_url( 'index.php' ); ?>">← Back to <?php echo $group_data['group_name'], ' ', ucfirst( $group ); ?> Overview</a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -703,12 +683,10 @@ $available_teams = $crm->storage->get_available_groups();
         
         <!-- Footer with admin/privacy links -->
         <footer class="privacy-footer">
-            <?php if ( $privacy_mode ) : ?>
-                <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>">🔒 Privacy Mode ON</a>
-            <?php else : ?>
-                <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>">🔓 Privacy Mode OFF</a>
-            <?php endif; ?>
-            <a href="<?php echo $crm->build_url( 'admin/index.php' ); ?>">⚙️ Admin Panel</a>
+            <a href="#" id="privacy-toggle" onclick="togglePrivacyMode(); return false;">
+                <span id="privacy-status">🔓 Privacy Mode OFF</span>
+            </a>
+            <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $current_group ) ); ?>">⚙️ Admin Panel</a>
         </footer>
     </div>
     

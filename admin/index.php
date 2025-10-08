@@ -12,10 +12,16 @@ require_once __DIR__ . '/../personal-crm.php';
 ini_set( 'display_errors', 1 );
 error_reporting( E_ALL );
 
-// Special logic - check for team creation before main initialization
+// Special logic - check for team creation or person editing before main initialization
 $crm = PersonalCrm::get_instance();
 $current_group = $crm->get_current_group_from_params();
-if ( ! $current_group && ! ( isset( $_GET['create_team'] ) && $_GET['create_team'] === 'new' ) ) {
+$route_person = function_exists( 'get_query_var' ) ? get_query_var( 'person' ) : '';
+$is_editing_person = ! empty( $route_person );
+
+// Redirect to selector if no group is specified (unless editing person, creating team, or handling POST)
+$is_creating_team = isset( $_GET['create_team'] ) && $_GET['create_team'] === 'new';
+$is_post_request = $_SERVER['REQUEST_METHOD'] === 'POST';
+if ( ! $current_group && ! $is_editing_person && ! $is_creating_team && ! $is_post_request ) {
 	header( 'Location: ' . $crm->build_url( 'select.php' ) );
 	exit;
 }
@@ -32,72 +38,98 @@ $action = $_POST['action'] ?? $_GET['action'] ?? 'dashboard';
 
 // Determine active tab from route or query parameter
 $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-if ( strpos( $request_uri, '/links' ) !== false ) {
+
+// If editing a person, skip all group-related logic
+if ( strpos( $request_uri, '/person/' ) !== false || $is_editing_person ) {
+	$active_tab = 'person_edit';
+} elseif ( strpos( $request_uri, '/links' ) !== false ) {
 	$active_tab = 'team_links';
-} elseif ( strpos( $request_uri, '/members' ) !== false ) {
-	$active_tab = 'members';
-} elseif ( strpos( $request_uri, '/leadership' ) !== false ) {
-	$active_tab = 'leadership';
-} elseif ( strpos( $request_uri, '/consultants' ) !== false ) {
-	$active_tab = 'consultants';
-} elseif ( strpos( $request_uri, '/alumni' ) !== false ) {
-	$active_tab = 'alumni';
 } elseif ( strpos( $request_uri, '/events' ) !== false ) {
 	$active_tab = 'events';
 } elseif ( strpos( $request_uri, '/audit' ) !== false ) {
 	$active_tab = 'audit';
-} elseif ( strpos( $request_uri, '/person/' ) !== false ) {
-	$active_tab = 'members'; // Person editing defaults to members tab
+} elseif ( strpos( $request_uri, '/members' ) !== false ) {
+	$active_tab = 'members';
 } else {
-	$active_tab = $_GET['tab'] ?? 'general';
+	// Check for child group tabs dynamically (handle both full and short slugs)
+	$found_person_tab = false;
+	if ( $current_group ) {
+		$temp_config = $crm->storage->get_group( $current_group );
+		if ( $temp_config && ! empty( $temp_config['id'] ) ) {
+			$child_groups = $crm->storage->get_child_groups( $temp_config['id'] );
+			foreach ( $child_groups as $child ) {
+				// Check for full slug
+				if ( strpos( $request_uri, '/' . $child['slug'] ) !== false ) {
+					$active_tab = $child['slug'];
+					$found_person_tab = true;
+					break;
+				}
+				// Check for short slug (without parent prefix)
+				$short_slug = $child['slug'];
+				if ( strpos( $short_slug, $current_group . '_' ) === 0 ) {
+					$short_slug = substr( $short_slug, strlen( $current_group ) + 1 );
+					if ( strpos( $request_uri, '/' . $short_slug ) !== false ) {
+						$active_tab = $child['slug'];
+						$found_person_tab = true;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	if ( ! $found_person_tab ) {
+		$active_tab = $_GET['tab'] ?? 'general';
+	}
 }
 $is_adding_new = isset( $_GET['add'] ) && $_GET['add'] === 'new';
-$is_creating_team = isset( $_GET['create_team'] ) && $_GET['create_team'] === 'new';
 
-// Check if group exists in database and redirect to selector if not (unless already creating a team)
-if ( $current_group && ! $crm->storage->group_exists( $current_group ) && ! $is_creating_team ) {
+// Check if group exists in database and redirect to selector if not (unless already creating a team or editing a person)
+if ( $current_group && ! $crm->storage->group_exists( $current_group ) && ! $is_creating_team && ! $is_editing_person ) {
 	header( 'Location: ' . $crm->build_url( 'select.php' ) );
 	exit;
 }
 
 // Check if we're editing a specific member or event
-// Handle wp-app route parameter for admin/{team}/person/{person}
-$route_person = function_exists( 'get_query_var' ) ? get_query_var( 'person' ) : '';
+// Handle wp-app route parameter for admin/person/{person}
 $edit_member = $_GET['edit_member'] ?? $route_person;
 $edit_event_index = $_GET['edit_event'] ?? '';
 $edit_data = null;
-$is_editing_member = false;
-$is_editing_leader = false;
-$is_editing_consultant = false;
-$is_editing_alumni = false;
 $is_editing_event = false;
 
 // Initialize $group early with a default value
 $group = 'team';
 
+// Dynamic is_editing_{type} variables
+$person_editing_vars = array();
+
 if ( ! empty( $edit_member ) ) {
-	$config = $crm->storage->get_group( $current_group );
-	$group = ( $config && isset( $config['type'] ) ) ? $config['type'] : 'team';
-	if ( $config && isset( $config['team_members'][ $edit_member ] ) ) {
-		$edit_data = $config['team_members'][ $edit_member ];
-		$edit_data['username'] = $edit_member;
-		$is_editing_member = true;
-		$active_tab = 'members';
-	} elseif ( isset( $config['leadership'][ $edit_member ] ) ) {
-		$edit_data = $config['leadership'][ $edit_member ];
-		$edit_data['username'] = $edit_member;
-		$is_editing_leader = true;
-		$active_tab = 'leadership';
-	} elseif ( isset( $config['consultants'][ $edit_member ] ) ) {
-		$edit_data = $config['consultants'][ $edit_member ];
-		$edit_data['username'] = $edit_member;
-		$is_editing_consultant = true;
-		$active_tab = 'consultants';
-	} elseif ( isset( $config['alumni'][ $edit_member ] ) ) {
-		$edit_data = $config['alumni'][ $edit_member ];
-		$edit_data['username'] = $edit_member;
-		$is_editing_alumni = true;
-		$active_tab = 'alumni';
+	// When editing a person, we don't need a current_group since they can belong to multiple groups
+	if ( $current_group ) {
+		$config = $crm->storage->get_group( $current_group );
+		$group = ( $config && isset( $config['type'] ) ) ? $config['type'] : 'team';
+	}
+
+	// Check all person types dynamically
+	$all_person_types = $current_group ? $crm->storage->get_person_types( $current_group ) : array();
+	$all_person_types[] = array( 'type_key' => 'alumni' );
+
+	foreach ( $all_person_types as $ptype ) {
+		$type_key = $ptype['type_key'];
+		if ( isset( $config[ $type_key ][ $edit_member ] ) ) {
+			$edit_data = $config[ $type_key ][ $edit_member ];
+			$edit_data['username'] = $edit_member;
+			$active_tab = $type_key;
+			// Set is_editing_{type} variable dynamically
+			$var_name = 'is_editing_' . $type_key;
+			$$var_name = true;
+			$person_editing_vars[ $type_key ] = true;
+			break;
+		} else {
+			// Initialize as false
+			$var_name = 'is_editing_' . $type_key;
+			$$var_name = false;
+		}
 	}
 } elseif ( $edit_event_index !== '' && is_numeric( $edit_event_index ) ) {
 	$config = $crm->storage->get_group( $current_group );
@@ -127,21 +159,97 @@ $error = '';
 require_once __DIR__ . '/actions.php';
 
 // Load config for display (after any POST operations)
-$config = $crm->storage->get_group( $current_group ) ?: array(
-	'activity_url_prefix' => '',
-	'group_name' => '',
-	'team_members' => array(),
-	'leadership' => array(),
-	'consultants' => array(),
-	'alumni' => array(),
-	'events' => array(),
-	'type' => 'team',
-	'default' => false,
-	'links' => array(),
-);
+$config = $crm->storage->get_group( $current_group );
+if ( ! $config ) {
+	// Fallback default config (group should normally be created via create_team)
+	$config = array(
+		'activity_url_prefix' => '',
+		'group_name' => '',
+		'alumni' => array(),
+		'events' => array(),
+		'type' => 'team',
+		'default' => false,
+		'links' => array(),
+	);
+	// Initialize arrays for person types from database
+	$person_types = $crm->storage->get_person_types( $current_group );
+	foreach ( $person_types as $type ) {
+		$config[ $type['type_key'] ] = array();
+	}
+}
 
 // Set group type label for UI
 $group = ( isset( $config['type'] ) && $config['type'] ) ? $config['type'] : 'team';
+
+// Handle POST requests before any HTML output (to allow redirects)
+$people_tab_included = false;
+if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $active_tab === 'person_edit' ) {
+	// Include people.php early to handle POST, which may redirect
+	require __DIR__ . '/tabs/people.php';
+	$people_tab_included = true;
+	// If we get here, POST was handled but didn't redirect - continue with HTML output
+}
+
+// Handle general settings POST
+if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POST['action'] === 'save_general' ) {
+	$group_obj = $crm->storage->get_group( $current_group );
+
+	// Build config array from POST data
+	$config_data = array(
+		'group_name' => sanitize_text_field( $_POST['team_name'] ?? '' ),
+		'activity_url_prefix' => sanitize_url( $_POST['activity_url_prefix'] ?? '' ),
+		'type' => sanitize_text_field( $_POST['team_type'] ?? 'team' ),
+		'display_icon' => sanitize_text_field( $_POST['display_icon'] ?? '' ),
+		'sort_order' => intval( $_POST['sort_order'] ?? 0 ),
+	);
+
+	// Handle parent group
+	$parent_slug = sanitize_text_field( $_POST['parent_group'] ?? '' );
+	if ( ! empty( $parent_slug ) && $parent_slug !== 'none' ) {
+		$parent_group = $crm->storage->get_group( $parent_slug );
+		$config_data['parent_id'] = $parent_group ? $parent_group->id : null;
+	} else {
+		$config_data['parent_id'] = null;
+	}
+
+	// Handle default flag
+	$is_default = isset( $_POST['is_default'] ) && $_POST['is_default'] === '1';
+	if ( $is_default ) {
+		// Remove default flag from other groups
+		$available_groups = $crm->storage->get_available_groups();
+		foreach ( $available_groups as $group_slug ) {
+			if ( $group_slug !== $current_group ) {
+				$other_group = $crm->storage->get_group( $group_slug );
+				if ( $other_group && $other_group->is_default ) {
+					$other_config = array(
+						'group_name' => $other_group->group_name,
+						'activity_url_prefix' => $other_group->activity_url_prefix,
+						'type' => $other_group->type,
+						'display_icon' => $other_group->display_icon,
+						'sort_order' => $other_group->sort_order,
+						'parent_id' => $other_group->parent_id,
+						'default' => false
+					);
+					$crm->storage->save_group( $other_group->id, $other_config );
+				}
+			}
+		}
+		$config_data['default'] = true;
+	} else {
+		$config_data['default'] = false;
+	}
+
+	// Save group and get the new slug (may have changed due to name change)
+	$new_slug = $crm->storage->save_group( $group_obj->id, $config_data );
+
+	if ( $new_slug ) {
+		// Always redirect after successful save
+		header( 'Location: ' . $crm->build_url( 'admin/index.php', array( 'group' => $new_slug, 'tab' => 'general' ) ) );
+		exit;
+	} else {
+		$error = 'Failed to save configuration.';
+	}
+}
 
 ?>
 <!DOCTYPE html>
@@ -171,7 +279,7 @@ $group = ( isset( $config['type'] ) && $config['type'] ) ? $config['type'] : 'te
             <div class="navigation">
                 <div class="group-switcher" style="display: inline-block; margin-right: 10px;">
                     <?php
-                    $available_groups = $crm->storage->get_available_groups();
+                    $available_groups = $crm->storage->get_available_groups( true );
                     if ( $available_groups ) :
                     	?>
                     <select id="group-selector" onchange="switchGroup()">
@@ -179,7 +287,7 @@ $group = ( isset( $config['type'] ) && $config['type'] ) ? $config['type'] : 'te
                         foreach ( $available_groups as $group_slug ) {
                             $team_display_name = $crm->storage->get_group_name( $group_slug );
                             $selected = $group_slug === $current_group ? 'selected' : '';
-                            echo '<option value="' . htmlspecialchars( $crm->build_url( $group_slug ) ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
+                            echo '<option value="' . htmlspecialchars( $crm->build_url( 'admin/index.php', array( 'group' => $group_slug ) ) ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
                         }
                         ?>
                     </select>
@@ -197,6 +305,23 @@ $group = ( isset( $config['type'] ) && $config['type'] ) ? $config['type'] : 'te
         <?php if ( $error ) : ?>
             <div class="message error"><?php echo htmlspecialchars( $error ); ?></div>
         <?php endif; ?>
+
+        <?php
+        // Show parent navigation link if this is a child group
+        if ( $current_group && ! $is_creating_team ) {
+            $current_group_config = $crm->storage->get_group( $current_group );
+            if ( $current_group_config && ! empty( $current_group_config['parent_id'] ) ) {
+                $parent_group = $crm->storage->get_group_by_id( $current_group_config['parent_id'] );
+                if ( $parent_group ) {
+                    ?>
+                    <div style="margin-bottom: 20px;">
+                        <a href="/crm/admin/group/<?php echo htmlspecialchars( $parent_group['slug'] ); ?>/" class="back-link-admin">← Back to <?php echo htmlspecialchars( $parent_group['group_name'] ); ?> Admin</a>
+                    </div>
+                    <?php
+                }
+            }
+        }
+        ?>
 
         <?php if ( $is_creating_team ) : ?>
             <!-- Create New Page -->
@@ -237,18 +362,56 @@ $group = ( isset( $config['type'] ) && $config['type'] ) ? $config['type'] : 'te
         <div class="nav-tabs">
             <a href="/crm/admin/<?php echo $current_group; ?>/" class="nav-tab <?php echo $active_tab === 'general' ? 'active' : ''; ?>">General</a>
             <a href="/crm/admin/<?php echo $current_group; ?>/links/" class="nav-tab <?php echo $active_tab === 'team_links' ? 'active' : ''; ?>">Links</a>
+            <?php
+            // Build navigation tabs for direct members + child groups
+            $parent_config = $crm->storage->get_group( $current_group );
+            $parent_group_id = $parent_config['id'];
+            $child_groups = $crm->storage->get_child_groups( $parent_group_id );
+
+            $nav_tabs = array(
+                array(
+                    'slug' => 'members',
+                    'display_name' => 'Team Members',
+                    'display_icon' => '👥',
+                    'count' => count( $parent_config['members'] ?? array() )
+                )
+            );
+
+            foreach ( $child_groups as $child ) {
+                // Use short slug in URL (remove parent prefix)
+                $url_slug = $child['slug'];
+                if ( strpos( $url_slug, $current_group . '_' ) === 0 ) {
+                    $url_slug = substr( $url_slug, strlen( $current_group ) + 1 );
+                }
+
+                $nav_tabs[] = array(
+                    'slug' => $child['slug'], // Full slug for matching
+                    'url_slug' => $url_slug,  // Short slug for URL
+                    'display_name' => $child['group_name'],
+                    'display_icon' => $child['display_icon'] ?: '',
+                    'count' => count( $crm->storage->get_group_members( $child['id'], false ) )
+                );
+            }
+
+            $all_tab_slugs = array_column( $nav_tabs, 'slug' );
+            $total_people = array_sum( array_column( $nav_tabs, 'count' ) );
+            ?>
             <?php if ( $group === 'group' ) : ?>
-                <a href="/crm/admin/<?php echo $current_group; ?>/members/" class="nav-tab <?php echo $active_tab === 'members' ? 'active' : ''; ?>">👥 Members (<?php echo count( $config['team_members'] ); ?>)</a>
+                <?php
+                $first_tab = $nav_tabs[0] ?? null;
+                if ( $first_tab ) :
+                ?>
+                <a href="/crm/admin/<?php echo $current_group; ?>/<?php echo $first_tab['slug']; ?>/" class="nav-tab <?php echo $active_tab === $first_tab['slug'] ? 'active' : ''; ?>"><?php echo $first_tab['display_icon']; ?> <?php echo htmlspecialchars( $first_tab['display_name'] ); ?> (<?php echo $first_tab['count']; ?>)</a>
+                <?php endif; ?>
             <?php else : ?>
             <div class="nav-dropdown">
-                <span class="nav-tab nav-dropdown-trigger <?php echo in_array( $active_tab, array( 'members', 'leadership', 'consultants', 'alumni' ) ) ? 'active' : ''; ?>">
-                    People (<?php echo count( $config['team_members'] ) + count( $config['leadership'] ) + count( $config['consultants'] ?? array() ) + count( $config['alumni'] ?? array() ); ?>) ▾
+                <span class="nav-tab nav-dropdown-trigger <?php echo in_array( $active_tab, $all_tab_slugs ) ? 'active' : ''; ?>">
+                    People (<?php echo $total_people; ?>) ▾
                 </span>
                 <div class="nav-dropdown-menu">
-                    <a href="/crm/admin/<?php echo $current_group; ?>/members/" class="nav-dropdown-item <?php echo $active_tab === 'members' ? 'active' : ''; ?>">👥 Members (<?php echo count( $config['team_members'] ); ?>)</a>
-                    <a href="/crm/admin/<?php echo $current_group; ?>/leadership/" class="nav-dropdown-item <?php echo $active_tab === 'leadership' ? 'active' : ''; ?>">👑 Leaders (<?php echo count( $config['leadership'] ); ?>)</a>
-                    <a href="/crm/admin/<?php echo $current_group; ?>/consultants/" class="nav-dropdown-item <?php echo $active_tab === 'consultants' ? 'active' : ''; ?>">🤝 Consultants (<?php echo count( $config['consultants'] ?? array() ); ?>)</a>
-                    <a href="/crm/admin/<?php echo $current_group; ?>/alumni/" class="nav-dropdown-item <?php echo $active_tab === 'alumni' ? 'active' : ''; ?>">🎓 Alumni (<?php echo count( $config['alumni'] ?? array() ); ?>)</a>
+                    <?php foreach ( $nav_tabs as $tab ) : ?>
+                        <a href="/crm/admin/<?php echo $current_group; ?>/<?php echo $tab['url_slug'] ?? $tab['slug']; ?>/" class="nav-dropdown-item <?php echo $active_tab === $tab['slug'] ? 'active' : ''; ?>"><?php echo $tab['display_icon']; ?> <?php echo htmlspecialchars( $tab['display_name'] ); ?> (<?php echo $tab['count']; ?>)</a>
+                    <?php endforeach; ?>
                 </div>
             </div>
             <?php endif; ?>
@@ -324,7 +487,74 @@ $group = ( isset( $config['type'] ) && $config['type'] ) ? $config['type'] : 'te
                 border-color: #50575e;
             }
         }
+
+        .tab-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .tab-header h3 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .edit-group-link {
+            font-size: 0.85em;
+            font-weight: normal;
+            text-decoration: none;
+            color: #007cba;
+            padding: 4px 10px;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+        }
+
+        .edit-group-link:hover {
+            background-color: rgba(0, 124, 186, 0.1);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .edit-group-link {
+                color: #72aee6;
+            }
+
+            .edit-group-link:hover {
+                background-color: rgba(114, 174, 230, 0.1);
+            }
+        }
         </style>
+
+        <script>
+        // Links management functions (must be before tabs are loaded)
+        function addLink(prefix) {
+            const container = document.getElementById(prefix + 'links-container');
+            const newRow = document.createElement('div');
+            newRow.className = 'link-row';
+            newRow.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
+            newRow.innerHTML = `
+                <input type="text" name="link_text[]" placeholder="Link text (e.g., 'Project docs')" style="flex: 1;">
+                <input type="url" name="link_url[]" placeholder="URL" style="flex: 2;">
+                <button type="button" onclick="removeLink(this)" class="btn-remove">Remove</button>
+            `;
+            container.appendChild(newRow);
+        }
+
+        function removeLink(button) {
+            const row = button.parentNode;
+            const container = row.parentNode;
+
+            // Don't remove if it's the last row - just clear it instead
+            if (container.children.length === 1) {
+                const inputs = row.querySelectorAll('input');
+                inputs.forEach(input => input.value = '');
+            } else {
+                row.remove();
+            }
+        }
+        </script>
 
         <?php
         // Include appropriate tab file based on active tab
@@ -335,17 +565,38 @@ $group = ( isset( $config['type'] ) && $config['type'] ) ? $config['type'] : 'te
             case 'team_links':
                 require __DIR__ . '/tabs/links.php';
                 break;
-            case 'members':
-            case 'leadership':
-            case 'consultants':
-            case 'alumni':
-                require __DIR__ . '/tabs/people.php';
-                break;
             case 'events':
                 require __DIR__ . '/tabs/events.php';
                 break;
             case 'audit':
                 require __DIR__ . '/tabs/audit.php';
+                break;
+            case 'person_edit':
+                // Person editing without group context - just load people.php
+                if ( ! $people_tab_included ) {
+                    require __DIR__ . '/tabs/people.php';
+                }
+                break;
+            default:
+                // Check if it's a people tab (direct members or child group)
+                $parent_config = $crm->storage->get_group( $current_group );
+                $parent_group_id = $parent_config['id'];
+                $child_groups = $crm->storage->get_child_groups( $parent_group_id );
+
+                $is_person_tab = false;
+                if ( $active_tab === 'members' ) {
+                    $is_person_tab = true;
+                } else {
+                    foreach ( $child_groups as $child ) {
+                        if ( $active_tab === $child['slug'] ) {
+                            $is_person_tab = true;
+                            break;
+                        }
+                    }
+                }
+                if ( $is_person_tab ) {
+                    require __DIR__ . '/tabs/people.php';
+                }
                 break;
         }
         ?>
@@ -353,9 +604,25 @@ $group = ( isset( $config['type'] ) && $config['type'] ) ? $config['type'] : 'te
         <?php endif; ?>
 
     <script>
-        const teamMembers = <?php echo json_encode( $config['team_members'] ); ?>;
-        const leadership = <?php echo json_encode( $config['leadership'] ); ?>;
-        const events = <?php echo json_encode( array_values( $config['events'] ) ); ?>;
+        <?php
+        // Export person data as JavaScript constants
+        if ( isset( $config['members'] ) ) {
+            echo "const members = " . json_encode( $config['members'] ) . ";\n        ";
+        }
+
+        // Export child groups
+        if ( ! empty( $config['id'] ) ) {
+            $child_groups = $crm->storage->get_child_groups( $config['id'] );
+            foreach ( $child_groups as $child ) {
+                $js_var_name = str_replace( array( '-', '_' ), '', ucwords( $child['slug'], '-_' ) );
+                $js_var_name = lcfirst( $js_var_name );
+                if ( isset( $config[ $child['slug'] ] ) ) {
+                    echo "const {$js_var_name} = " . json_encode( $config[ $child['slug'] ] ) . ";\n        ";
+                }
+            }
+        }
+        ?>
+        const events = <?php echo json_encode( array_values( $config['events'] ?? array() ) ); ?>;
         
         function showTab(tabName) {
             // Hide all tab content
@@ -592,33 +859,6 @@ $group = ( isset( $config['type'] ) && $config['type'] ) ? $config['type'] : 'te
                 });
             }
         });
-        
-        // Links management functions
-        function addLink(prefix) {
-            const container = document.getElementById(prefix + 'links-container');
-            const newRow = document.createElement('div');
-            newRow.className = 'link-row';
-            newRow.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
-            newRow.innerHTML = `
-                <input type="text" name="link_text[]" placeholder="Link text (e.g., 'Project docs')" style="flex: 1;">
-                <input type="url" name="link_url[]" placeholder="URL" style="flex: 2;">
-                <button type="button" onclick="removeLink(this)" class="btn-remove">Remove</button>
-            `;
-            container.appendChild(newRow);
-        }
-
-        function removeLink(button) {
-            const row = button.parentNode;
-            const container = row.parentNode;
-
-            // Don't remove if it's the last row - just clear it instead
-            if (container.children.length === 1) {
-                const inputs = row.querySelectorAll('input');
-                inputs.forEach(input => input.value = '');
-            } else {
-                row.remove();
-            }
-        }
 
         // Event links management
         let eventLinkCounter = 0;
@@ -877,26 +1117,19 @@ $group = ( isset( $config['type'] ) && $config['type'] ) ? $config['type'] : 'te
     
     <!-- Footer with admin/privacy links -->
     <footer class="footer-admin">
-        <?php
-        $current_params = $_GET;
-        if ( $privacy_mode ) {
-            $current_params['privacy'] = '0';
-            echo '<a href="?' . http_build_query( $current_params ) . '" class="text-muted" style="text-decoration: none; margin-right: 15px;">🔒 Privacy Mode ON</a>';
-        } else {
-            $current_params['privacy'] = '1';
-            echo '<a href="?' . http_build_query( $current_params ) . '" class="text-muted" style="text-decoration: none; margin-right: 15px;">🔓 Privacy Mode OFF</a>';
-        }
-        ?>
+        <a href="#" id="privacy-toggle" onclick="togglePrivacyMode(); return false;" class="text-muted" style="text-decoration: none; margin-right: 15px;">
+            <span id="privacy-status">🔓 Privacy Mode OFF</span>
+        </a>
         <a href="<?php echo $crm->build_url( 'index.php' ); ?>" class="text-muted" style="text-decoration: none;">👥 Overview</a>
     </footer>
     
     <?php
     if ( function_exists( 'wp_app_enqueue_script' ) ) {
-        wp_app_enqueue_script( 'a8c-hr-cmd-k-js', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js' );
-        wp_app_enqueue_script( 'a8c-hr-script-js', plugin_dir_url( __FILE__ ) . 'assets/script.js' );
+        wp_app_enqueue_script( 'personal-crm-admin-js', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/admin.js' );
+        wp_app_enqueue_script( 'personal-crm-script-js', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/script.js' );
     } else {
-        echo '<script src="' . plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js"></script>';
-        echo '<script src="' . plugin_dir_url( __FILE__ ) . 'assets/script.js"></script>';
+        echo '<script src="' . plugin_dir_url( dirname( __FILE__ ) ) . 'assets/admin.js"></script>';
+        echo '<script src="' . plugin_dir_url( dirname( __FILE__ ) ) . 'assets/script.js"></script>';
     }
 	if ( function_exists( '\wp_app_body_close' ) ) \wp_app_body_close();
     ?>

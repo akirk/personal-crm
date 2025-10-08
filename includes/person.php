@@ -22,7 +22,6 @@ class Person {
 	public $notes; // Additional personal notes
 	public $location; // Location/town
 	public $timezone; // Timezone identifier (e.g., "America/New_York")
-	public $privacy_mode; // Whether privacy mode is enabled for this person
 	public $github; // GitHub username
 	public $github_repos; // Array of GitHub repositories
 	public $wordpress; // WordPress.org username
@@ -39,8 +38,7 @@ class Person {
 	public $category; // Category: team_members, leadership, consultants, or alumni
 	private $original_username; // Store original username for data lookups
 
-	public function __construct( $name, $username = '', $links = array(), $role = '', $privacy_mode = false ) {
-		// Always store original data - privacy masking will be applied at display time
+	public function __construct( $name, $username = '', $links = array(), $role = '' ) {
 		$this->name = $name;
 		$this->nickname = ''; // Will be set later
 		$this->original_username = $username;
@@ -55,7 +53,6 @@ class Person {
 		$this->notes = array();
 		$this->location = '';
 		$this->timezone = '';
-		$this->privacy_mode = $privacy_mode;
 		$this->github = '';
 		$this->github_repos = array();
 		$this->wordpress = '';
@@ -66,42 +63,9 @@ class Person {
 	}
 
 	/**
-	 * Mask a full name for privacy mode
-	 */
-	private function mask_name( $full_name ) {
-		$parts = explode( ' ', trim( $full_name ) );
-		if ( count( $parts ) <= 1 ) {
-			return $full_name; // Only first name, no masking needed
-		}
-
-		// Return first name + masked last name
-		$first_name = $parts[0];
-		$last_name_initial = isset( $parts[ count( $parts ) - 1 ] ) ? substr( $parts[ count( $parts ) - 1 ], 0, 1 ) . '.' : '';
-
-		return $first_name . ' ' . $last_name_initial;
-	}
-
-	/**
-	 * Mask a username for privacy mode
-	 */
-	private function mask_username( $username ) {
-		if ( strlen( $username ) <= 1 ) {
-			return $username; // Too short to mask meaningfully
-		}
-
-		return substr( $username, 0, 1 ) . '...';
-	}
-
-	/**
 	 * Get display name with nickname
 	 */
 	public function get_display_name_with_nickname() {
-		$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
-
-		if ( $privacy_mode ) {
-			return '[Hidden]';
-		}
-
 		$name = $this->name;
 
 		if ( ! empty( $this->nickname ) ) {
@@ -122,15 +86,9 @@ class Person {
 	}
 
 	/**
-	 * Get username (automatically handles privacy mode)
+	 * Get username
 	 */
 	public function get_username() {
-		$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
-
-		if ( $privacy_mode ) {
-			return '[hidden]';
-		}
-
 		return $this->username;
 	}
 
@@ -139,32 +97,8 @@ class Person {
 	 */
 	public function get_profile_url( $additional_params = array() ) {
 		$params = array( 'person' => $this->original_username );
-
-		if ( $this->privacy_mode ) {
-			$params['privacy'] = '1';
-		}
-
 		$params = array_merge( $params, $additional_params );
 		return PersonalCrm::get_instance()->build_url( 'person.php', $params );
-	}
-
-	/**
-	 * Get URL to edit this person in admin
-	 */
-	public function get_edit_url( $additional_params = array() ) {
-		global $current_team;
-		$params = array( 'edit_member' => $this->original_username );
-		
-		if ( $current_team !== 'team' ) {
-			$params['team'] = $current_team;
-		}
-		
-		if ( $this->privacy_mode ) {
-			$params['privacy'] = '1';
-		}
-		
-		$params = array_merge( $params, $additional_params );
-		return 'admin/index.php?' . http_build_query( $params );
 	}
 
 	/**
@@ -450,16 +384,6 @@ class Person {
 			return '';
 		}
 
-		// Handle privacy mode
-		if ( $this->privacy_mode ) {
-			// Show only age if full birthday is available
-			$age = $this->get_age();
-			if ( $age !== null ) {
-				return 'Age ' . $age;
-			}
-			return '[Hidden]';
-		}
-
 		$current_date = new \DateTime();
 		$current_year = (int) $current_date->format( 'Y' );
 
@@ -518,11 +442,6 @@ class Person {
 	 * Get human-readable time until a date
 	 */
 	private function get_time_until_date( $from_date, $to_date ) {
-		// Hide time calculations in privacy mode
-		if ( $this->privacy_mode ) {
-			return '';
-		}
-
 		$diff = $from_date->diff( $to_date );
 
 		if ( $diff->days <= 0 ) {

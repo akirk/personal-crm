@@ -17,7 +17,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 	$action = $_POST['action'];
 
 	if ( $action === 'add_event' ) {
-		$config = $crm->storage->get_group( $current_group );
+		$group_obj = $crm->storage->get_group( $current_group );
 
 		$links = array();
 		if ( ! empty( $_POST['event_links'] ) && is_array( $_POST['event_links'] ) ) {
@@ -30,7 +30,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 			}
 		}
 
-		$event = array(
+		$event_data = array(
 			'name' => sanitize_text_field( $_POST['event_name'] ?? '' ),
 			'start_date' => sanitize_text_field( $_POST['start_date'] ?? '' ),
 			'end_date' => sanitize_text_field( $_POST['end_date'] ?? '' ),
@@ -40,19 +40,15 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 			'links' => $links
 		);
 
-		$config['events'][] = $event;
-
-		if ( $crm->storage->save_group( $current_group, $config ) ) {
+		if ( $crm->storage->save_event( $group_obj->id, $event_data ) ) {
 			$message = 'Event added successfully!';
-			$config = $crm->storage->get_group( $current_group );
 		} else {
 			$error = 'Failed to save event.';
 		}
 	} elseif ( $action === 'edit_event' ) {
-		$config = $crm->storage->get_group( $current_group );
-		$event_index = (int) ( $_POST['event_index'] ?? -1 );
+		$event_id = (int) ( $_POST['event_id'] ?? 0 );
 
-		if ( $event_index < 0 || ! isset( $config['events'][ $event_index ] ) ) {
+		if ( ! $event_id ) {
 			$error = 'Invalid event.';
 		} else {
 			$links = array();
@@ -66,7 +62,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 				}
 			}
 
-			$event = array(
+			$event_data = array(
 				'name' => sanitize_text_field( $_POST['event_name'] ?? '' ),
 				'start_date' => sanitize_text_field( $_POST['start_date'] ?? '' ),
 				'end_date' => sanitize_text_field( $_POST['end_date'] ?? '' ),
@@ -76,49 +72,53 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 				'links' => $links
 			);
 
-			$config['events'][ $event_index ] = $event;
-
-			if ( $crm->storage->save_group( $current_group, $config ) ) {
+			if ( $crm->storage->update_event( $event_id, $event_data ) ) {
 				$message = 'Event updated successfully!';
-				$edit_data = $config['events'][ $event_index ];
-				$edit_data['event_index'] = $event_index;
+				$edit_data = $crm->storage->get_event( $event_id );
 			} else {
 				$error = 'Failed to update event.';
 			}
 		}
 	} elseif ( $action === 'delete_event' ) {
-		$config = $crm->storage->get_group( $current_group );
-		$event_index = (int) ( $_POST['event_index'] ?? -1 );
+		$event_id = (int) ( $_POST['event_id'] ?? 0 );
 
-		if ( $event_index >= 0 && isset( $config['events'][ $event_index ] ) ) {
-			array_splice( $config['events'], $event_index, 1 );
-			if ( $crm->storage->save_group( $current_group, $config ) ) {
-				$message = 'Event deleted successfully!';
-			} else {
-				$error = 'Failed to delete event.';
-			}
+		if ( $event_id && $crm->storage->delete_event( $event_id ) ) {
+			$message = 'Event deleted successfully!';
+		} else {
+			$error = 'Failed to delete event.';
 		}
 	}
+}
+// Load events from database
+$group_obj = $crm->storage->get_group( $current_group );
+$events = $crm->storage->get_group_events( $group_obj->id );
+
+// Handle editing - load event by ID
+$is_editing_event = ! empty( $_GET['edit_event'] );
+$edit_data = null;
+if ( $is_editing_event ) {
+	$event_id = (int) $_GET['edit_event'];
+	$edit_data = $crm->storage->get_event( $event_id );
 }
 ?>
         <!-- Events Tab -->
         <div id="events" class="tab-content <?php echo $active_tab === 'events' ? 'active' : ''; ?>">
-            <?php if ( $is_editing_event ) : ?>
+            <?php if ( $is_editing_event && $edit_data ) : ?>
                 <h2>Edit Event: <?php echo htmlspecialchars( $edit_data['name'] ?? 'Event' ); ?></h2>
             <?php endif; ?>
 
             <?php if ( ! $is_editing_event ) : ?>
                 <h3>Current Events</h3>
-                <?php if ( ! empty( $config['events'] ) ) : ?>
+                <?php if ( ! empty( $events ) ) : ?>
                     <div class="person-list">
-                        <?php foreach ( $config['events'] as $index => $event ) : ?>
+                        <?php foreach ( $events as $event ) : ?>
                             <div class="person-item">
                                 <div class="person-info">
-                                    <h4><?php echo htmlspecialchars( $event['name'] ); ?></h4>
-                                    <small><?php echo htmlspecialchars( $event['start_date'] ); ?> • <?php echo htmlspecialchars( $event['location'] ); ?> • <?php echo ucfirst( $event['type'] ); ?></small>
-                                    <?php if ( ! empty( $event['links'] ) ) : ?>
+                                    <h4><?php echo htmlspecialchars( $event->name ); ?></h4>
+                                    <small><?php echo htmlspecialchars( $event->date->format( 'Y-m-d' ) ); ?> • <?php echo htmlspecialchars( $event->location ); ?> • <?php echo ucfirst( $event->type ); ?></small>
+                                    <?php if ( ! empty( $event->links ) ) : ?>
                                         <div class="person-links" style="margin-top: 8px;">
-                                            <?php foreach ( $event['links'] as $link_text => $link_url ) : ?>
+                                            <?php foreach ( $event->links as $link_text => $link_url ) : ?>
                                                 <a href="<?php echo htmlspecialchars( $link_url ); ?>" target="_blank" class="link-primary text-small" style="margin-right: 10px;">
                                                     <?php echo htmlspecialchars( $link_text ); ?> →
                                                 </a>
@@ -127,10 +127,10 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
                                     <?php endif; ?>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
-                                    <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'events', 'edit_event' => $index ) ); ?>" class="btn">Edit</a>
+                                    <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $current_group, 'tab' => 'events', 'edit_event' => $event->id ) ); ?>" class="btn">Edit</a>
                                     <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this event?')">
                                         <input type="hidden" name="action" value="delete_event">
-                                        <input type="hidden" name="event_index" value="<?php echo $index; ?>">
+                                        <input type="hidden" name="event_id" value="<?php echo $event->id; ?>">
                                         <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
@@ -146,7 +146,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
             <h3 id="event-form-title"><?php echo $is_editing_event ? 'Edit Event' : 'Add New Event'; ?></h3>
             <form method="post" id="event-form">
                 <input type="hidden" id="event-action" name="action" value="<?php echo $is_editing_event ? 'edit_event' : 'add_event'; ?>">
-                <input type="hidden" id="event-index" name="event_index" value="<?php echo $is_editing_event ? htmlspecialchars( $edit_data['event_index'] ) : ''; ?>">
+                <input type="hidden" id="event-id" name="event_id" value="<?php echo $is_editing_event && $edit_data ? htmlspecialchars( $edit_data['id'] ) : ''; ?>">
                 <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                 
                 <div class="form-grid">

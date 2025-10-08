@@ -10,53 +10,44 @@ namespace PersonalCRM;
 require_once __DIR__ . '/personal-crm.php';
 
 $crm = PersonalCrm::get_instance();
-$current_group = $crm->get_current_group_from_params();
-
-if ( $current_group ) {
-	$has_person_param = isset( $_GET['person'] ) ||
-	                   ( function_exists( 'get_query_var' ) && get_query_var( 'person' ) );
-
-	if ( $current_group === $crm->get_default_group() && ! $has_person_param ) {
-		header( 'Location: ' . $crm->build_url( 'index.php' ) );
-		exit;
-	}
-}
-
 extract( PersonalCrm::get_globals() );
 
 $person = $_GET['person'] ?? null;
-$route_team = $_GET['team'] ?? null;
+$back_group = $_GET['back'] ?? null;
 
 if ( empty( $person ) && function_exists( 'get_query_var' ) ) {
 	$person = get_query_var( 'person' );
 }
-if ( empty( $route_team ) && function_exists( 'get_query_var' ) ) {
-	$route_team = get_query_var( 'team' );
-}
-
-if ( ! empty( $route_team ) ) {
-	$current_group = $route_team;
-} elseif ( ! $current_group ) {
-	$current_group = $crm->get_default_group();
+if ( empty( $back_group ) && function_exists( 'get_query_var' ) ) {
+	$back_group = get_query_var( 'back' );
 }
 
 if ( empty( $person ) ) {
-	header( 'Location: ' . $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
+	header( 'Location: ' . $crm->build_url( 'index.php' ) );
 	exit;
 }
 
-$person_data = $crm->get_person_with_category( $current_group, $person );
+$person_data_raw = $crm->storage->get_person( $person );
 
-if ( ! $person_data ) {
-	header( 'Location: ' . $crm->build_url( 'index.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ) );
+if ( ! $person_data_raw ) {
+	header( 'Location: ' . $crm->build_url( 'index.php' ) );
 	exit;
 }
 
-$group_data = $crm->load_group_config_with_objects( $current_group );
+$person_data = $crm->create_person_from_data( $person, $person_data_raw );
 
-$is_team_member = ( $person_data->category === 'team_members' );
-$is_consultant = ( $person_data->category === 'consultants' );
-$is_alumni = ( $person_data->category === 'alumni' );
+$current_group = null;
+$group_data = null;
+if ( ! empty( $back_group ) && $crm->storage->group_exists( $back_group ) ) {
+	$current_group = $back_group;
+	$group_data = $crm->storage->get_group( $current_group );
+	$person_data->team = $current_group;
+}
+
+// Determine person's role based on category (only set if coming from a specific group)
+$is_team_member = ! empty( $person_data->category ) && $person_data->category === 'members';
+$is_consultant = ! empty( $person_data->category ) && stripos( $person_data->category, 'consultant' ) !== false;
+$is_alumni = ! empty( $person_data->category ) && stripos( $person_data->category, 'alumni' ) !== false;
 
 ?>
 <!DOCTYPE html>
@@ -66,7 +57,10 @@ $is_alumni = ( $person_data->category === 'alumni' );
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta name="color-scheme" content="light dark">
 	<title><?php
-	$page_title = esc_html( $person_data->get_display_name_with_nickname() ) . ' - ' . esc_html( $crm->get_group_display_title( $current_group ) );
+	$page_title = esc_html( $person_data->get_display_name_with_nickname() );
+	if ( $current_group ) {
+		$page_title .= ' - ' . esc_html( $crm->get_group_display_title( $current_group ) );
+	}
 	echo function_exists( 'wp_app_title' ) ? wp_app_title( $page_title ) : $page_title;
 	?></title>
 	<?php
@@ -97,18 +91,18 @@ $is_alumni = ( $person_data->category === 'alumni' );
 						<?php if ( ! empty( $person_data->role ) ) : ?>
 							• <?php echo esc_html( $person_data->role ); ?>
 						<?php endif; ?>
-						<?php if ( $is_consultant ) : ?>
-							• Consultant
-						<?php elseif ( $is_alumni ) : ?>
-							• Alumni
+						<?php if ( ! $is_team_member && ! empty( $person_data->category_group ) ) : ?>
+							• <?php echo esc_html( $person_data->category_group ); ?>
 						<?php elseif ( ! empty( $person_data->deceased ) ) : ?>
 							• Deceased
 						<?php endif; ?>
 					</span>
 				</h1>
-				<div class="back-nav">
-					<a href="<?php echo $crm->build_url($current_group ); ?>">← Back to <?php echo $group_data['group_name'], ' ', ucfirst( $group ); ?> Overview</a>
-				</div>
+				<?php if ( $current_group && $group_data ) : ?>
+					<div class="back-nav">
+						<a href="<?php echo $crm->build_url( 'index.php', array( 'group' => $current_group ) ); ?>">← Back to <?php echo htmlspecialchars( $group_data['group_name'] ); ?> Overview</a>
+					</div>
+				<?php endif; ?>
 			</div>
 
 			<?php do_action( 'personal_crm_person_header_tabs', $person_data, $is_team_member, $current_group, $group_data ); ?>
@@ -126,19 +120,11 @@ $is_alumni = ( $person_data->category === 'alumni' );
 						<?php $gravatar_url = $person_data->get_gravatar_url( 100 ); ?>
 						<?php if ( $gravatar_url ) : ?>
 							<div class="person-avatar-section">
-								<?php if ( $privacy_mode ) : ?>
-									<img src="<?php echo esc_url( $gravatar_url ); ?>"
-										 alt="<?php echo esc_attr( $person_data->get_display_name_with_nickname() ); ?>"
-										 class="gravatar-large privacy-blur"
-										 width="100"
-										 height="100">
-								<?php else : ?>
-									<img src="<?php echo esc_url( $gravatar_url ); ?>"
-										 alt="<?php echo esc_attr( $person_data->get_display_name_with_nickname() ); ?>"
-										 class="gravatar-large"
-										 width="100"
-										 height="100">
-								<?php endif; ?>
+								<img src="<?php echo esc_url( $gravatar_url ); ?>"
+									 alt="<?php echo esc_attr( $person_data->get_display_name_with_nickname() ); ?>"
+									 class="gravatar-large"
+									 width="100"
+									 height="100">
 								<?php if ( ! empty( $person_data->role ) ) : ?>
 									<div class="person-name-badge"><?php echo esc_html( $person_data->get_display_name_with_nickname() ); ?></div>
 								<?php endif; ?>
@@ -167,43 +153,28 @@ $is_alumni = ( $person_data->category === 'alumni' );
 									if ( $is_deceased && $deceased_date ) {
 										// For deceased people, show birth-death dates with age at death
 										$age_at_death = $deceased_date->diff( $birth_date )->y;
-										if ( $privacy_mode ) {
-											$age_display = $birth_date->format( 'F Y' ) . ' - ' . $deceased_date->format( 'F Y' ) . ' (aged ' . $age_at_death . ')';
-										} else {
-											$age_display = $birth_date->format( 'F j, Y' ) . ' - ' . $deceased_date->format( 'F j, Y' ) . ' (aged ' . $age_at_death . ')';
-										}
+										$age_display = $birth_date->format( 'F j, Y' ) . ' - ' . $deceased_date->format( 'F j, Y' ) . ' (aged ' . $age_at_death . ')';
 									} else {
 										// For living people, calculate current age
 										$current_date = new \DateTime();
 										$age = $current_date->diff( $birth_date )->y;
-										if ( $privacy_mode ) {
-											$age_display = $birth_date->format( 'F' );
-										} else {
-											$age_display = $age . ' (born ' . $birth_date->format( 'F j, Y' ) . ')';
-										}
+										$age_display = $age . ' (born ' . $birth_date->format( 'F j, Y' ) . ')';
 									}
 								}
 							} elseif ( preg_match( '/^\d{2}-\d{2}$/', $person_data->birthday ) ) {
 								// Legacy MM-DD format - limited calculation
-								if ( $privacy_mode ) {
-									$display_date = \DateTime::createFromFormat( 'm-d', $person_data->birthday );
-									if ( $display_date ) {
-										$age_display = $display_date->format( 'F' );
-									}
-								} else {
-									$display_date = \DateTime::createFromFormat( 'm-d', $person_data->birthday );
-									if ( $display_date ) {
-										if ( $is_deceased && $deceased_date ) {
-											$age_display = 'Birthday ' . $display_date->format( 'F j' ) . ' - passed away ' . $deceased_date->format( 'F j, Y' );
-										} else {
-											$age_display = 'Birthday ' . $display_date->format( 'F j' );
-										}
+								$display_date = \DateTime::createFromFormat( 'm-d', $person_data->birthday );
+								if ( $display_date ) {
+									if ( $is_deceased && $deceased_date ) {
+										$age_display = 'Birthday ' . $display_date->format( 'F j' ) . ' - passed away ' . $deceased_date->format( 'F j, Y' );
+									} else {
+										$age_display = 'Birthday ' . $display_date->format( 'F j' );
 									}
 								}
 							}
 							?>
 							<?php if ( $age_display ) : ?>
-								<p><strong>🎂 <?php echo $privacy_mode ? 'Birthday:' : ($is_deceased ? 'Life span:' : 'Age:'); ?></strong> <?php echo esc_html( $age_display ); ?></p>
+								<p><strong>🎂 <?php echo $is_deceased ? 'Life span:' : 'Age:'; ?></strong> <?php echo esc_html( $age_display ); ?></p>
 							<?php endif; ?>
 						<?php endif; ?>
 
@@ -214,17 +185,13 @@ $is_alumni = ( $person_data->category === 'alumni' );
 							if ( $anniversary_date ) {
 								$current_date = new \DateTime();
 								$years_at_company = $current_date->diff( $anniversary_date )->y;
-								
-								if ( $privacy_mode ) {
-									echo '<p><strong>🏢 Years at Company:</strong> ' . $years_at_company . ' years</p>';
+
+								if ( $years_at_company == 0 ) {
+									// First year - show start date
+									echo '<p><strong>🏢 Years at Company:</strong> Started ' . esc_html( $anniversary_date->format( 'F j, Y' ) ) . ' (less than 1 year)</p>';
 								} else {
-									if ( $years_at_company == 0 ) {
-										// First year - show start date
-										echo '<p><strong>🏢 Years at Company:</strong> Started ' . esc_html( $anniversary_date->format( 'F j, Y' ) ) . ' (less than 1 year)</p>';
-									} else {
-										// Multiple years - show time at company and start date
-										echo '<p><strong>🏢 Years at Company:</strong> ' . $years_at_company . ' years (started ' . esc_html( $anniversary_date->format( 'F j, Y' ) ) . ')</p>';
-									}
+									// Multiple years - show time at company and start date
+									echo '<p><strong>🏢 Years at Company:</strong> ' . $years_at_company . ' years (started ' . esc_html( $anniversary_date->format( 'F j, Y' ) ) . ')</p>';
 								}
 							}
 							?>
@@ -252,22 +219,14 @@ $is_alumni = ( $person_data->category === 'alumni' );
 						<?php if ( ! empty( $person_data->location ) ) : ?>
 							<p>
 								<strong>🌍 Location:</strong>
-								<?php
-								$display_location = $person_data->location;
-								if ( $privacy_mode ) {
-									// Extract country from location (assume country is last part after comma)
-									$location_parts = array_map( 'trim', explode( ',', $person_data->location ) );
-									$display_location = end( $location_parts ); // Get the last part (country)
-								}
-								?>
-								<a href="https://maps.google.com/maps?q=<?php echo urlencode( $privacy_mode ? $display_location : $person_data->location ); ?>" target="_blank" class="location-link"><?php echo esc_html( $display_location ); ?></a>
+								<a href="https://maps.google.com/maps?q=<?php echo urlencode( $person_data->location ); ?>" target="_blank" class="location-link"><?php echo esc_html( $person_data->location ); ?></a>
 								<?php if ( empty( $person_data->deceased ) ) : ?>
 									<span id="time-<?php echo esc_attr( $person ); ?>" class="timezone-display"></span>
 								<?php endif; ?>
 							</p>
 						<?php endif; ?>
 
-						<?php if ( ! empty( $person_data->partner ) && ! $privacy_mode ) : ?>
+						<?php if ( ! empty( $person_data->partner ) ) : ?>
 							<p><strong>💑 Partner:</strong> <?php echo esc_html( $person_data->partner ); ?>
 							<?php if ( ! empty( $person_data->partner_birthday ) ) : ?>
 								<?php
@@ -298,10 +257,7 @@ $is_alumni = ( $person_data->category === 'alumni' );
 						<?php if ( ! empty( $kids_with_ages ) ) : ?>
 							<p>
 								<strong>👨‍👩‍👧‍👦 Children:</strong>
-								<?php if ( $privacy_mode ) : ?>
-									<?php echo count( $kids_with_ages ); ?> child<?php echo count( $kids_with_ages ) !== 1 ? 'ren' : ''; ?>
-								<?php else : ?>
-									<?php foreach ( $kids_with_ages as $kid ) : ?>
+								<?php foreach ( $kids_with_ages as $kid ) : ?>
 										<?php 
 										// Build tooltip text with available birth data
 										$tooltip = '';
@@ -328,12 +284,26 @@ $is_alumni = ( $person_data->category === 'alumni' );
 												(born <?php echo $kid['birth_year']; ?>)
 											<?php endif; ?>
 										</span>
-									<?php endforeach; ?>
-								<?php endif; ?>
+								<?php endforeach; ?>
 							</p>
 						<?php endif; ?>
 					</div>
+				<?php endif; ?>
 
+				<?php if ( ! empty( $person_data_raw['groups'] ) && is_array( $person_data_raw['groups'] ) ) : ?>
+					<div class="section">
+						<h2>Teams</h2>
+						<div class="teams-list">
+							<?php foreach ( $person_data_raw['groups'] as $group ) : ?>
+								<a href="<?php echo esc_url( $crm->build_url( 'index.php', array( 'group' => $group['slug'] ) ) ); ?>" class="team-badge">
+									<?php echo htmlspecialchars( $group['group_name'] ); ?>
+								</a>
+							<?php endforeach; ?>
+						</div>
+					</div>
+				<?php endif; ?>
+
+				<?php if ( ! empty( $person_data->birthday ) || ! empty( $person_data->company_anniversary ) || ! empty( $kids_with_ages ) || ! empty( $person_data->notes ) || ! empty( $person_data->location ) || ! empty( $person_data->partner ) || ! empty( $person_data->partner_birthday ) ) : ?>
 					<?php
 					// Check if person has any external accounts or GitHub repos
 					$has_github = ! empty( $person_data->github );
@@ -356,16 +326,7 @@ $is_alumni = ( $person_data->category === 'alumni' );
 							if ( ! empty( $repos ) ) :
 							?>
 								<div class="github-repo-grid">
-									<?php if ( $privacy_mode ) : ?>
-										<?php for ( $i = 0; $i < count( $repos ); $i++ ) : ?>
-											<div class="github-repo-card">
-												<span class="github-repo-link privacy-hidden">
-													📦 [Repository <?php echo $i + 1; ?>]
-												</span>
-											</div>
-										<?php endfor; ?>
-									<?php else : ?>
-										<?php foreach ( $repos as $repo ) : ?>
+									<?php foreach ( $repos as $repo ) : ?>
 											<div class="github-repo-card">
 												<a href="https://github.com/<?php echo esc_attr( $repo ); ?>" target="_blank" class="github-repo-link">
 													📦 <?php echo esc_html( $repo ); ?>
@@ -374,8 +335,7 @@ $is_alumni = ( $person_data->category === 'alumni' );
 													<a href="https://github.com/<?php echo esc_attr( $repo ); ?>/pulls/<?php echo esc_attr( $person_data->github ); ?>" target="_blank" class="github-pr-link">PRs</a>
 												<?php endif; ?>
 											</div>
-										<?php endforeach; ?>
-									<?php endif; ?>
+									<?php endforeach; ?>
 								</div>
 							<?php endif; ?>
 						</div>
@@ -393,7 +353,7 @@ $is_alumni = ( $person_data->category === 'alumni' );
 					}
 					$has_other_links = ! empty( $filtered_links );
 					$has_activity_links = $is_team_member && ! empty( $person_data->username ) && isset( $group_data['activity_url_prefix'] ) && ! $crm->is_social_group( $current_group );
-					$has_add_note_link = ! $privacy_mode && ! $has_notes;
+					$has_add_note_link = ! $has_notes;
 					?>
 
 					<?php if ( $has_other_links || $has_activity_links || $has_add_note_link ) : ?>
@@ -412,7 +372,7 @@ $is_alumni = ( $person_data->category === 'alumni' );
 									<?php endforeach; ?>
 							<?php endif; ?>
 
-							<?php if ( ! $privacy_mode && ! $has_notes ) : ?>
+							
 								<a href="#" onclick="toggleAddNoteForm(); return false;" class="quick-link">
 									<span style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; margin-right: 8px; font-size: 14px;">📝</span>
 									Add note
@@ -421,13 +381,13 @@ $is_alumni = ( $person_data->category === 'alumni' );
 
 							<?php
 							// Allow plugins to add quick links
-							do_action( 'personal_crm_person_quick_links', $person_data, $is_team_member, $group, $group_data, $privacy_mode );
+							do_action( 'personal_crm_person_quick_links', $person_data, $is_team_member, $group, $group_data );
 							?>
 							</div>
 						</div>
 					<?php endif; ?>
 
-					<?php if ( ! $privacy_mode ) : ?>
+					
 						<?php 
 						$view_mode = $_GET['notes_view'] ?? 'compiled'; 
 						?>
@@ -437,10 +397,10 @@ $is_alumni = ( $person_data->category === 'alumni' );
 									<strong>📝 Notes:</strong>
 									<div class="notes-controls">
 										<?php if ( $view_mode === 'chronological' ) : ?>
-											<a href="<?php echo $crm->build_url( 'person.php', array( 'person' => $person, 'notes_view' => 'compiled', 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
+											<a href="<?php echo $crm->build_url( 'person.php', array( 'person' => $person, 'notes_view' => 'compiled' ) ); ?>"
 											   class="timeline-toggle">← Compiled view</a>
 										<?php else : ?>
-											<a href="<?php echo $crm->build_url( 'person.php', array( 'person' => $person, 'notes_view' => 'chronological', 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>"
+											<a href="<?php echo $crm->build_url( 'person.php', array( 'person' => $person, 'notes_view' => 'chronological' ) ); ?>"
 											   class="timeline-toggle">Timeline view →</a>
 										<?php endif; ?>
 										<button type="button" onclick="toggleAddNoteForm()" class="add-note-btn">Add note</button>
@@ -449,34 +409,31 @@ $is_alumni = ( $person_data->category === 'alumni' );
 								
 								<?php if ( $view_mode === 'chronological' ) : ?>
 									<div class="notes-chronological">
-										<?php foreach ( $person_data->notes as $note_index => $note ) : ?>
+										<?php foreach ( $person_data->notes as $note ) : ?>
+										<?php $note_id = $note['id']; ?>
 											<div class="note">
 												<div class="note-header">
 													<small class="note-date"><?php echo esc_html( $note['date'] ); ?></small>
 													<div class="note-actions">
-														<button type="button" onclick="toggleEditNote(<?php echo $note_index; ?>)" class="edit-note-btn">✏️ Edit</button>
-														<button type="button" onclick="deleteNote(<?php echo $note_index; ?>)" class="delete-note-btn">🗑️ Delete</button>
+														<button type="button" onclick="toggleEditNote(<?php echo $note_id; ?>)" class="edit-note-btn">✏️ Edit</button>
+														<button type="button" onclick="deleteNote(<?php echo $note_id; ?>)" class="delete-note-btn">🗑️ Delete</button>
 													</div>
 												</div>
-												<div class="note-display" id="note-display-<?php echo $note_index; ?>">
+												<div class="note-display" id="note-display-<?php echo $note_id; ?>">
 													<p class="note-text"><?php echo nl2br( esc_html( $note['text'] ) ); ?></p>
 												</div>
-												<form method="post" action="<?php echo $crm->build_url( 'admin/index.php' ); ?>" class="edit-note-form" id="edit-note-form-<?php echo $note_index; ?>" style="display: none;">
+												<form method="post" action="<?php echo $crm->build_url( 'admin/person.php', array( 'person' => $person ) ); ?>" class="edit-note-form" id="edit-note-form-<?php echo $note_id; ?>" style="display: none;">
 													<input type="hidden" name="action" value="edit_note">
 													<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
-													<input type="hidden" name="group" value="<?php echo esc_attr( $current_group ); ?>">
-													<input type="hidden" name="note_index" value="<?php echo $note_index; ?>">
+													<input type="hidden" name="note_id" value="<?php echo $note_id; ?>">
 													<input type="hidden" name="return_to_person" value="1">
-													<?php if ( $privacy_mode ) : ?>
-														<input type="hidden" name="privacy" value="1">
-													<?php endif; ?>
 													<?php if ( isset( $_GET['notes_view'] ) ) : ?>
 														<input type="hidden" name="notes_view" value="<?php echo esc_attr( $_GET['notes_view'] ); ?>">
 													<?php endif; ?>
 													<textarea name="edit_note_text" rows="3" required><?php echo esc_textarea( $note['text'] ); ?></textarea>
 													<div class="form-actions">
 														<button type="submit">Save Changes</button>
-														<button type="button" onclick="toggleEditNote(<?php echo $note_index; ?>)" class="cancel-btn">Cancel</button>
+														<button type="button" onclick="toggleEditNote(<?php echo $note_id; ?>)" class="cancel-btn">Cancel</button>
 													</div>
 												</form>
 											</div>
@@ -493,15 +450,11 @@ $is_alumni = ( $person_data->category === 'alumni' );
 										<p class="notes-content"><?php echo nl2br( esc_html( trim( $compiled_text ) ) ); ?></p>
 									</div>
 								<?php endif; ?>
-								
-								<form method="post" action="<?php echo $crm->build_url( 'admin/index.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
+
+								<form method="post" action="<?php echo $crm->build_url( 'admin/person.php', array( 'person' => $person ) ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
 									<input type="hidden" name="action" value="add_note">
 									<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
-									<input type="hidden" name="group" value="<?php echo esc_attr( $current_group ); ?>">
 									<input type="hidden" name="return_to_person" value="1">
-									<?php if ( $privacy_mode ) : ?>
-										<input type="hidden" name="privacy" value="1">
-									<?php endif; ?>
 									<?php if ( isset( $_GET['notes_view'] ) ) : ?>
 										<input type="hidden" name="notes_view" value="<?php echo esc_attr( $_GET['notes_view'] ); ?>">
 									<?php endif; ?>
@@ -514,16 +467,12 @@ $is_alumni = ( $person_data->category === 'alumni' );
 							</div>
 						<?php endif; ?>
 						
-						<?php if ( ! $privacy_mode && ! $has_notes ) : ?>
+						
 							<!-- Hidden form for adding notes when no notes exist -->
-							<form method="post" action="<?php echo $crm->build_url( 'admin/index.php' ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
+							<form method="post" action="<?php echo $crm->build_url( 'admin/person.php', array( 'person' => $person ) ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
 								<input type="hidden" name="action" value="add_note">
 								<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
-								<input type="hidden" name="group" value="<?php echo esc_attr( $current_group ); ?>">
 								<input type="hidden" name="return_to_person" value="1">
-								<?php if ( $privacy_mode ) : ?>
-									<input type="hidden" name="privacy" value="1">
-								<?php endif; ?>
 								<div class="notes-section">
 									<div class="notes-header">
 										<strong>📝 Add your first note:</strong>
@@ -585,11 +534,13 @@ $is_alumni = ( $person_data->category === 'alumni' );
 			</div>
 
 			<div class="events-sidebar">
-				<a href="<?php echo $crm->build_url( 'events.php', array( 'privacy' => $privacy_mode ? '1' : '0' ) ); ?>" class="sidebar-section-link">
+				<a href="<?php echo $crm->build_url( 'events.php' ); ?>" class="sidebar-section-link">
 					<h3 class="sidebar-section-heading">🗓️ Upcoming Events</h3>
 				</a>
 				<?php
-				$crm->render_upcoming_events_sidebar( $group_data, 365, $person, false );
+				if ( $group_data ) {
+					$crm->render_upcoming_events_sidebar( $group_data, 365, $person, false );
+				}
 				?>
 
 				<?php
@@ -600,17 +551,17 @@ $is_alumni = ( $person_data->category === 'alumni' );
 		</div>
 
 		<footer class="privacy-footer">
-			<?php if ( $privacy_mode ) : ?>
-				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>">🔒 Privacy Mode ON</a>
-			<?php else : ?>
-				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>">🔓 Privacy Mode OFF</a>
-			<?php endif; ?>
+			<a href="#" id="privacy-toggle" onclick="togglePrivacyMode(); return false;">
+				<span id="privacy-status">🔓 Privacy Mode OFF</span>
+			</a>
 			<?php
 			// Allow other plugins to add footer links
-			do_action( 'personal_crm_footer_links', $group_data, $current_group );
+			if ( $current_group && $group_data ) {
+				do_action( 'personal_crm_footer_links', $group_data, $current_group );
+			}
 			?>
-			<a href="<?php echo $crm->build_url( 'admin/index.php' ); ?>">⚙️ Admin Panel</a>
-			<a href="/crm/admin/<?php echo $current_group; ?>/person/<?php echo $person; ?>/">✏️ Edit Person</a>
+			<a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $current_group ) ); ?>">⚙️ Admin Panel</a>
+			<a href="<?php echo $crm->build_url( 'admin/person.php', array( 'person' => $person ) ); ?>" id="edit-person-link">✏️ Edit Person</a>
 		</footer>
 	</div>
 
@@ -633,13 +584,16 @@ $is_alumni = ( $person_data->category === 'alumni' );
 			// Keyboard shortcut: Press 'e' to edit person
 			document.addEventListener('keydown', (event) => {
 				// Only trigger if not typing in an input field
-				if (event.target.tagName.toLowerCase() !== 'input' && 
-					event.target.tagName.toLowerCase() !== 'textarea' && 
+				if (event.target.tagName.toLowerCase() !== 'input' &&
+					event.target.tagName.toLowerCase() !== 'textarea' &&
 					!event.target.isContentEditable) {
-					
+
 					if (event.key.toLowerCase() === 'e') {
 						event.preventDefault();
-						window.location.href = '<?php echo addslashes( $person_data->get_edit_url() ); ?>';
+						const editLink = document.getElementById('edit-person-link');
+						if (editLink) {
+							window.location.href = editLink.href;
+						}
 					}
 				}
 			});
@@ -680,19 +634,15 @@ $is_alumni = ( $person_data->category === 'alumni' );
 			if (confirm('Are you sure you want to delete this note?')) {
 				const form = document.createElement('form');
 				form.method = 'post';
-				form.action = '<?php echo addslashes( $crm->build_url( 'admin/index.php' ) ); ?>';
+				form.action = '<?php echo addslashes( $crm->build_url( 'admin/person.php', array( 'person' => $person ) ) ); ?>';
 
 				const fields = {
 					'action': 'delete_note',
 					'username': '<?php echo addslashes( $person ); ?>',
-					'group': '<?php echo addslashes( $current_group ); ?>',
-					'note_index': noteIndex,
+					'note_id': noteIndex,
 					'return_to_person': '1'
 				};
 
-				<?php if ( $privacy_mode ) : ?>
-				fields.privacy = '1';
-				<?php endif; ?>
 				<?php if ( isset( $_GET['notes_view'] ) ) : ?>
 				fields.notes_view = '<?php echo addslashes( $_GET['notes_view'] ); ?>';
 				<?php endif; ?>

@@ -14,21 +14,39 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
  */
 if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POST['action'] === 'save_team_links' ) {
 	$crm = PersonalCrm::get_instance();
-	$config = $crm->storage->get_group( $current_group );
+	$group_obj = $crm->storage->get_group( $current_group );
 
-	$team_links = array();
+	// Get existing links for comparison
+	$existing_links = $crm->storage->get_group_links_by_id( $group_obj->id );
+
+	// Process submitted links
+	$submitted_links = array();
 	if ( isset( $_POST['team_links'] ) && is_array( $_POST['team_links'] ) ) {
 		foreach ( $_POST['team_links'] as $link_data ) {
 			$link_text = trim( sanitize_text_field( $link_data['text'] ?? '' ) );
 			$link_url = trim( sanitize_url( $link_data['url'] ?? '' ) );
 			if ( ! empty( $link_text ) && ! empty( $link_url ) ) {
-				$team_links[ $link_text ] = $link_url;
+				$submitted_links[ $link_text ] = $link_url;
 			}
 		}
 	}
-	$config['team_links'] = $team_links;
 
-	if ( $crm->storage->save_group( $current_group, $config ) ) {
+	// Delete links that were removed
+	foreach ( $existing_links as $link_name => $link_url ) {
+		if ( ! isset( $submitted_links[ $link_name ] ) ) {
+			$crm->storage->delete_group_link( $group_obj->id, $link_name );
+		}
+	}
+
+	// Save or update links
+	$success = true;
+	foreach ( $submitted_links as $link_name => $link_url ) {
+		if ( ! $crm->storage->save_group_link( $group_obj->id, $link_name, $link_url ) ) {
+			$success = false;
+		}
+	}
+
+	if ( $success ) {
 		$message = 'Links saved successfully!';
 	} else {
 		$error = 'Failed to save links.';

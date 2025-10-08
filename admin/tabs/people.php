@@ -19,17 +19,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
  * Render birthday dropdown fields (day, month, year)
  * Reusable helper to avoid 116 lines of duplication
  */
-function render_birthday_dropdown( $field_prefix, $value, $privacy_mode ) {
-	if ( $privacy_mode ) {
-		?>
-		<input type="hidden" name="<?php echo $field_prefix; ?>_day" value="">
-		<input type="hidden" name="<?php echo $field_prefix; ?>_month" value="">
-		<input type="hidden" name="<?php echo $field_prefix; ?>_year" value="">
-		<p class="text-muted italic-text">Hidden in privacy mode</p>
-		<?php
-		return;
-	}
-
+function render_birthday_dropdown( $field_prefix, $value ) {
 	// Parse existing date
 	$day = $month = $year = '';
 	if ( ! empty( $value ) ) {
@@ -90,14 +80,6 @@ function render_birthday_dropdown( $field_prefix, $value, $privacy_mode ) {
 	<?php
 }
 
-function mask_date_input( $date, $privacy_mode ) {
-	if ( ! $privacy_mode || empty( $date ) ) {
-		return $date;
-	}
-
-	return ''; // Hide the date input value in privacy mode
-}
-
 /**
  * Get person type configuration
  */
@@ -105,59 +87,38 @@ function get_person_type_config( $person_type ) {
 	global $group, $current_group;
 	$crm = PersonalCrm::get_instance();
 
-	$configs = array(
-		'member' => array(
-			'section_key' => 'team_members',
-			'form_prefix' => '',
-			'form_id' => 'member-form',
-			'edit_action' => 'edit_member',
-			'add_action' => 'add_member',
-			'delete_action' => 'delete_member',
-			'edit_text' => 'Update ' . $crm->get_type_display_word( $current_group ) . ' Member',
-			'add_text' => 'Add ' . $crm->get_type_display_word( $current_group ) . ' Member',
-			'display_name' => $crm->get_type_display_word( $current_group ) . ' Member',
-			'show_hr_feedback' => true,
-			'show_alumni_actions' => ! $crm->is_social_group( $current_group ),
-		),
-		'leader' => array(
-			'section_key' => 'leadership',
-			'form_prefix' => 'leader-',
-			'form_id' => 'leader-form',
-			'edit_action' => 'edit_leadership',
-			'add_action' => 'add_leadership',
-			'delete_action' => 'delete_leader',
-			'edit_text' => 'Update Leadership',
-			'add_text' => 'Add Leadership',
-			'display_name' => 'Leadership',
-			'show_hr_feedback' => false,
-			'show_alumni_actions' => ! $crm->is_social_group( $current_group ),
-		),
-		'consultants' => array(
-			'section_key' => 'consultants',
-			'form_prefix' => 'consultant-',
-			'form_id' => 'consultant-form',
-			'edit_action' => 'edit_consultants',
-			'add_action' => 'add_consultants',
-			'delete_action' => 'delete_consultant',
-			'edit_text' => 'Update Consultant',
-			'add_text' => 'Add Consultant',
-			'display_name' => 'Consultant',
-			'show_hr_feedback' => false,
-			'show_alumni_actions' => false,
-		),
-		'alumni' => array(
-			'section_key' => 'alumni',
-			'form_prefix' => 'alumni-',
-			'form_id' => 'alumni-form',
-			'edit_action' => 'edit_alumni',
-			'add_action' => null, // Alumni can only be created by moving existing members
-			'delete_action' => 'delete_alumni',
-			'edit_text' => 'Update Alumni',
-			'add_text' => null,
-			'display_name' => 'Alumni',
-			'show_hr_feedback' => false,
-			'show_alumni_actions' => false,
-		),
+	$person_types = $crm->storage->get_person_types( $current_group );
+
+	$configs = array();
+	foreach ( $person_types as $type ) {
+		$type_key = $type['type_key'];
+		$form_prefix = $type_key === 'team_members' ? '' : $type_key . '-';
+
+		$configs[ $type_key ] = array(
+			'section_key' => $type_key,
+			'form_prefix' => $form_prefix,
+			'form_id' => $type_key . '-form',
+			'edit_action' => 'edit_' . $type_key,
+			'add_action' => $type['can_add'] ? 'add_' . $type_key : null,
+			'delete_action' => 'delete_' . $type_key,
+			'edit_text' => 'Update ' . $type['display_name'],
+			'add_text' => $type['can_add'] ? 'Add ' . $type['display_name'] : null,
+			'display_name' => $type['display_name'],
+			'display_icon' => $type['display_icon'],
+		);
+	}
+
+	$configs['alumni'] = array(
+		'section_key' => 'alumni',
+		'form_prefix' => 'alumni-',
+		'form_id' => 'alumni-form',
+		'edit_action' => 'edit_alumni',
+		'add_action' => null,
+		'delete_action' => 'delete_alumni',
+		'edit_text' => 'Update Alumni',
+		'add_text' => null,
+		'display_name' => 'Alumni',
+		'display_icon' => '🎓',
 	);
 
 	return $configs[ $person_type ] ?? null;
@@ -186,7 +147,10 @@ function generate_username_from_name( $name ) {
  */
 function create_person_data_from_form() {
 	global $current_group, $crm;
-	$is_social_group = $crm->is_social_group( $current_group );
+	if ( ! $crm ) {
+		$crm = \PersonalCrm\PersonalCrm::get_instance();
+	}
+	$is_social_group = $current_group ? $crm->is_social_group( $current_group ) : false;
 
 	// Parse links data from form
 	$links = array();
@@ -257,7 +221,6 @@ function create_person_data_from_form() {
 		'partner' => sanitize_text_field( $_POST['partner'] ?? '' ),
 		'partner_birthday' => $partner_birthday,
 		'kids' => parse_kids_data( $_POST['kids'] ?? '' ),
-		'notes' => create_notes_from_form(),
 		'personal_events' => parse_personal_events_data( $_POST['personal_events'] ?? array() ),
 		'deceased' => !empty( $_POST['deceased'] ) ? 1 : 0,
 		'deceased_date' => sanitize_text_field( $_POST['deceased_date'] ?? '' ),
@@ -287,44 +250,6 @@ function create_person_data_from_form() {
 	}
 
 	return $data;
-}
-
-/**
- * Create notes array from form input
- */
-function create_notes_from_form() {
-	global $config_file;
-	$notes = array();
-
-	// Get existing notes if we're editing
-	if ( isset( $_POST['action'] ) && in_array( $_POST['action'], array( 'edit_member', 'edit_leadership', 'edit_consultants', 'edit_alumni' ) ) && isset( $_POST['username'] ) ) {
-		global $current_group;
-		$crm = PersonalCrm::get_instance();
-		$team_data = $crm->storage->get_group( $current_group );
-		$username = sanitize_text_field( $_POST['username'] );
-
-		// Check all person types for existing data
-		foreach ( array( 'team_members', 'leadership', 'consultants', 'alumni' ) as $type ) {
-			if ( isset( $team_data[$type][$username] ) ) {
-				$existing_data = $team_data[$type][$username];
-				if ( ! empty( $existing_data['notes'] ) && is_array( $existing_data['notes'] ) ) {
-					$notes = $existing_data['notes'];
-				}
-				break;
-			}
-		}
-	}
-
-	// Add new note if provided
-	$new_note = sanitize_textarea_field( $_POST['new_note'] ?? '' );
-	if ( ! empty( $new_note ) ) {
-		$notes[] = array(
-			'date' => date( 'Y-m-d H:i' ),
-			'text' => $new_note
-		);
-	}
-
-	return $notes;
 }
 
 /**
@@ -483,10 +408,6 @@ function format_kids_for_form( $kids ) {
 }
 
 function get_person_form_value( $field_name, $edit_data = array(), $is_editing = false, $error = '' ) {
-	$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
-	$crm = PersonalCrm::get_instance();
-
-
 	// Use global error if no error parameter provided
 	if ( empty( $error ) ) {
 		global $error;
@@ -502,13 +423,9 @@ function get_person_form_value( $field_name, $edit_data = array(), $is_editing =
 	}
 
 	// Handle special cases
-	if ( $field_name === 'name' && $privacy_mode && ! empty( $value ) ) {
-		$value = $crm->mask_name( $value, true );
-	} elseif ( $field_name === 'location' && empty( $value ) && $is_editing ) {
+	if ( $field_name === 'location' && empty( $value ) && $is_editing ) {
 		// Fallback to 'town' field for backward compatibility
 		$value = $edit_data['town'] ?? '';
-	} elseif ( $field_name === 'company_anniversary' && $privacy_mode ) {
-		$value = mask_date_input( $value, $privacy_mode );
 	}
 
 	return htmlspecialchars( $value );
@@ -563,8 +480,8 @@ function handle_person_action( $action, $config, $person_data ) {
 			// Allow plugins to save additional data
 			do_action( 'personal_crm_admin_person_save', $username, $_POST, $config['section_key'] );
 
-			// Redirect to person view using proper route pattern {team}/{person}
-			$redirect_url = '/crm/' . sanitize_key( $current_group ) . '/' . sanitize_key( $username );
+			// Redirect to person view
+			$redirect_url = $crm->build_url( 'person.php', array( 'person' => $username ) );
 			header( 'Location: ' . $redirect_url );
 			exit;
 		} else {
@@ -619,96 +536,94 @@ function handle_person_action( $action, $config, $person_data ) {
  * PERSON-RELATED POST HANDLERS
  * ==================================================
  */
+_POST['action'] . ')' : 'NO' ) );
 
 // Handle POST requests for person operations
 if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 	$action = $_POST['action'];
 
-	switch ( $action ) {
-		case 'edit_member':
-		case 'add_member':
-			$member_config = get_person_type_config( 'member' );
+	// Handle standard person actions first (add_person, edit_person, delete_person)
+	if ( in_array( $action, array( 'add_person', 'edit_person', 'delete_person', 'move_to_alumni' ), true ) ) {
+		switch ( $action ) {
+
+		case 'add_person':
+		case 'edit_person':
 			$person_data = create_person_data_from_form();
-			$result = handle_person_action( $action, $member_config, $person_data );
-			if ( isset( $result['error'] ) ) {
-				$error = $result['error'];
-			} elseif ( isset( $result['message'] ) ) {
-				$message = $result['message'];
+			$username = sanitize_text_field( $_POST['username'] ?? '' );
+			$original_username = sanitize_text_field( $_POST['original_username'] ?? '' );
+			$group_ids = $_POST['group_ids'] ?? array();
+
+			// Auto-generate username if empty and belongs to a social group
+			if ( empty( $username ) ) {
+				// Check if any of the selected groups are social groups
+				$is_social = false;
+				foreach ( $group_ids as $gid ) {
+					$group_data = $crm->storage->get_group_by_id( intval( $gid ) );
+					if ( $group_data && isset( $group_data['type'] ) && $group_data['type'] === 'group' ) {
+						$is_social = true;
+						break;
+					}
+				}
+				if ( $is_social ) {
+					$name = $person_data['name'] ?? '';
+					$username = strtolower( str_replace( ' ', '.', $name ) );
+					$username = preg_replace( '/[^a-z0-9._-]/', '', $username );
+				}
+			}
+
+			if ( empty( $username ) ) {
+				$error = 'Username is required.';
+				break;
+			}
+
+			// If editing and username changed, update the username
+			if ( $action === 'edit_person' && ! empty( $original_username ) && $original_username !== $username ) {
+				// Delete old person
+				$crm->storage->delete_person( $original_username );
+			}
+
+			// Convert group_ids to integers
+			$group_ids = array_map( 'intval', array_filter( $group_ids ) );
+
+			$save_result = $crm->storage->save_person( $username, $person_data, $group_ids );
+
+			if ( $save_result ) {
+				$message = $action === 'edit_person' ? 'Person updated successfully!' : 'Person added successfully!';
+				// Redirect to person view
+				$redirect_url = $crm->build_url( 'person.php', array( 'person' => $username ) );
+				header( 'Location: ' . $redirect_url );
+				exit;
+			} else {
+				$error = 'Failed to save person.';
 			}
 			break;
 
-		case 'edit_leadership':
-		case 'add_leadership':
-			$leader_config = get_person_type_config( 'leader' );
-			$person_data = create_person_data_from_form();
-			$result = handle_person_action( $action, $leader_config, $person_data );
-			if ( isset( $result['error'] ) ) {
-				$error = $result['error'];
-			} elseif ( isset( $result['message'] ) ) {
-				$message = $result['message'];
-			}
-			break;
+		case 'delete_person':
+			$username = sanitize_text_field( $_POST['username'] ?? '' );
+			$group_id = intval( $_POST['group_id'] ?? 0 );
 
-		case 'edit_consultants':
-		case 'add_consultants':
-			$consultant_config = get_person_type_config( 'consultants' );
-			$person_data = create_person_data_from_form();
-			$result = handle_person_action( $action, $consultant_config, $person_data );
-			if ( isset( $result['error'] ) ) {
-				$error = $result['error'];
-			} elseif ( isset( $result['message'] ) ) {
-				$message = $result['message'];
+			if ( empty( $username ) || empty( $group_id ) ) {
+				$error = 'Username and group ID are required.';
+				break;
 			}
-			break;
 
-		case 'edit_alumni':
-			$alumni_config = get_person_type_config( 'alumni' );
-			$person_data = create_person_data_from_form();
-			$result = handle_person_action( $action, $alumni_config, $person_data );
-			if ( isset( $result['error'] ) ) {
-				$error = $result['error'];
-			} elseif ( isset( $result['message'] ) ) {
-				$message = $result['message'];
-			}
-			break;
+			// Get person to check if they belong to other groups
+			$person = $crm->storage->get_person( $username );
+			if ( $person && ! empty( $person['groups'] ) ) {
+				// Remove from this specific group
+				$person_id = $person['id'];
+				$crm->storage->remove_person_from_group( $person_id, $group_id );
 
-		case 'delete_member':
-			$member_config = get_person_type_config( 'member' );
-			$result = handle_person_action( $action, $member_config, array() );
-			if ( isset( $result['error'] ) ) {
-				$error = $result['error'];
-			} elseif ( isset( $result['message'] ) ) {
-				$message = $result['message'];
-			}
-			break;
+				// Check if person is in any other groups
+				$remaining_groups = $crm->storage->get_person_groups( $person_id );
+				if ( empty( $remaining_groups ) ) {
+					// Delete person entirely if not in any groups
+					$crm->storage->delete_person( $username );
+				}
 
-		case 'delete_consultant':
-			$consultant_config = get_person_type_config( 'consultants' );
-			$result = handle_person_action( $action, $consultant_config, array() );
-			if ( isset( $result['error'] ) ) {
-				$error = $result['error'];
-			} elseif ( isset( $result['message'] ) ) {
-				$message = $result['message'];
-			}
-			break;
-
-		case 'delete_leader':
-			$leader_config = get_person_type_config( 'leader' );
-			$result = handle_person_action( $action, $leader_config, array() );
-			if ( isset( $result['error'] ) ) {
-				$error = $result['error'];
-			} elseif ( isset( $result['message'] ) ) {
-				$message = $result['message'];
-			}
-			break;
-
-		case 'delete_alumni':
-			$alumni_config = get_person_type_config( 'alumni' );
-			$result = handle_person_action( $action, $alumni_config, array() );
-			if ( isset( $result['error'] ) ) {
-				$error = $result['error'];
-			} elseif ( isset( $result['message'] ) ) {
-				$message = $result['message'];
+				$message = 'Person removed successfully!';
+			} else {
+				$error = 'Person not found.';
 			}
 			break;
 
@@ -803,16 +718,16 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 					if ( $delete_if_empty && ! $has_members && $current_group !== 'team' ) {
 						global $config_file;
 						if ( unlink( $config_file ) ) {
-							// Redirect to person in new team after deleting current team
-							$redirect_url = $crm->build_url( 'index.php', array( 'team' => $target_team, 'person' => $username ) );
+							// Redirect to person after deleting current team
+							$redirect_url = $crm->build_url( 'person.php', array( 'person' => $username ) );
 							header( 'Location: ' . $redirect_url );
 							exit;
 						} else {
 							$message = "Person moved successfully but could not delete empty team file.";
 						}
 					} else {
-						// Redirect to person in new team
-						$redirect_url = $crm->build_url( 'index.php', array( 'team' => $target_team, 'person' => $username ) );
+						// Redirect to person
+						$redirect_url = $crm->build_url( 'person.php', array( 'person' => $username ) );
 						header( 'Location: ' . $redirect_url );
 						exit;
 					}
@@ -823,6 +738,32 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 				$error = 'Person not found in current team.';
 			}
 			break;
+		}
+	} elseif ( preg_match( '/^(edit|add|delete)_(.+)$/', $action, $matches ) ) {
+		// Dynamic person type handler - matches edit_{type}, add_{type}, delete_{type}
+		$operation = $matches[1];
+		$type_key = $matches[2];
+
+		// Get person type config
+		$type_config = get_person_type_config( $type_key );
+		if ( $type_config ) {
+			// Handle based on operation
+			if ( $operation === 'delete' ) {
+				$result = handle_person_action( $action, $type_config, array() );
+			} else {
+				$person_data = create_person_data_from_form();
+				$result = handle_person_action( $action, $type_config, $person_data );
+			}
+
+			// Set message/error
+			if ( isset( $result['error'] ) ) {
+				$error = $result['error'];
+			} elseif ( isset( $result['message'] ) ) {
+				$message = $result['message'];
+			}
+		} else {
+			$error = 'Invalid person type.';
+		}
 	}
 }
 
@@ -833,28 +774,45 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
  */
 
 /**
- * Render a person form (team member, leader, or alumni)
+ * NEW: Render person form with group membership (replaces category-based forms)
  */
-function render_person_form( $type, $edit_data = null, $is_editing = false ) {
-	global $group, $current_group;
+function render_person_form_new( $default_group_id, $parent_group_id, $edit_data = null, $is_editing = false ) {
+	global $current_group;
 
 	$crm = PersonalCrm::get_instance();
-	$privacy_mode = isset( $_GET['privacy'] ) && $_GET['privacy'] === '1';
 
-	$config = get_person_type_config( $type );
-	if ( ! $config ) {
-		return;
+	// Get all groups with hierarchy for datalist autocomplete
+	$all_groups = $crm->storage->get_all_groups_with_hierarchy();
+
+	// Get groups this person is currently a member of
+	$selected_groups = array();
+	$person_group_ids = array( $default_group_id );
+
+	if ( $is_editing && ! empty( $edit_data['username'] ) ) {
+		$person = $crm->storage->get_person( $edit_data['username'] );
+		if ( $person && ! empty( $person['groups'] ) ) {
+			$person_group_ids = array_column( $person['groups'], 'id' );
+			foreach ( $person['groups'] as $group ) {
+				$selected_groups[] = array(
+					'id' => $group['id'],
+					'name' => $group['group_name'],
+					'icon' => $group['display_icon'] ?: ''
+				);
+			}
+		}
+	} else {
+		// For new person, default to the current group
+		$parent_config = $crm->storage->get_group( $current_group );
+		$selected_groups[] = array(
+			'id' => $default_group_id,
+			'name' => ( $parent_config['group_name'] ?? 'Team' ) . ' (Team Members)',
+			'icon' => '👥'
+		);
 	}
 
-	if ( ! $is_editing && $config['add_action'] === null ) {
-		return;
-	}
-
-	$form_id = $config['form_id'];
-	$action = $is_editing ? $config['edit_action'] : $config['add_action'];
+	$action = $is_editing ? 'edit_person' : 'add_person';
 	$submit_text = 'Save';
-	$prefix = $config['form_prefix'];
-	$show_alumni_actions = $config['show_alumni_actions'];
+	$form_id = $is_editing ? 'edit-person-form' : 'add-person-form';
 
 ?>
 <form method="post" action="" id="<?php echo $form_id; ?>">
@@ -867,39 +825,39 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<h4 class="section-heading">Personal Information</h4>
 	<div class="form-grid">
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>name">Full Name<?php echo $privacy_mode ? ' (Privacy Mode - Last name will be masked)' : ''; ?></label>
-			<input type="text" id="<?php echo $prefix; ?>name" name="name" value="<?php echo get_person_form_value( 'name', $edit_data, $is_editing ); ?>"<?php echo $privacy_mode ? ' placeholder="First name visible only"' : ''; ?> autofocus>
+			<label for="name">Full Name</label>
+			<input type="text" id="name" name="name" value="<?php echo get_person_form_value( 'name', $edit_data, $is_editing ); ?>" autofocus>
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>nickname">Nickname <small class="optional-label">(optional)</small></label>
-			<input type="text" id="<?php echo $prefix; ?>nickname" name="nickname" value="<?php echo get_person_form_value( 'nickname', $edit_data, $is_editing ); ?>" placeholder="e.g., Mike, Lizzy, DJ">
+			<label for="nickname">Nickname <small class="optional-label">(optional)</small></label>
+			<input type="text" id="nickname" name="nickname" value="<?php echo get_person_form_value( 'nickname', $edit_data, $is_editing ); ?>" placeholder="e.g., Mike, Lizzy, DJ">
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>location">Location</label>
-			<input type="text" id="<?php echo $prefix; ?>location" name="location" value="<?php echo get_person_form_value( 'location', $edit_data, $is_editing ); ?>">
+			<label for="location">Location</label>
+			<input type="text" id="location" name="location" value="<?php echo get_person_form_value( 'location', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>timezone">Timezone</label>
+			<label for="timezone">Timezone</label>
 			<div class="timezone-input">
 				<input type="text"
-					   id="<?php echo $prefix; ?>timezone"
+					   id="timezone"
 					   name="timezone"
 					   value="<?php echo get_person_form_value( 'timezone', $edit_data, $is_editing ); ?>"
 					   placeholder="e.g., America/New_York or type city like 'madrid'"
 					   autocomplete="off">
-				<div id="<?php echo $prefix; ?>timezone-suggestions" class="timezone-suggestions"></div>
+				<div id="timezone-suggestions" class="timezone-suggestions"></div>
 			</div>
-			<script type="application/json" id="<?php echo $prefix; ?>timezone-data">
+			<script type="application/json" id="timezone-data">
 				<?php echo json_encode( get_timezone_options() ); ?>
 			</script>
 		</div>
 
 		<div class="form-group">
-			<label>Birthday<?php echo $privacy_mode ? ' (Hidden in Privacy Mode)' : ''; ?></label>
-			<?php render_birthday_dropdown( 'birthday', $edit_data['birthday'] ?? '', $privacy_mode ); ?>
+			<label>Birthday</label>
+			<?php render_birthday_dropdown( 'birthday', $edit_data['birthday'] ?? '' ); ?>
 		</div>
 	</div>
 
@@ -909,19 +867,19 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
 		<div class="form-grid">
 			<div class="form-group">
-				<label for="<?php echo $prefix; ?>partner">Partner</label>
-				<input type="text" id="<?php echo $prefix; ?>partner" name="partner" value="<?php echo get_person_form_value( 'partner', $edit_data, $is_editing ); ?>">
+				<label for="partner">Partner</label>
+				<input type="text" id="partner" name="partner" value="<?php echo get_person_form_value( 'partner', $edit_data, $is_editing ); ?>">
 			</div>
 
 			<div class="form-group">
-				<label>Partner Birthday<?php echo $privacy_mode ? ' (Hidden in Privacy Mode)' : ''; ?></label>
-				<?php render_birthday_dropdown( 'partner_birthday', $edit_data['partner_birthday'] ?? '', $privacy_mode ); ?>
+				<label>Partner Birthday</label>
+				<?php render_birthday_dropdown( 'partner_birthday', $edit_data['partner_birthday'] ?? '' ); ?>
 			</div>
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>kids">Kids (one per line, formats: "Name YYYY-MM-DD", "Name MM-DD", "Name YYYY" or just "Name")</label>
-			<textarea id="<?php echo $prefix; ?>kids" name="kids" rows="4" placeholder="Emma 2010-03-15&#10;Jake 12-25&#10;Sam 2012&#10;Alex"><?php echo $is_editing ? htmlspecialchars( format_kids_for_form( $edit_data['kids'] ?? array() ) ) : ''; ?></textarea>
+			<label for="kids">Kids (one per line, formats: "Name YYYY-MM-DD", "Name MM-DD", "Name YYYY" or just "Name")</label>
+			<textarea id="kids" name="kids" rows="4" placeholder="Emma 2010-03-15&#10;Jake 12-25&#10;Sam 2012&#10;Alex"><?php echo $is_editing ? htmlspecialchars( format_kids_for_form( $edit_data['kids'] ?? array() ) ) : ''; ?></textarea>
 		</div>
 	</details>
 
@@ -929,8 +887,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<h4 class="section-heading">Company Information</h4>
 	<div class="form-grid">
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>username">Username *<?php if ( $crm->is_social_group( $current_group ) ) echo ' (auto-generated if empty)'; ?></label>
-			<input type="text" id="<?php echo $prefix; ?>username" name="username" value="<?php echo get_person_form_value( 'username', $edit_data, $is_editing ); ?>" <?php echo $crm->is_social_group( $current_group ) ? '' : 'required'; ?>>
+			<label for="username">Username *<?php if ( $crm->is_social_group( $current_group ) ) echo ' (auto-generated if empty)'; ?></label>
+			<input type="text" id="username" name="username" value="<?php echo get_person_form_value( 'username', $edit_data, $is_editing ); ?>" <?php echo $crm->is_social_group( $current_group ) ? '' : 'required'; ?>>
 			<?php if ( $crm->is_social_group( $current_group ) ) : ?>
 				<small style="color: #666;">Leave empty to auto-generate from name (e.g., "John Smith" → "john.smith")</small>
 			<?php endif; ?>
@@ -938,15 +896,15 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
 		<?php if ( ! $crm->is_social_group( $current_group ) ) : ?>
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>role">Role</label>
-			<input type="text" id="<?php echo $prefix; ?>role" name="role" value="<?php echo get_person_form_value( 'role', $edit_data, $is_editing ); ?>" placeholder="e.g., Developer, Lead, HR">
+			<label for="role">Role</label>
+			<input type="text" id="role" name="role" value="<?php echo get_person_form_value( 'role', $edit_data, $is_editing ); ?>" placeholder="e.g., Developer, Lead, HR">
 		</div>
 		<?php endif; ?>
 
 		<?php if ( ! $crm->is_social_group( $current_group ) ) : ?>
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>company_anniversary">Company Anniversary<?php echo $privacy_mode ? ' (Hidden in Privacy Mode)' : ''; ?></label>
-			<input type="date" id="<?php echo $prefix; ?>company_anniversary" name="company_anniversary" value="<?php echo get_person_form_value( 'company_anniversary', $edit_data, $is_editing ); ?>"<?php echo $privacy_mode ? ' placeholder="Hidden for privacy"' : ''; ?>>
+			<label for="company_anniversary">Company Anniversary</label>
+			<input type="date" id="company_anniversary" name="company_anniversary" value="<?php echo get_person_form_value( 'company_anniversary', $edit_data, $is_editing ); ?>">
 		</div>
 		<?php endif; ?>
 
@@ -954,7 +912,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		<!-- Links Section -->
 		<div class="form-group" style="grid-column: 1 / -1;">
 			<label>Links</label>
-			<div id="<?php echo $prefix; ?>links-container">
+			<div id="links-container">
 				<?php
 				$current_links = array();
 				if ( $is_editing && isset( $edit_data['links'] ) ) {
@@ -978,7 +936,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 					</div>
 				<?php endforeach; ?>
 			</div>
-			<button type="button" onclick="addLink('<?php echo $prefix; ?>')" class="btn-add">+ Add Link</button>
+			<button type="button" onclick="addLink('')" class="btn-add">+ Add Link</button>
 		</div>
 	</div>
 
@@ -986,33 +944,33 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<h4 class="section-heading">Online Profiles</h4>
 	<div class="form-grid">
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>github">GitHub Username</label>
-			<input type="text" id="<?php echo $prefix; ?>github" name="github" value="<?php echo get_person_form_value( 'github', $edit_data, $is_editing ); ?>">
+			<label for="github">GitHub Username</label>
+			<input type="text" id="github" name="github" value="<?php echo get_person_form_value( 'github', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>linear">Linear Username</label>
-			<input type="text" id="<?php echo $prefix; ?>linear" name="linear" value="<?php echo get_person_form_value( 'linear', $edit_data, $is_editing ); ?>">
+			<label for="linear">Linear Username</label>
+			<input type="text" id="linear" name="linear" value="<?php echo get_person_form_value( 'linear', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>wordpress">WordPress.org Username</label>
-			<input type="text" id="<?php echo $prefix; ?>wordpress" name="wordpress" value="<?php echo get_person_form_value( 'wordpress', $edit_data, $is_editing ); ?>">
+			<label for="wordpress">WordPress.org Username</label>
+			<input type="text" id="wordpress" name="wordpress" value="<?php echo get_person_form_value( 'wordpress', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>linkedin">LinkedIn Username</label>
-			<input type="text" id="<?php echo $prefix; ?>linkedin" name="linkedin" value="<?php echo get_person_form_value( 'linkedin', $edit_data, $is_editing ); ?>">
+			<label for="linkedin">LinkedIn Username</label>
+			<input type="text" id="linkedin" name="linkedin" value="<?php echo get_person_form_value( 'linkedin', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>website">Website URL</label>
-			<input type="text" id="<?php echo $prefix; ?>website" name="website" value="<?php echo get_person_form_value( 'website', $edit_data, $is_editing ); ?>">
+			<label for="website">Website URL</label>
+			<input type="text" id="website" name="website" value="<?php echo get_person_form_value( 'website', $edit_data, $is_editing ); ?>">
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>email">Email Address</label>
-			<input type="email" id="<?php echo $prefix; ?>email" name="email" value="<?php echo get_person_form_value( 'email', $edit_data, $is_editing ); ?>">
+			<label for="email">Email Address</label>
+			<input type="email" id="email" name="email" value="<?php echo get_person_form_value( 'email', $edit_data, $is_editing ); ?>">
 		</div>
 	</div>
 
@@ -1021,10 +979,10 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<div class="form-group">
 		<label>GitHub Repositories</label>
 		<div style="margin: 5px 0 10px 0;">
-			<button type="button" onclick="addRepoField('<?php echo $prefix; ?>')" class="btn-add-repo">+ Add Repository</button>
+			<button type="button" onclick="addRepoField()" class="btn-add-repo">+ Add Repository</button>
 		</div>
 
-		<div id="<?php echo $prefix; ?>repo_fields">
+		<div id="repo_fields">
 			<?php
 			$existing_repos = array();
 			if ( $is_editing && ! empty( $edit_data['github_repos'] ) ) {
@@ -1055,7 +1013,15 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		global $config_file;
 		$team_config = $crm->storage->get_group( $current_group );
 		$all_repos = array();
-		$all_people = array_merge( $team_config['team_members'] ?? array(), $team_config['leadership'] ?? array(), $team_config['alumni'] ?? array() );
+
+		// Merge all people from all person types dynamically
+		$all_people = array();
+		$person_types = $crm->storage->get_person_types( $current_group );
+		foreach ( $person_types as $type ) {
+			$all_people = array_merge( $all_people, $team_config[ $type['type_key'] ] ?? array() );
+		}
+		// Also include alumni
+		$all_people = array_merge( $all_people, $team_config['alumni'] ?? array() );
 		foreach ( $all_people as $person ) {
 			if ( ! empty( $person['github_repos'] ) ) {
 				$person_repos = is_array( $person['github_repos'] ) ? $person['github_repos'] : array_filter( array_map( 'trim', explode( ',', $person['github_repos'] ?? '' ) ) );
@@ -1077,7 +1043,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 				<small class="text-small-muted">Potential repositories (click to add):</small>
 				<div style="margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px;">
 					<?php foreach ( $available_repos as $repo ) : ?>
-						<button type="button" onclick="addRepoToField('<?php echo $prefix; ?>', '<?php echo htmlspecialchars( $repo, ENT_QUOTES ); ?>')"
+						<button type="button" onclick="addRepoToField('<?php echo htmlspecialchars( $repo, ENT_QUOTES ); ?>')"
 								class="event-type-tag">
 							<?php echo htmlspecialchars( $repo ); ?>
 						</button>
@@ -1089,8 +1055,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<?php endif; ?>
 
 	<script>
-		function addRepoField(prefix) {
-			const container = document.getElementById(prefix + 'repo_fields');
+		function addRepoField() {
+			const container = document.getElementById('repo_fields');
 			const div = document.createElement('div');
 			div.className = 'repo-field';
 			div.style.display = 'flex';
@@ -1108,12 +1074,12 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			button.closest('.repo-field').remove();
 
 			if (container.children.length === 0) {
-				addRepoField('<?php echo $prefix; ?>');
+				addRepoField();
 			}
 		}
 
-		function addRepoToField(prefix, repo) {
-			const container = document.getElementById(prefix + 'repo_fields');
+		function addRepoToField(repo) {
+			const container = document.getElementById('repo_fields');
 			const inputs = container.querySelectorAll('input[name="github_repos[]"]');
 
 			for (let input of inputs) {
@@ -1129,7 +1095,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 				}
 			}
 
-			addRepoField(prefix);
+			addRepoField();
 			const newInputs = container.querySelectorAll('input[name="github_repos[]"]');
 			newInputs[newInputs.length - 1].value = repo;
 		}
@@ -1182,13 +1148,24 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		}
 	</script>
 
-	<?php if ( $type === 'alumni' ) : ?>
+	<?php
+	// Check if default group is an alumni group
+	$default_group = null;
+	foreach ( $selected_groups as $ag ) {
+		if ( $ag['id'] == $default_group_id ) {
+			$default_group = $ag;
+			break;
+		}
+	}
+	$is_alumni_group = $default_group && stripos( $default_group['name'], 'alumni' ) !== false;
+	?>
+	<?php if ( $is_alumni_group ) : ?>
 	<!-- Alumni-specific fields -->
 	<h4 class="section-heading">Alumni Information</h4>
 	<div class="form-grid">
 		<div class="form-group" style="grid-column: 1 / -1;">
 			<label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 600;">
-				<input type="checkbox" id="<?php echo $prefix; ?>left_company" name="left_company" value="1" <?php echo get_person_checkbox_checked( 'left_company', $edit_data, $is_editing ); ?> style="width: auto;">
+				<input type="checkbox" id="left_company" name="left_company" value="1" <?php echo get_person_checkbox_checked( 'left_company', $edit_data, $is_editing ); ?> style="width: auto;">
 				<span>Has left the company</span>
 			</label>
 			<small class="text-small-muted" style="margin-left: 20px;">
@@ -1197,13 +1174,13 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>new_company">New Company</label>
-			<input type="text" id="<?php echo $prefix; ?>new_company" name="new_company" value="<?php echo get_person_form_value( 'new_company', $edit_data, $is_editing ); ?>" placeholder="e.g., Google, Microsoft, etc.">
+			<label for="new_company">New Company</label>
+			<input type="text" id="new_company" name="new_company" value="<?php echo get_person_form_value( 'new_company', $edit_data, $is_editing ); ?>" placeholder="e.g., Google, Microsoft, etc.">
 		</div>
 
 		<div class="form-group">
-			<label for="<?php echo $prefix; ?>new_company_website">New Company Website</label>
-			<input type="url" id="<?php echo $prefix; ?>new_company_website" name="new_company_website" value="<?php echo get_person_form_value( 'new_company_website', $edit_data, $is_editing ); ?>" placeholder="https://example.com">
+			<label for="new_company_website">New Company Website</label>
+			<input type="url" id="new_company_website" name="new_company_website" value="<?php echo get_person_form_value( 'new_company_website', $edit_data, $is_editing ); ?>" placeholder="https://example.com">
 		</div>
 	</div>
 	<?php endif; ?>
@@ -1211,7 +1188,7 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	<!-- Deceased Status -->
 	<div class="form-group">
 		<label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 400; color: #666;">
-			<input type="checkbox" id="<?php echo $prefix; ?>deceased" name="deceased" value="1" <?php echo get_person_checkbox_checked( 'deceased', $edit_data, $is_editing ); ?> style="width: auto;" onchange="toggleDeceasedDate()">
+			<input type="checkbox" id="deceased" name="deceased" value="1" <?php echo get_person_checkbox_checked( 'deceased', $edit_data, $is_editing ); ?> style="width: auto;" onchange="toggleDeceasedDate()">
 			<span>Mark as deceased</span>
 		</label>
 		<small class="text-small-muted" style="margin-left: 20px; color: #888;">
@@ -1222,8 +1199,8 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			global $error;
 			echo (!empty($error) && isset($_POST['deceased'])) || ($is_editing && !empty($edit_data['deceased'])) ? '' : 'display: none;';
 		?>">
-			<label for="<?php echo $prefix; ?>deceased_date">Date of passing:</label>
-			<input type="date" id="<?php echo $prefix; ?>deceased_date" name="deceased_date" value="<?php echo get_person_form_value( 'deceased_date', $edit_data, $is_editing ); ?>">
+			<label for="deceased_date">Date of passing:</label>
+			<input type="date" id="deceased_date" name="deceased_date" value="<?php echo get_person_form_value( 'deceased_date', $edit_data, $is_editing ); ?>">
 			<small class="text-small-muted" style="display: block; margin-top: 5px;">
 				Optional - leave empty if unknown
 			</small>
@@ -1232,9 +1209,9 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 
 	<script>
 	function toggleDeceasedDate() {
-		const checkbox = document.getElementById('<?php echo $prefix; ?>deceased');
+		const checkbox = document.getElementById('deceased');
 		const container = document.getElementById('deceased-date-container');
-		const dateInput = document.getElementById('<?php echo $prefix; ?>deceased_date');
+		const dateInput = document.getElementById('deceased_date');
 
 		if (checkbox.checked) {
 			container.style.display = 'block';
@@ -1245,8 +1222,34 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 	}
 	</script>
 
+	<!-- Group Membership -->
+	<h4 class="section-heading">Group Membership</h4>
 	<div class="form-group">
-		<label>Notes</label>
+		<label>Currently selected groups:</label>
+		<div id="selected-groups-container" style="margin-top: 10px; margin-bottom: 15px;">
+			<?php foreach ( $selected_groups as $group ) : ?>
+				<label style="display: block; margin-bottom: 8px;" data-group-id="<?php echo $group['id']; ?>">
+					<input type="checkbox" name="group_ids[]" value="<?php echo $group['id']; ?>" checked>
+					<?php echo htmlspecialchars( ( $group['icon'] ? $group['icon'] . ' ' : '' ) . $group['name'] ); ?>
+				</label>
+			<?php endforeach; ?>
+		</div>
+
+		<label for="add-group-input">Add group:</label>
+		<input type="text" id="add-group-input" list="groups-datalist" placeholder="Search for group..." autocomplete="off" style="width: 100%; max-width: 400px;">
+		<datalist id="groups-datalist">
+			<?php foreach ( $all_groups as $group ) : ?>
+				<option value="<?php echo htmlspecialchars( ( $group['display_icon'] ? $group['display_icon'] . ' ' : '' ) . $group['hierarchical_name'] ); ?>"></option>
+			<?php endforeach; ?>
+		</datalist>
+
+		<script type="application/json" id="all-groups-data">
+			<?php echo json_encode( $all_groups ); ?>
+		</script>
+	</div>
+
+	<h4 class="section-heading">Notes</h4>
+	<div class="form-group">
 
 		<?php if ( $is_editing && ! empty( $edit_data['notes'] ) && is_array( $edit_data['notes'] ) ) : ?>
 			<div class="existing-notes">
@@ -1259,29 +1262,17 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
 			</div>
 		<?php endif; ?>
 
-		<label for="<?php echo $prefix; ?>new_note">Add new note</label>
-		<textarea id="<?php echo $prefix; ?>new_note" name="new_note" placeholder="Add what you learned today..."></textarea>
+		<label for="new_note">Add new note</label>
+		<textarea id="new_note" name="new_note" placeholder="Add what you learned today..."></textarea>
 	</div>
 
 	<?php
-	do_action( 'personal_crm_admin_person_form_fields', $edit_data, $is_editing, $prefix );
+	do_action( 'personal_crm_admin_person_form_fields', $edit_data, $is_editing );
 	?>
 
 	<button type="submit" class="btn"><?php echo $submit_text; ?></button>
 </form>
 
-<?php if ( $is_editing && $show_alumni_actions ) : ?>
-	<div class="divider-section">
-		<h4 class="text-muted" style="margin-bottom: 10px;">Alumni Actions</h4>
-		<form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to move this person to alumni? They will be removed from active team lists.')">
-			<input type="hidden" name="action" value="move_to_alumni">
-			<input type="hidden" name="username" value="<?php echo htmlspecialchars( $edit_data['username'] ?? '' ); ?>">
-			<input type="hidden" name="from_section" value="<?php echo $config['section_key']; ?>">
-			<input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
-			<button type="submit" class="btn btn-warning">Move to Alumni</button>
-		</form>
-	</div>
-<?php endif; ?>
 <?php
 }
 
@@ -1291,44 +1282,121 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
  * ==================================================
  */
 ?>
-        <!-- Team Members Tab -->
-        <div id="members" class="tab-content <?php echo $active_tab === 'members' ? 'active' : ''; ?>">
-            <?php if ( $is_editing_member ) : ?>
-                <h2>Edit <?php echo ucfirst( $group ); ?> Member: <?php echo htmlspecialchars( $crm->mask_name( $edit_data['name'] ?? $edit_data['username'], $privacy_mode ) ); ?></h2>
+        <?php
+        // Person editing (M:N relationship - person doesn't belong to a single group)
+        if ( ! empty( $edit_member ) ) {
+            $person = $crm->storage->get_person( $edit_member );
+            if ( $person ) {
+                $person['username'] = $edit_member;
+                // Default group is the first group they belong to (if any)
+                $default_group_id = ! empty( $person['groups'] ) ? $person['groups'][0]['id'] : 0;
+                $parent_group_id = $default_group_id;
+                echo '<h2>Edit Person: ' . htmlspecialchars( $person['name'] ?? $edit_member ) . '</h2>';
+                render_person_form_new( $default_group_id, $parent_group_id, $person, true );
+            } else {
+                echo '<p>Person not found.</p>';
+            }
+            return;
+        }
+
+        // Group-based person list view (only when not editing a specific person)
+        if ( empty( $current_group ) ) {
+            echo '<p>Please select a group to view people.</p>';
+            return;
+        }
+
+        // Generate tabs for direct members + child groups
+        $parent_config = $crm->storage->get_group( $current_group );
+        $parent_group_id = $parent_config['id'];
+        $child_groups = $crm->storage->get_child_groups( $parent_group_id );
+
+        // First tab: Direct members of parent group
+        $tabs = array(
+            array(
+                'slug' => 'members',
+                'display_name' => 'Team Members',
+                'display_icon' => '👥',
+                'can_add' => 1,
+                'sort_order' => 0,
+                'group_id' => $parent_group_id
+            )
+        );
+
+        // Add child group tabs
+        foreach ( $child_groups as $child ) {
+            // Use short slug in URL (remove parent prefix)
+            $url_slug = $child['slug'];
+            if ( strpos( $url_slug, $current_group . '_' ) === 0 ) {
+                $url_slug = substr( $url_slug, strlen( $current_group ) + 1 );
+            }
+
+            $tabs[] = array(
+                'slug' => $child['slug'],
+                'url_slug' => $url_slug,
+                'display_name' => $child['group_name'],
+                'display_icon' => $child['display_icon'] ?: '',
+                'can_add' => 1,
+                'sort_order' => $child['sort_order'],
+                'group_id' => $child['id']
+            );
+        }
+
+        foreach ( $tabs as $tab ) :
+            $slug = $tab['slug'];
+            $url_slug = $tab['url_slug'] ?? $slug;
+            $display_name = $tab['display_name'];
+            $display_icon = $tab['display_icon'];
+            $can_add = $tab['can_add'];
+            $tab_group_id = $tab['group_id'];
+
+            // Check if editing someone in this group
+            $is_editing = false;
+            if ( ! empty( $edit_member ) && isset( $config[ $slug ] ) && isset( $config[ $slug ][ $edit_member ] ) ) {
+                $is_editing = true;
+                $edit_data = $config[ $slug ][ $edit_member ];
+                $edit_data['username'] = $edit_member;
+            }
+        ?>
+        <!-- <?php echo $display_name; ?> Tab -->
+        <div id="<?php echo $slug; ?>" class="tab-content <?php echo $active_tab === $slug ? 'active' : ''; ?>">
+            <?php if ( $is_editing ) : ?>
+                <h2>Edit <?php echo htmlspecialchars( $display_name ); ?>: <?php echo htmlspecialchars( $edit_data['name'] ?? $edit_data['username'] ); ?></h2>
             <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
             <?php else : ?>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3 style="margin: 0;">Current <?php echo ucfirst( $group ); ?> Members</h3>
-                    <?php
-                    $add_params = array( 'tab' => 'members', 'add' => 'new' );
-                    if ( $privacy_mode ) $add_params['privacy'] = '1';
-                    ?>
-                    <a href="/crm/admin/<?php echo $current_group; ?>/members/?add=new" class="btn">+ Add New <?php echo ucfirst( $group ); ?> Member</a>
+                <div class="tab-header">
+                    <h3>
+                        <?php echo htmlspecialchars( ( $display_icon ? $display_icon . ' ' : '' ) . $display_name ); ?>
+                        <?php if ( $slug !== 'members' ) : ?>
+                            <a href="/crm/admin/<?php echo $slug; ?>/" class="edit-group-link">⚙️ Edit Group</a>
+                        <?php endif; ?>
+                    </h3>
+                    <?php if ( $can_add ) : ?>
+                        <a href="/crm/admin/<?php echo $current_group; ?>/<?php echo $url_slug; ?>/?add=new" class="btn">+ Add <?php echo htmlspecialchars( $display_name ); ?></a>
+                    <?php endif; ?>
                 </div>
-                <?php if ( ! empty( $config['team_members'] ) ) : ?>
+                <?php if ( ! empty( $config[ $slug ] ) ) : ?>
                     <div class="person-list">
                         <?php
-                        // Sort members by name
-                        $sorted_members = $config['team_members'];
-                        uasort( $sorted_members, function( $a, $b ) {
+                        $sorted_people = $config[ $slug ];
+                        uasort( $sorted_people, function( $a, $b ) {
                             return strcasecmp( $a['name'], $b['name'] );
                         } );
 
-                        foreach ( $sorted_members as $username => $member ) : ?>
+                        foreach ( $sorted_people as $username => $person ) :
+                            // Determine the correct group slug for the edit link
+                            $edit_group_slug = ( $slug === 'members' ) ? $current_group : $slug;
+                        ?>
                             <div class="person-item">
                                 <div class="person-info">
-                                    <h4><?php echo htmlspecialchars( $crm->mask_name( $member['name'], $privacy_mode ) ); ?></h4>
-                                    <small>@<?php echo htmlspecialchars( $crm->mask_username( $username, $privacy_mode ) ); ?> • <?php echo htmlspecialchars( $member['location'] ?? $member['town'] ?? '' ); ?></small>
+                                    <h4><?php echo htmlspecialchars( $person['name'] ); ?></h4>
+                                    <small>@<?php echo htmlspecialchars( $username ); ?> • <?php echo htmlspecialchars( $person['location'] ?? $person['town'] ?? '' ); ?></small>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
-                                    <?php
-                                    $edit_params = array( 'edit_member' => $username );
-                                    if ( $privacy_mode ) $edit_params['privacy'] = '1';
-                                    ?>
-                                    <a href="/crm/admin/<?php echo $current_group; ?>/person/<?php echo $username; ?>/" class="btn">Edit</a>
-                                    <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this team member?')">
-                                        <input type="hidden" name="action" value="delete_member">
+                                    <a href="<?php echo $crm->build_url( 'admin/person.php', array( 'person' => $username ) ); ?>" class="btn">Edit</a>
+                                    <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this person?')">
+                                        <input type="hidden" name="action" value="delete_person">
                                         <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
+                                        <input type="hidden" name="group_id" value="<?php echo $tab_group_id; ?>">
                                         <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
@@ -1337,189 +1405,18 @@ function render_person_form( $type, $edit_data = null, $is_editing = false ) {
                         <?php endforeach; ?>
                     </div>
                 <?php else : ?>
-                    <p>No team members added yet.</p>
+                    <p>No <?php echo strtolower( $display_name ); ?> added yet.</p>
                 <?php endif; ?>
             <?php endif; ?>
 
-            <?php if ( $is_editing_member ) : ?>
-                <?php render_person_form( 'member', $edit_data, $is_editing_member ); ?>
-            <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
+            <?php if ( $is_editing ) : ?>
+                <?php render_person_form_new( $tab_group_id, $parent_group_id, $edit_data, $is_editing ); ?>
+            <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' && $can_add ) : ?>
                 <div style="margin-bottom: 20px;">
-                    <?php
-                    $back_params = array( 'tab' => 'members' );
-                    if ( $privacy_mode ) $back_params['privacy'] = '1';
-                    ?>
-                    <a href="/crm/admin/<?php echo $current_group; ?>/members/" class="back-link-admin">← Back to <?php echo ucfirst( $group ); ?> Members</a>
+                    <a href="/crm/admin/<?php echo $current_group; ?>/<?php echo $slug; ?>/" class="back-link-admin">← Back to <?php echo htmlspecialchars( $display_name ); ?></a>
                 </div>
-                <h3>Add New <?php echo ucfirst( $group ); ?> Member</h3>
-                <?php render_person_form( 'member', null, false ); ?>
+                <h3>Add <?php echo htmlspecialchars( $display_name ); ?></h3>
+                <?php render_person_form_new( $tab_group_id, $parent_group_id, null, false ); ?>
             <?php endif; ?>
         </div>
-
-        <!-- Leadership Tab -->
-        <div id="leadership" class="tab-content <?php echo $active_tab === 'leadership' ? 'active' : ''; ?>">
-            <?php if ( $is_editing_leader ) : ?>
-                <h2>Edit Leader: <?php echo htmlspecialchars( $crm->mask_name( $edit_data['name'] ?? $edit_data['username'], $privacy_mode ) ); ?></h2>
-            <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
-            <?php else : ?>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3 style="margin: 0;">Leadership</h3>
-                    <?php
-                    $add_params = array( 'tab' => 'leadership', 'add' => 'new' );
-                    if ( $privacy_mode ) $add_params['privacy'] = '1';
-                    ?>
-                    <a href="/crm/admin/<?php echo $current_group; ?>/leadership/?add=new" class="btn">+ Add Leader</a>
-                </div>
-                <?php if ( ! empty( $config['leadership'] ) ) : ?>
-                    <div class="person-list">
-                        <?php
-                        $sorted_leaders = $config['leadership'];
-                        uasort( $sorted_leaders, function( $a, $b ) {
-                            return strcasecmp( $a['name'], $b['name'] );
-                        } );
-
-                        foreach ( $sorted_leaders as $username => $leader ) : ?>
-                            <div class="person-item">
-                                <div class="person-info">
-                                    <h4><?php echo htmlspecialchars( $crm->mask_name( $leader['name'], $privacy_mode ) ); ?></h4>
-                                    <small>@<?php echo htmlspecialchars( $crm->mask_username( $username, $privacy_mode ) ); ?> • <?php echo htmlspecialchars( $leader['location'] ?? $leader['town'] ?? '' ); ?></small>
-                                </div>
-                                <div style="display: flex; gap: 8px;">
-                                    <a href="/crm/admin/<?php echo $current_group; ?>/person/<?php echo $username; ?>/" class="btn">Edit</a>
-                                    <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this leader?')">
-                                        <input type="hidden" name="action" value="delete_leader">
-                                        <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
-                                        <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                                        <button type="submit" class="btn btn-danger">Delete</button>
-                                    </form>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else : ?>
-                    <p>No leaders added yet.</p>
-                <?php endif; ?>
-            <?php endif; ?>
-
-            <?php if ( $is_editing_leader ) : ?>
-                <?php render_person_form( 'leader', $edit_data, $is_editing_leader ); ?>
-            <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
-                <div style="margin-bottom: 20px;">
-                    <a href="/crm/admin/<?php echo $current_group; ?>/leadership/" class="back-link-admin">← Back to Leadership</a>
-                </div>
-                <h3>Add New Leader</h3>
-                <?php render_person_form( 'leader', null, false ); ?>
-            <?php endif; ?>
-        </div>
-
-        <!-- Consultants Tab -->
-        <div id="consultants" class="tab-content <?php echo $active_tab === 'consultants' ? 'active' : ''; ?>">
-            <?php if ( $is_editing_consultant ) : ?>
-                <h2>Edit Consultant: <?php echo htmlspecialchars( $crm->mask_name( $edit_data['name'] ?? $edit_data['username'], $privacy_mode ) ); ?></h2>
-            <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
-            <?php else : ?>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3 style="margin: 0;">Consultants</h3>
-                    <?php
-                    $add_params = array( 'tab' => 'consultants', 'add' => 'new' );
-                    if ( $privacy_mode ) $add_params['privacy'] = '1';
-                    ?>
-                    <a href="/crm/admin/<?php echo $current_group; ?>/consultants/?add=new" class="btn">+ Add Consultant</a>
-                </div>
-                <?php if ( ! empty( $config['team_consultants'] ) ) : ?>
-                    <div class="person-list">
-                        <?php
-                        $sorted_consultants = $config['team_consultants'];
-                        uasort( $sorted_consultants, function( $a, $b ) {
-                            return strcasecmp( $a['name'], $b['name'] );
-                        } );
-
-                        foreach ( $sorted_consultants as $username => $consultant ) : ?>
-                            <div class="person-item">
-                                <div class="person-info">
-                                    <h4><?php echo htmlspecialchars( $crm->mask_name( $consultant['name'], $privacy_mode ) ); ?></h4>
-                                    <small>@<?php echo htmlspecialchars( $crm->mask_username( $username, $privacy_mode ) ); ?> • <?php echo htmlspecialchars( $consultant['location'] ?? $consultant['town'] ?? '' ); ?></small>
-                                </div>
-                                <div style="display: flex; gap: 8px;">
-                                    <a href="/crm/admin/<?php echo $current_group; ?>/person/<?php echo $username; ?>/" class="btn">Edit</a>
-                                    <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this consultant?')">
-                                        <input type="hidden" name="action" value="delete_consultant">
-                                        <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
-                                        <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                                        <button type="submit" class="btn btn-danger">Delete</button>
-                                    </form>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else : ?>
-                    <p>No consultants added yet.</p>
-                <?php endif; ?>
-            <?php endif; ?>
-
-            <?php if ( $is_editing_consultant ) : ?>
-                <?php render_person_form( 'consultant', $edit_data, $is_editing_consultant ); ?>
-            <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
-                <div style="margin-bottom: 20px;">
-                    <a href="/crm/admin/<?php echo $current_group; ?>/consultants/" class="back-link-admin">← Back to Consultants</a>
-                </div>
-                <h3>Add New Consultant</h3>
-                <?php render_person_form( 'consultant', null, false ); ?>
-            <?php endif; ?>
-        </div>
-
-        <!-- Alumni Tab -->
-        <div id="alumni" class="tab-content <?php echo $active_tab === 'alumni' ? 'active' : ''; ?>">
-            <?php if ( $is_editing_alumni ) : ?>
-                <h2>Edit Alumni: <?php echo htmlspecialchars( $crm->mask_name( $edit_data['name'] ?? $edit_data['username'], $privacy_mode ) ); ?></h2>
-            <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
-            <?php else : ?>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3 style="margin: 0;">Alumni</h3>
-                    <?php
-                    $add_params = array( 'tab' => 'alumni', 'add' => 'new' );
-                    if ( $privacy_mode ) $add_params['privacy'] = '1';
-                    ?>
-                    <a href="/crm/admin/<?php echo $current_group; ?>/alumni/?add=new" class="btn">+ Add to Alumni</a>
-                </div>
-                <?php if ( ! empty( $config['alumni'] ) ) : ?>
-                    <div class="person-list">
-                        <?php
-                        $sorted_alumni = $config['alumni'];
-                        uasort( $sorted_alumni, function( $a, $b ) {
-                            return strcasecmp( $a['name'], $b['name'] );
-                        } );
-
-                        foreach ( $sorted_alumni as $username => $alumnus ) : ?>
-                            <div class="person-item">
-                                <div class="person-info">
-                                    <h4><?php echo htmlspecialchars( $crm->mask_name( $alumnus['name'], $privacy_mode ) ); ?></h4>
-                                    <small>@<?php echo htmlspecialchars( $crm->mask_username( $username, $privacy_mode ) ); ?> • <?php echo htmlspecialchars( $alumnus['location'] ?? $alumnus['town'] ?? '' ); ?></small>
-                                </div>
-                                <div style="display: flex; gap: 8px;">
-                                    <a href="/crm/admin/<?php echo $current_group; ?>/person/<?php echo $username; ?>/" class="btn">Edit</a>
-                                    <form method="post" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this alumni entry?')">
-                                        <input type="hidden" name="action" value="delete_alumni">
-                                        <input type="hidden" name="username" value="<?php echo htmlspecialchars( $username ); ?>">
-                                        <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
-                                        <button type="submit" class="btn btn-danger">Delete</button>
-                                    </form>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php else : ?>
-                    <p>No alumni added yet.</p>
-                <?php endif; ?>
-            <?php endif; ?>
-
-            <?php if ( $is_editing_alumni ) : ?>
-                <?php render_person_form( 'alumni', $edit_data, $is_editing_alumni ); ?>
-            <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' ) : ?>
-                <div style="margin-bottom: 20px;">
-                    <a href="/crm/admin/<?php echo $current_group; ?>/alumni/" class="back-link-admin">← Back to Alumni</a>
-                </div>
-                <h3>Add to Alumni</h3>
-                <?php render_person_form( 'alumni', null, false ); ?>
-            <?php endif; ?>
-        </div>
+        <?php endforeach; ?>

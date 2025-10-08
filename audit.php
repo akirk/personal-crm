@@ -330,14 +330,9 @@ $available_teams = $crm->storage->get_available_groups();
                     }
                     ?>
                 </select>
-                
-                <?php if ( $privacy_mode ) : ?>
-                    <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '0' ) ) ); ?>" class="nav-link" style="background: #28a745;">🔒 Privacy Mode ON</a>
-                <?php else : ?>
-                    <a href="?<?php echo http_build_query( array_merge( $_GET, array( 'privacy' => '1' ) ) ); ?>" class="nav-link" style="background: #dc3545;">🔓 Privacy Mode OFF</a>
-                <?php endif; ?>
-                <a href="<?php echo $crm->build_url( 'index.php' ); ?>" class="nav-link">👥 Team Overview</a>
-                <a href="<?php echo $crm->build_url( 'admin/index.php' ); ?>" class="nav-link">⚙️ Admin Panel</a>
+
+                <a href="<?php echo $crm->build_url( 'index.php', array( 'group' => $current_group ) ); ?>" class="nav-link">👥 Team Overview</a>
+                <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $current_group ) ); ?>" class="nav-link">⚙️ Admin Panel</a>
             </div>
         </div>
 
@@ -400,10 +395,10 @@ $available_teams = $crm->storage->get_available_groups();
                     <tr data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" data-score="<?php echo $item['score']; ?>">
                         <td>
                             <div class="person-name">
-                                <?php echo htmlspecialchars( $crm->mask_name( $item['name'], $privacy_mode ) ); ?>
+                                <?php echo htmlspecialchars( $item['name'] ); ?>
                             </div>
                             <div style="font-size: 12px; color: #666;">
-                                @<?php echo htmlspecialchars( $crm->mask_username( $item['username'], $privacy_mode ) ); ?>
+                                @<?php echo htmlspecialchars( $item['username'] ); ?>
                             </div>
                         </td>
                         <td><?php echo htmlspecialchars( $item['type'] ); ?></td>
@@ -434,6 +429,13 @@ $available_teams = $crm->storage->get_available_groups();
                 <?php endforeach; ?>
             </tbody>
         </table>
+
+        <footer class="privacy-footer">
+            <a href="#" id="privacy-toggle" onclick="togglePrivacyMode(); return false;">
+                <span id="privacy-status">🔓 Privacy Mode OFF</span>
+            </a>
+            <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $current_group ) ); ?>" class="footer-link">⚙️ Admin Panel</a>
+        </footer>
     </div>
 
     <script>

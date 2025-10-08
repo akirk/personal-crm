@@ -9,42 +9,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
 	exit;
 }
 
-/**
- * Handle POST request for general settings
- */
-if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POST['action'] === 'save_general' ) {
-	$crm = PersonalCrm::get_instance();
-	$config = $crm->storage->get_group( $current_group );
-
-	$config['group_name'] = sanitize_text_field( $_POST['team_name'] ?? '' );
-	$config['activity_url_prefix'] = sanitize_url( $_POST['activity_url_prefix'] ?? '' );
-	$config['type'] = sanitize_text_field( $_POST['team_type'] ?? 'team' );
-
-	$is_default = isset( $_POST['is_default'] ) && $_POST['is_default'] === '1';
-	if ( $is_default ) {
-		$available_groups = $crm->storage->get_available_groups();
-		foreach ( $available_groups as $group_slug ) {
-			if ( $group_slug !== $current_group ) {
-				$other_config = $crm->storage->get_group( $group_slug );
-				if ( $other_config && isset( $other_config['default'] ) ) {
-					unset( $other_config['default'] );
-					$crm->storage->save_group( $group_slug, $other_config );
-				}
-			}
-		}
-		$config['default'] = true;
-	} else {
-		if ( isset( $config['default'] ) ) {
-			unset( $config['default'] );
-		}
-	}
-
-	if ( $crm->storage->save_group( $current_group, $config ) ) {
-		$message = 'General settings saved successfully!';
-	} else {
-		$error = 'Failed to save configuration.';
-	}
-}
+$group_obj = $crm->storage->get_group( $current_group );
 ?>
 <div id="general" class="tab-content <?php echo $active_tab === 'general' ? 'active' : ''; ?>">
     <h2>General Settings</h2>
@@ -54,26 +19,60 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
 
         <div class="form-group">
             <label for="team_name">Name</label>
-            <input type="text" id="team_name" name="team_name" value="<?php echo htmlspecialchars( $config['group_name'] ); ?>" required autofocus>
+            <input type="text" id="team_name" name="team_name" value="<?php echo htmlspecialchars( $group_obj->group_name ); ?>" required autofocus>
+        </div>
+
+        <div class="form-group">
+            <label for="parent_group">Parent Group</label>
+            <select id="parent_group" name="parent_group">
+                <option value="none">None (Top-level group)</option>
+                <?php
+                $available_groups = $crm->storage->get_available_groups();
+                $current_parent_slug = null;
+                if ( ! empty( $group_obj->parent_id ) ) {
+                    $parent = $crm->storage->get_parent_group( $group_obj->id );
+                    $current_parent_slug = $parent['slug'] ?? null;
+                }
+                foreach ( $available_groups as $group_slug ) {
+                    if ( $group_slug === $current_group ) continue; // Can't be parent of itself
+                    $group_name = $crm->storage->get_group_name( $group_slug );
+                    $selected = ( $group_slug === $current_parent_slug ) ? 'selected' : '';
+                    echo '<option value="' . htmlspecialchars( $group_slug ) . '" ' . $selected . '>' . htmlspecialchars( $group_name ) . '</option>';
+                }
+                ?>
+            </select>
+            <small class="text-small-muted">Select a parent group to create a subgroup (e.g., "Engineering Leadership" under "Engineering")</small>
+        </div>
+
+        <div class="form-group">
+            <label for="display_icon">Display Icon</label>
+            <input type="text" id="display_icon" name="display_icon" value="<?php echo htmlspecialchars( $group_obj->display_icon ?? '' ); ?>" placeholder="e.g., 👥, 👑, 🤝">
+            <small class="text-small-muted">Emoji to display in navigation</small>
+        </div>
+
+        <div class="form-group">
+            <label for="sort_order">Sort Order</label>
+            <input type="number" id="sort_order" name="sort_order" value="<?php echo intval( $group_obj->sort_order ?? 0 ); ?>" min="0">
+            <small class="text-small-muted">Lower numbers appear first in navigation</small>
         </div>
 
         <?php
         // Allow plugins to add fields after the name field
-        do_action( 'personal_crm_admin_team_general_fields', $config, $group, $current_group );
+        do_action( 'personal_crm_admin_team_general_fields', $group_obj, $group, $current_group );
         ?>
 
         <div class="form-group">
             <label for="team_type">Type</label>
             <select id="team_type" name="team_type">
-                <option value="team" <?php echo ( ! isset( $config['type'] ) || $config['type'] === 'team' ) ? 'selected' : ''; ?>>Team (work/business context)</option>
-                <option value="group" <?php echo ( isset( $config['type'] ) && $config['type'] === 'group' ) ? 'selected' : ''; ?>>Group (personal/social context)</option>
+                <option value="team" <?php echo ( $group_obj->type === 'team' ) ? 'selected' : ''; ?>>Team (work/business context)</option>
+                <option value="group" <?php echo ( $group_obj->type === 'group' ) ? 'selected' : ''; ?>>Group (personal/social context)</option>
             </select>
             <small class="text-small-muted">Choose "Group" for personal friends/acquaintances, or "Team" for work/business contexts.</small>
         </div>
 
         <div class="form-group" style="margin-bottom: 15px;">
             <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 600;">
-                <input type="checkbox" id="is_default" name="is_default" value="1" <?php echo isset( $config['default'] ) && $config['default'] ? 'checked' : ''; ?> style="width: auto;">
+                <input type="checkbox" id="is_default" name="is_default" value="1" <?php echo $group_obj->is_default ? 'checked' : ''; ?> style="width: auto;">
                 <span>Set as default team</span>
             </label>
             <small class="text-small-muted" style="margin-left: 20px;">
@@ -83,7 +82,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
 
         <?php
         // Allow plugins to add team management options
-        do_action( 'personal_crm_admin_team_management_options', $config, $group, $current_group );
+        do_action( 'personal_crm_admin_team_management_options', $group_obj, $group, $current_group );
         ?>
 
 

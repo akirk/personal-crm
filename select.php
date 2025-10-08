@@ -85,24 +85,49 @@ if ( empty( $available_teams ) ) {
                 $team_type = $crm->storage->get_group_type( $team_slug );
                 $people_data = $crm->storage->get_group_people_names( $team_slug );
                 $people_count = count( $people_data );
-                $param_name = ( $team_type === 'group' ) ? 'group' : 'team';
+
+                // Check if this is a child group and get parent name
+                $group_obj = $crm->storage->get_group( $team_slug );
+                $display_name = $team_name;
+                if ( $group_obj && $group_obj->parent_id ) {
+                    $parent_name = $crm->storage->get_group_name_by_id( $group_obj->parent_id );
+                    if ( $parent_name ) {
+                        $display_name = $parent_name . ' › ' . $team_name;
+                    }
+                }
+
+                // Get first few member names for preview
+                $member_names = array();
+                $max_preview = 3;
+                foreach ( $people_data as $username => $person ) {
+                    if ( count( $member_names ) >= $max_preview ) {
+                        break;
+                    }
+                    $member_names[] = $person['name'];
+                }
                 ?>
                 <a href="<?php
-                    $params = array();
-                    if ( $crm->get_default_group() !== $team_slug ) {
-                        $params[$param_name] = $team_slug;
-                    }
+                    $params = array( 'group' => $team_slug );
                     echo $crm->build_url( 'index.php', $params );
-                ?>" 
-                   class="team-card" 
-                   data-team-name="<?php echo htmlspecialchars( $team_name ); ?>"
+                ?>"
+                   class="team-card"
+                   data-team-name="<?php echo htmlspecialchars( $display_name ); ?>"
                    data-group-slug="<?php echo htmlspecialchars( $team_slug ); ?>"
                    data-team-type="<?php echo htmlspecialchars( $team_type ); ?>"
                    data-people-data="<?php echo htmlspecialchars( json_encode( $people_data ) ); ?>">
-                    <h3><?php echo htmlspecialchars( $team_name ); ?></h3>
+                    <h3><?php echo htmlspecialchars( $display_name ); ?></h3>
                     <div class="team-card-details">
-                        <p class="team-file-name"><?php echo htmlspecialchars( $team_slug ); ?>.json</p>
-                        <p class="team-people-count"><?php echo $people_count; ?> <?php echo $people_count === 1 ? 'person' : 'people'; ?></p>
+                        <p class="team-people-count"><?php echo $people_count; ?> <?php echo $people_count === 1 ? 'member' : 'members'; ?></p>
+                        <?php if ( ! empty( $member_names ) ) : ?>
+                            <p class="team-member-preview" style="font-size: 13px; color: #666; margin-top: 4px;">
+                                <?php
+                                echo htmlspecialchars( implode( ', ', $member_names ) );
+                                if ( $people_count > $max_preview ) {
+                                    echo ', +' . ( $people_count - $max_preview ) . ' more';
+                                }
+                                ?>
+                            </p>
+                        <?php endif; ?>
                         <div class="team-matched-person" style="display: none;">
                             <span class="match-label">Found:</span>
                             <span class="match-name" data-group-slug="<?php echo htmlspecialchars( $team_slug ); ?>" style="cursor: pointer; text-decoration: underline; color: #007cba;"></span>

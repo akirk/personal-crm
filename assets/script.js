@@ -201,3 +201,136 @@ function initializeCommandK(peopleData, teamsData) {
 }
 
 document.addEventListener('DOMContentLoaded', initializeDarkMode);
+
+// ===========================================
+// Privacy Mode (Client-Side)
+// ===========================================
+
+/**
+ * Privacy mode implementation - masks names and sensitive data client-side
+ */
+function initPrivacyMode() {
+    const isEnabled = localStorage.getItem('privacyMode') === 'true';
+
+    // Update toggle UI
+    updatePrivacyToggleUI(isEnabled);
+
+    // Apply privacy transformations if enabled
+    if (isEnabled) {
+        applyPrivacyMode();
+    }
+}
+
+/**
+ * Apply privacy transformations to the page
+ */
+function applyPrivacyMode() {
+    // Wait for searchIndex to be available from cmd-k initialization
+    const checkSearchIndex = setInterval(() => {
+        if (typeof searchIndex !== 'undefined') {
+            clearInterval(checkSearchIndex);
+            maskNames(searchIndex);
+            blurAvatars();
+        }
+    }, 100);
+
+    // Failsafe: stop checking after 5 seconds
+    setTimeout(() => clearInterval(checkSearchIndex), 5000);
+}
+
+/**
+ * Mask last names in the DOM using person data from search index
+ */
+function maskNames(peopleData) {
+    if (!peopleData || !Array.isArray(peopleData)) {
+        return;
+    }
+
+    // Build a map of full names to masked names
+    const nameMap = new Map();
+
+    peopleData.forEach(person => {
+        if (!person.name) return;
+
+        const parts = person.name.trim().split(' ');
+        if (parts.length > 1) {
+            const firstName = parts[0];
+            const lastInitial = parts[parts.length - 1].charAt(0) + '.';
+            const maskedName = firstName + ' ' + lastInitial;
+            nameMap.set(person.name, maskedName);
+        }
+    });
+
+    // Walk the DOM and replace names in text nodes
+    const walk = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            let text = node.textContent;
+            let modified = false;
+
+            nameMap.forEach((maskedName, fullName) => {
+                if (text.includes(fullName)) {
+                    text = text.replace(new RegExp(fullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), maskedName);
+                    modified = true;
+                }
+            });
+
+            if (modified) {
+                node.textContent = text;
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            // Skip script and style elements
+            if (node.tagName !== 'SCRIPT' && node.tagName !== 'STYLE') {
+                // Process value attributes for input elements
+                if (node.tagName === 'INPUT' && node.value) {
+                    nameMap.forEach((maskedName, fullName) => {
+                        if (node.value.includes(fullName)) {
+                            node.value = node.value.replace(new RegExp(fullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), maskedName);
+                        }
+                    });
+                }
+                // Recurse into child nodes
+                node.childNodes.forEach(child => walk(child));
+            }
+        }
+    };
+
+    walk(document.body);
+}
+
+/**
+ * Add blur effect to avatar images
+ */
+function blurAvatars() {
+    const avatars = document.querySelectorAll('.gravatar-large, .person-avatar img, img[alt*="avatar"]');
+    avatars.forEach(avatar => {
+        avatar.classList.add('privacy-blur');
+    });
+}
+
+/**
+ * Toggle privacy mode on/off
+ */
+function togglePrivacyMode() {
+    const currentState = localStorage.getItem('privacyMode') === 'true';
+    const newState = !currentState;
+
+    localStorage.setItem('privacyMode', newState.toString());
+
+    // Reload page to apply/remove privacy transformations
+    window.location.reload();
+}
+
+/**
+ * Update the privacy toggle button UI
+ */
+function updatePrivacyToggleUI(isEnabled) {
+    const toggle = document.getElementById('privacy-toggle');
+    const status = document.getElementById('privacy-status');
+
+    if (status) {
+        status.textContent = isEnabled ? '🔒 Privacy Mode ON' : '🔓 Privacy Mode OFF';
+    }
+}
+
+// Initialize privacy mode when DOM is ready
+document.addEventListener('DOMContentLoaded', initPrivacyMode);

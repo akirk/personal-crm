@@ -15,26 +15,48 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
             // Get audit data for all people
             $audit_data = array();
 
-            // Process all person types using unified approach
-            $person_type_mappings = array(
-                'team_members' => array('type_name' => ucfirst( $group ) . ' Member', 'audit_type' => 'member'),
-                'leadership' => array('type_name' => 'Leadership', 'audit_type' => 'leader'),
-                'consultants' => array('type_name' => 'Consultant', 'audit_type' => 'consultants'),
-                'alumni' => array('type_name' => 'Alumni', 'audit_type' => 'alumni'),
-            );
-            
-            foreach ( $person_type_mappings as $section_key => $type_info ) {
-                foreach ( $config[ $section_key ] ?? array() as $username => $person ) {
-                    $missing = get_missing_data_points( $person, $type_info['audit_type'], $current_group );
-                    $score = get_completeness_score( $missing, $type_info['audit_type'], $current_group );
-                    $audit_data[] = array(
-                        'type' => $type_info['type_name'],
-                        'name' => $person['name'],
-                        'username' => $username,
-                        'missing' => $missing,
-                        'score' => $score,
-                        'person' => $person
-                    );
+            // Process direct members
+            foreach ( $config['members'] ?? array() as $username => $person ) {
+                $missing = get_missing_data_points( $person, 'member', $current_group );
+                $score = get_completeness_score( $missing, 'member', $current_group );
+                $audit_data[] = array(
+                    'type' => ( $config['group_name'] ?? ucfirst( $group ) ) . ' Member',
+                    'name' => $person['name'],
+                    'username' => $username,
+                    'missing' => $missing,
+                    'score' => $score,
+                    'person' => $person
+                );
+            }
+
+            // Process child groups dynamically
+            if ( ! empty( $config['id'] ) ) {
+                $child_groups = $crm->storage->get_child_groups( $config['id'] );
+                foreach ( $child_groups as $child ) {
+                    $child_slug = $child['slug'];
+
+                    // Determine audit type based on group name
+                    $audit_type = 'member';
+                    if ( stripos( $child['group_name'], 'leadership' ) !== false || stripos( $child['group_name'], 'lead' ) !== false ) {
+                        $audit_type = 'leader';
+                    } elseif ( stripos( $child['group_name'], 'consultant' ) !== false ) {
+                        $audit_type = 'consultants';
+                    } elseif ( stripos( $child['group_name'], 'alumni' ) !== false ) {
+                        $audit_type = 'alumni';
+                    }
+
+                    foreach ( $config[$child_slug] ?? array() as $username => $person ) {
+                        $missing = get_missing_data_points( $person, $audit_type, $current_group );
+                        $score = get_completeness_score( $missing, $audit_type, $current_group );
+                        $audit_data[] = array(
+                            'type' => $child['group_name'],
+                            'name' => $person['name'],
+                            'username' => $username,
+                            'missing' => $missing,
+                            'score' => $score,
+                            'person' => $person
+                        );
+                    }
                 }
             }
 
@@ -76,10 +98,15 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
                 <span style="margin-right: 15px; font-weight: 600;">Filter by:</span>
                 <select class="form-select-small" style="margin-right: 15px;" id="type-filter" onchange="filterAuditTable()">
                     <option value="">All Types</option>
-                    <option value="Team Member"><?php echo ucfirst( $group ); ?> Members</option>
-                    <option value="Leadership">Leadership</option>
-                    <option value="Consultant">Consultants</option>
-                    <option value="Alumni">Alumni</option>
+                    <option value="<?php echo htmlspecialchars( ( $config['group_name'] ?? ucfirst( $group ) ) . ' Member' ); ?>"><?php echo htmlspecialchars( $config['group_name'] ?? ucfirst( $group ) ); ?> Members</option>
+                    <?php
+                    if ( ! empty( $config['id'] ) ) {
+                        $child_groups = $crm->storage->get_child_groups( $config['id'] );
+                        foreach ( $child_groups as $child ) {
+                            echo '<option value="' . htmlspecialchars( $child['group_name'] ) . '">' . htmlspecialchars( $child['group_name'] ) . '</option>';
+                        }
+                    }
+                    ?>
                 </select>
                 <select class="form-select-small" id="score-filter" onchange="filterAuditTable()">
                     <option value="">All Scores</option>
@@ -105,10 +132,10 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
                         <tr class="table-row" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" data-score="<?php echo $item['score']; ?>">
                             <td class="table-cell" style="font-weight: normal;">
                                 <div style="font-weight: 600;">
-                                    <?php echo htmlspecialchars( $crm->mask_name( $item['name'], $privacy_mode ) ); ?>
+                                    <?php echo htmlspecialchars( $item['name'] ); ?>
                                 </div>
                                 <div class="text-small-muted">
-                                    @<?php echo htmlspecialchars( $crm->mask_username( $item['username'], $privacy_mode ) ); ?>
+                                    @<?php echo htmlspecialchars( $item['username'] ); ?>
                                 </div>
                             </td>
                             <td class="table-cell" style="font-weight: normal; white-space: nowrap;"><?php echo htmlspecialchars( $item['type'] ); ?></td>
@@ -173,7 +200,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
                                 <?php endif; ?>
                             </td>
                             <td class="table-cell" style="font-weight: normal; white-space: nowrap;">
-                                <a href="/crm/admin/<?php echo $current_group; ?>/person/<?php echo $item['username']; ?>/" class="link-primary text-small" style="margin-right: 8px;">✏️ Edit</a>
+                                <a href="<?php echo $crm->build_url( 'admin/person.php', array( 'person' => $item['username'] ) ); ?>" class="link-primary text-small" style="margin-right: 8px;">✏️ Edit</a>
                                 <a href="<?php echo $crm->build_url( 'index.php', array( 'person' => $item['username'] ) ); ?>" class="link-primary text-small" target="_blank">👁️ View</a>
                             </td>
                         </tr>

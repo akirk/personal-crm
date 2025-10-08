@@ -277,12 +277,8 @@ window.CmdK = {
     },
 
     buildPersonUrl(teamSlug, username) {
-        // Use the route format: /crm/{team}/{person}
-        const team = teamSlug && teamSlug !== 'team' ? teamSlug : '';
-        if (team) {
-            return `${this.baseUrl}${team}/${username}`;
-        }
-        return `${this.baseUrl}${username}`;
+        // Use the route format: /crm/person/{person}
+        return `${this.baseUrl}person/${username}`;
     },
 
     bindEvents() {
