@@ -292,7 +292,7 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 
 				<?php if ( ! empty( $person_data_raw['groups'] ) && is_array( $person_data_raw['groups'] ) ) : ?>
 					<div class="section">
-						<h2>Teams</h2>
+						<h2>Groups</h2>
 						<div class="teams-list">
 							<?php foreach ( $person_data_raw['groups'] as $group ) : ?>
 								<a href="<?php echo esc_url( $crm->build_url( 'index.php', array( 'group' => $group['slug'] ) ) ); ?>" class="team-badge">
@@ -381,7 +381,7 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 
 							<?php
 							// Allow plugins to add quick links
-							do_action( 'personal_crm_person_quick_links', $person_data, $is_team_member, $group, $group_data );
+							do_action( 'personal_crm_person_quick_links', $person_data, $is_team_member, $group_data );
 							?>
 							</div>
 						</div>
@@ -466,26 +466,6 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 								</form>
 							</div>
 						<?php endif; ?>
-						
-						
-							<!-- Hidden form for adding notes when no notes exist -->
-							<form method="post" action="<?php echo $crm->build_url( 'admin/person.php', array( 'person' => $person ) ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
-								<input type="hidden" name="action" value="add_note">
-								<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
-								<input type="hidden" name="return_to_person" value="1">
-								<div class="notes-section">
-									<div class="notes-header">
-										<strong>📝 Add your first note:</strong>
-									</div>
-									<textarea name="new_note" placeholder="Add a new note..." rows="3" required></textarea>
-									<div class="form-actions">
-										<button type="submit">Save Note</button>
-										<button type="button" onclick="toggleAddNoteForm()" class="cancel-btn">Cancel</button>
-									</div>
-								</div>
-							</form>
-						<?php endif; ?>
-					<?php endif; ?>
 
 					<?php if ( $has_any_accounts ) : ?>
 						<div class="section">
@@ -528,8 +508,6 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 								<?php endif; ?>
 							</div>
 						</div>
-					<?php endif; ?>
-
 					<?php endif; ?>
 			</div>
 

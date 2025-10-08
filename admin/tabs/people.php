@@ -84,7 +84,7 @@ function render_birthday_dropdown( $field_prefix, $value ) {
  * Get person type configuration
  */
 function get_person_type_config( $person_type ) {
-	global $group, $current_group;
+	global $current_group;
 	$crm = PersonalCrm::get_instance();
 
 	$person_types = $crm->storage->get_person_types( $current_group );
@@ -536,7 +536,6 @@ function handle_person_action( $action, $config, $person_data ) {
  * PERSON-RELATED POST HANDLERS
  * ==================================================
  */
-_POST['action'] . ')' : 'NO' ) );
 
 // Handle POST requests for person operations
 if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
@@ -805,7 +804,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 		$parent_config = $crm->storage->get_group( $current_group );
 		$selected_groups[] = array(
 			'id' => $default_group_id,
-			'name' => ( $parent_config['group_name'] ?? 'Team' ) . ' (Team Members)',
+			'name' => ( $parent_config['group_name'] ?? '' ) . ' (Members)',
 			'icon' => '👥'
 		);
 	}
@@ -1314,7 +1313,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
         $tabs = array(
             array(
                 'slug' => 'members',
-                'display_name' => 'Team Members',
+                'display_name' => 'Members',
                 'display_icon' => '👥',
                 'can_add' => 1,
                 'sort_order' => 0,

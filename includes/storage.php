@@ -230,7 +230,7 @@ class Storage extends \WpApp\BaseStorage {
             $default_types = array(
                 array(
                     'type_key' => 'team_members',
-                    'display_name' => 'Team Members',
+                    'display_name' => 'Members',
                     'display_icon' => '👥',
                     'can_add' => 1,
                     'sort_order' => 1
@@ -1329,7 +1329,7 @@ class Storage extends \WpApp\BaseStorage {
                     $hierarchical_name = $group['group_name'];
                 }
             } else {
-                $hierarchical_name = $group['group_name'] . ' (Team Members)';
+                $hierarchical_name = $group['group_name'] . ' (Members)';
             }
 
             $result[] = array(

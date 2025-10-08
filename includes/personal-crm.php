@@ -278,8 +278,6 @@ if ( ! function_exists( "dbDelta" ) ) {
             }
         }
 
-        $group = $crm->is_social_group( $current_group ) ? 'group' : 'team';
-
         // Load group object - members and events will be lazy loaded
         $group_data = $crm->storage->get_group( $current_group );
 
@@ -299,7 +297,7 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         $available_groups = $crm->storage->get_available_groups();
 
-        return compact( 'crm', 'current_group', 'group', 'group_data', 'available_groups' );
+        return compact( 'crm', 'current_group', 'group_data', 'available_groups' );
     }
 
     /**
@@ -721,7 +719,7 @@ if ( ! function_exists( "dbDelta" ) ) {
                 $days_until_next = $current_date->diff( $next_event_after->date )->days;
                 ?>
                 <p style="color: #999; font-size: 12px; margin: 12px 0 0 0; font-style: italic;">
-                    Then <?php echo $days_until_next; ?> days until next event
+                    Then <?php echo $days_until_next; ?> days until the next event
                 </p>
                 <?php
             }
@@ -957,6 +955,11 @@ if ( ! function_exists( "dbDelta" ) ) {
                     const ajaxUrl = <?php echo json_encode( $ajax_url ); ?>;
                     const baseUrl = <?php echo json_encode( $base_url ); ?>;
                     CmdK.init(teams, searchIndex, ajaxUrl, baseUrl);
+
+                    // Trigger privacy mode now that searchIndex is available
+                    if (typeof applyPrivacyMode === 'function' && localStorage.getItem('privacyMode') === 'true') {
+                        applyPrivacyMode(searchIndex);
+                    }
                 }
             });
         </script>

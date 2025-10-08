@@ -31,7 +31,6 @@ if ( $all_teams_mode ) {
     // For all-teams mode, we'll load this later after we set up the parameters
     $group_data = null;
 } else {
-    $group = $crm->is_social_group( $current_group ) ? 'group' : 'team';
     $group_data = $crm->storage->get_group( $current_group );
 }
 
@@ -57,8 +56,6 @@ if ( $calendar_year < 2000 || $calendar_year > 2100 ) {
 
 // Handle all-teams mode data loading
 if ( $all_teams_mode ) {
-	$group = 'team'; // Default for all-teams mode
-
 	// Load events from all teams (lazy loaded)
 	$all_teams_groups = array();
 	foreach ( $available_teams as $team_slug ) {
@@ -66,7 +63,7 @@ if ( $all_teams_mode ) {
 	}
 	// Create a combined team_data structure
 	$group_data = array(
-		'team_name' => 'All Teams',
+		'team_name' => 'All Groups',
 		'events' => array(),
 		'people' => array(),
 		'team_members' => array(),
@@ -266,19 +263,19 @@ $available_teams = $crm->storage->get_available_groups();
                 </h1>
                 <div class="back-nav">
                     <?php if ( $all_teams_mode ) : ?>
-                        <a href="<?php echo $crm->build_url( 'select.php' ); ?>">← Back to Team Selection</a>
+                        <a href="<?php echo $crm->build_url( 'select.php' ); ?>">← Back to Group Selection</a>
                     <?php else : ?>
-                    <a href="<?php echo $crm->build_url( 'index.php' ); ?>">← Back to <?php echo $group_data['group_name'], ' ', ucfirst( $group ); ?> Overview</a>
+                    <a href="<?php echo $crm->build_url( 'index.php' ); ?>">← Back to <?php echo $group_data['group_name']; ?> Overview</a>
                     <?php endif; ?>
                 </div>
             </div>
             <div class="nav-container">
                 <select id="group-selector" onchange="switchGroup()">
                     <?php
-                    // Add "All Teams" option at the top
+                    // Add "All Groups" option at the top
                     $selected_all = $all_teams_mode ? 'selected' : '';
                     ?>
-                    <option value="all-teams" <?php echo $selected_all; ?>>All Teams</option>
+                    <option value="all-teams" <?php echo $selected_all; ?>>All Groups</option>
 
                     <?php
                     // Separate teams by type and default status (same structure as index.php)
@@ -321,7 +318,7 @@ $available_teams = $crm->storage->get_available_groups();
                     <?php endif; ?>
 
                     <?php if ( ! empty( $teams ) ) : ?>
-                    <optgroup label="Teams">
+                    <optgroup label="Groups">
                         <?php foreach ( $teams as $item ) : ?>
                             <option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
                         <?php endforeach; ?>
@@ -619,7 +616,7 @@ $available_teams = $crm->storage->get_available_groups();
         <?php if ( $view_mode === 'list' && ! empty( $past_by_month ) ) : ?>
             <div class="section" style="margin-top: 40px;">
                 <div class="section-header">
-                    <h2 class="section-title">📋 Past Team Events</h2>
+                    <h2 class="section-title">📋 Past Events</h2>
                     <span class="count-text"><?php echo count( $past_team_events ); ?> event<?php echo count( $past_team_events ) !== 1 ? 's' : ''; ?> (last 3 years)</span>
                 </div>
 

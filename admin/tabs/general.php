@@ -58,31 +58,31 @@ $group_obj = $crm->storage->get_group( $current_group );
 
         <?php
         // Allow plugins to add fields after the name field
-        do_action( 'personal_crm_admin_team_general_fields', $group_obj, $group, $current_group );
+        do_action( 'personal_crm_admin_team_general_fields', $group_obj, $current_group );
         ?>
 
         <div class="form-group">
             <label for="team_type">Type</label>
             <select id="team_type" name="team_type">
-                <option value="team" <?php echo ( $group_obj->type === 'team' ) ? 'selected' : ''; ?>>Team (work/business context)</option>
-                <option value="group" <?php echo ( $group_obj->type === 'group' ) ? 'selected' : ''; ?>>Group (personal/social context)</option>
+                <option value="team" <?php echo ( $group_obj->type === 'team' ) ? 'selected' : ''; ?>>Work (business context)</option>
+                <option value="group" <?php echo ( $group_obj->type === 'group' ) ? 'selected' : ''; ?>>Personal (social context)</option>
             </select>
-            <small class="text-small-muted">Choose "Group" for personal friends/acquaintances, or "Team" for work/business contexts.</small>
+            <small class="text-small-muted">Choose "Personal" for friends/acquaintances, or "Work" for business contexts.</small>
         </div>
 
         <div class="form-group" style="margin-bottom: 15px;">
             <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 600;">
                 <input type="checkbox" id="is_default" name="is_default" value="1" <?php echo $group_obj->is_default ? 'checked' : ''; ?> style="width: auto;">
-                <span>Set as default team</span>
+                <span>Set as default group</span>
             </label>
             <small class="text-small-muted" style="margin-left: 20px;">
-                When users visit the site without specifying a team, they'll be redirected to this team automatically.
+                When users visit the site without specifying a group, they'll be redirected to this group automatically.
             </small>
         </div>
 
         <?php
         // Allow plugins to add team management options
-        do_action( 'personal_crm_admin_team_management_options', $group_obj, $group, $current_group );
+        do_action( 'personal_crm_admin_team_management_options', $group_obj, $current_group );
         ?>
 
 

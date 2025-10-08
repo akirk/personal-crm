@@ -45,7 +45,7 @@ if ( empty( $available_teams ) ) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( 'Team Selection - Orbit Team Management' ) : 'Team Selection - Orbit Team Management'; ?></title>
+    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( 'Group Selection - Orbit' ) : 'Group Selection - Orbit'; ?></title>
     <?php
     if ( function_exists( 'wp_app_enqueue_style' ) ) {
         wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
@@ -73,8 +73,8 @@ if ( empty( $available_teams ) ) {
             
             <div class="type-filter-buttons">
                 <a href="<?php echo $crm->build_url( 'select.php' ); ?>" class="filter-btn<?php echo !$type_filter ? ' active' : ''; ?>">All</a>
-                <a href="<?php echo $crm->build_url( 'select.php', array( 'type' => 'team' ) ); ?>" class="filter-btn<?php echo $type_filter === 'team' ? ' active' : ''; ?>">Teams</a>
-                <a href="<?php echo $crm->build_url( 'select.php', array( 'type' => 'group' ) ); ?>" class="filter-btn<?php echo $type_filter === 'group' ? ' active' : ''; ?>">Groups</a>
+                <a href="<?php echo $crm->build_url( 'select.php', array( 'type' => 'team' ) ); ?>" class="filter-btn<?php echo $type_filter === 'team' ? ' active' : ''; ?>">Work</a>
+                <a href="<?php echo $crm->build_url( 'select.php', array( 'type' => 'group' ) ); ?>" class="filter-btn<?php echo $type_filter === 'group' ? ' active' : ''; ?>">Personal</a>
             </div>
         </div>
 

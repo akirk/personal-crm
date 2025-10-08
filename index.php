@@ -112,7 +112,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 						<?php endif; ?>
 
 						<?php if ( ! empty( $teams ) ) : ?>
-						<optgroup label="Teams">
+						<optgroup label="Groups">
 							<?php foreach ( $teams as $item ) : ?>
 								<option value="<?php echo htmlspecialchars( $crm->build_url( 'index.php', array( 'group' => $item['slug'] ) ) ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
 							<?php endforeach; ?>
@@ -134,7 +134,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 				<div class="people-section">
 					<div class="section">
 						<?php $members = $group_data->get_members(); ?>
-						<h3><?php echo ucfirst( $group ); ?> Members (<?php echo count( $members ); ?>)</h3>
+						<h3>Members (<?php echo count( $members ); ?>)</h3>
 						<?php if ( ! empty( $members ) ) : ?>
 							<ul class="people-list">
 								<?php foreach ( $members as $username => $member ) : ?>
@@ -168,13 +168,13 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 								<?php endforeach; ?>
 							</ul>
 						<?php else : ?>
-							<p class="empty-state-message">No <?php echo $group; ?> members yet. <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'members', 'add' => 'new' ) ); ?>" class="action-link">Add your first <?php echo $group; ?> member →</a></p>
+							<p class="empty-state-message">No members yet. <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'members', 'add' => 'new' ) ); ?>" class="action-link">Add your first member →</a></p>
 						<?php endif; ?>
 					</div>
 
 					<?php
 					// Render child groups (leadership, consultants, alumni, etc.)
-					if ( $group !== 'group' ) :
+					if ( ! $crm->is_social_group( $current_group ) ) :
 						$child_groups_objs = $group_data->get_child_groups();
 						foreach ( $child_groups_objs as $child_group_obj ) :
 							$child_slug = $child_group_obj->slug;
@@ -281,7 +281,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 		<?php else : ?>
 			<div class="header">
 				<h1>Page Not Found</h1>
-				<p><a href="?<?php echo $current_group !== 'team' ? 'team=' . urlencode( $current_group ) : ''; ?>">← Back to <?php echo ucfirst( $group ); ?> Overview</a></p>
+				<p><a href="?<?php echo $current_group !== 'team' ? 'team=' . urlencode( $current_group ) : ''; ?>">← Back to Overview</a></p>
 			</div>
 		<?php endif; ?>
 

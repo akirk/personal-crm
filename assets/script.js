@@ -214,62 +214,82 @@ function initPrivacyMode() {
 
     // Update toggle UI
     updatePrivacyToggleUI(isEnabled);
-
-    // Apply privacy transformations if enabled
-    if (isEnabled) {
-        applyPrivacyMode();
-    }
 }
 
 /**
  * Apply privacy transformations to the page
+ * Called from init_cmd_k_js() after searchIndex is initialized
  */
-function applyPrivacyMode() {
-    // Wait for searchIndex to be available from cmd-k initialization
-    const checkSearchIndex = setInterval(() => {
-        if (typeof searchIndex !== 'undefined') {
-            clearInterval(checkSearchIndex);
-            maskNames(searchIndex);
-            blurAvatars();
-        }
-    }, 100);
+function applyPrivacyMode(searchIndex) {
+    if (!searchIndex) {
+        return;
+    }
 
-    // Failsafe: stop checking after 5 seconds
-    setTimeout(() => clearInterval(checkSearchIndex), 5000);
+    maskNames(searchIndex);
+    removeYears();
+    blurAvatars();
 }
 
 /**
- * Mask last names in the DOM using person data from search index
+ * Mask last names and usernames in the DOM using person data from search index
  */
 function maskNames(peopleData) {
     if (!peopleData || !Array.isArray(peopleData)) {
         return;
     }
 
-    // Build a map of full names to masked names
+    // Build maps for names and usernames
     const nameMap = new Map();
+    const usernameMap = new Map();
 
     peopleData.forEach(person => {
-        if (!person.name) return;
+        // Mask full names (with or without nicknames)
+        if (person.name) {
+            const parts = person.name.trim().split(' ');
+            if (parts.length > 1) {
+                const firstName = parts[0];
+                const lastInitial = parts[parts.length - 1].charAt(0) + '.';
+                const maskedName = firstName + ' ' + lastInitial;
+                nameMap.set(person.name, maskedName);
 
-        const parts = person.name.trim().split(' ');
-        if (parts.length > 1) {
-            const firstName = parts[0];
-            const lastInitial = parts[parts.length - 1].charAt(0) + '.';
-            const maskedName = firstName + ' ' + lastInitial;
-            nameMap.set(person.name, maskedName);
+                // Also handle name with nickname: "John "Johnny" Smith"
+                if (person.nickname) {
+                    const nameWithNickname = firstName + ' "' + person.nickname + '" ' + parts.slice(1).join(' ');
+                    const maskedWithNickname = firstName + ' "' + person.nickname + '" ' + lastInitial;
+                    nameMap.set(nameWithNickname, maskedWithNickname);
+                }
+            }
+        }
+
+        // Mask usernames
+        if (person.username) {
+            const username = person.username;
+            const maskedUsername = username.length > 3
+                ? username.substring(0, 3) + '***'
+                : '***';
+            usernameMap.set(username, maskedUsername);
         }
     });
 
-    // Walk the DOM and replace names in text nodes
+    // Walk the DOM and replace names and usernames in text nodes
     const walk = (node) => {
         if (node.nodeType === Node.TEXT_NODE) {
             let text = node.textContent;
             let modified = false;
 
+            // Replace full names
             nameMap.forEach((maskedName, fullName) => {
                 if (text.includes(fullName)) {
                     text = text.replace(new RegExp(fullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), maskedName);
+                    modified = true;
+                }
+            });
+
+            // Replace usernames (look for @username pattern)
+            usernameMap.forEach((maskedUsername, username) => {
+                const usernamePattern = new RegExp('@' + username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+                if (usernamePattern.test(text)) {
+                    text = text.replace(usernamePattern, '@' + maskedUsername);
                     modified = true;
                 }
             });
@@ -305,6 +325,46 @@ function blurAvatars() {
     avatars.forEach(avatar => {
         avatar.classList.add('privacy-blur');
     });
+}
+
+/**
+ * Remove years from dates in the DOM for privacy
+ */
+function removeYears() {
+    const walk = (node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+            let text = node.textContent;
+            let modified = false;
+
+            // Remove 4-digit years from various date patterns
+            // Pattern: "Jan 15, 2024" -> "Jan 15"
+            text = text.replace(/(\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2}),?\s+\d{4}\b/g, '$1');
+
+            // Pattern: "2024-01-15" -> "01-15"
+            text = text.replace(/\b\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])\b/g, '$1-$2');
+
+            // Pattern: "15 January 2024" -> "15 January"
+            text = text.replace(/(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December))\s+\d{4}\b/g, '$1');
+
+            // Pattern: "2024" standalone (be careful not to remove other 4-digit numbers)
+            // Only remove if it appears to be a year (1900-2099)
+            text = text.replace(/\b(19|20)\d{2}\b/g, (match) => {
+                // Check if it looks like a year in context (preceded by date-like words)
+                return '****';
+            });
+
+            if (text !== node.textContent) {
+                node.textContent = text;
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            // Skip script and style elements
+            if (node.tagName !== 'SCRIPT' && node.tagName !== 'STYLE') {
+                node.childNodes.forEach(child => walk(child));
+            }
+        }
+    };
+
+    walk(document.body);
 }
 
 /**

@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
                 $missing = get_missing_data_points( $person, 'member', $current_group );
                 $score = get_completeness_score( $missing, 'member', $current_group );
                 $audit_data[] = array(
-                    'type' => ( $config['group_name'] ?? ucfirst( $group ) ) . ' Member',
+                    'type' => ( $config['group_name'] ?? '' ) . ' Member',
                     'name' => $person['name'],
                     'username' => $username,
                     'missing' => $missing,
@@ -98,7 +98,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
                 <span style="margin-right: 15px; font-weight: 600;">Filter by:</span>
                 <select class="form-select-small" style="margin-right: 15px;" id="type-filter" onchange="filterAuditTable()">
                     <option value="">All Types</option>
-                    <option value="<?php echo htmlspecialchars( ( $config['group_name'] ?? ucfirst( $group ) ) . ' Member' ); ?>"><?php echo htmlspecialchars( $config['group_name'] ?? ucfirst( $group ) ); ?> Members</option>
+                    <option value="<?php echo htmlspecialchars( ( $config['group_name'] ?? '' ) . ' Member' ); ?>"><?php echo htmlspecialchars( $config['group_name'] ?? '' ); ?> Members</option>
                     <?php
                     if ( ! empty( $config['id'] ) ) {
                         $child_groups = $crm->storage->get_child_groups( $config['id'] );

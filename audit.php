@@ -102,7 +102,7 @@ foreach ( $group_data['team_members'] as $username => $member ) {
 	$missing = get_missing_data_points( $member, 'member' );
 	$score = get_completeness_score( $missing, 'member' );
 	$audit_data[] = array(
-		'type' => 'Team Member',
+		'type' => 'Member',
 		'name' => $member->name,
 		'username' => $username,
 		'missing' => $missing,
@@ -157,7 +157,7 @@ $available_teams = $crm->storage->get_available_groups();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $group_data['group_name'] ) . ' Team Audit' ) : htmlspecialchars( $group_data['group_name'] ) . ' Team Audit'; ?></title>
+    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $group_data['group_name'] ) . ' Audit' ) : htmlspecialchars( $group_data['group_name'] ) . ' Audit'; ?></title>
     <?php
     if ( function_exists( 'wp_app_enqueue_style' ) ) {
         wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
@@ -317,8 +317,8 @@ $available_teams = $crm->storage->get_available_groups();
     <div class="container">
         <div class="header">
             <div style="flex-grow: 1;">
-                <h1><a href="<?php echo $crm->build_url( 'audit.php' ); ?>" style="color: inherit; text-decoration: none;">📊 <?php echo htmlspecialchars( $group_data['group_name'] ); ?> Team Audit</a></h1>
-                <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Identify missing data points and improve team profiles</p>
+                <h1><a href="<?php echo $crm->build_url( 'audit.php' ); ?>" style="color: inherit; text-decoration: none;">📊 <?php echo htmlspecialchars( $group_data['group_name'] ); ?> Audit</a></h1>
+                <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Identify missing data points and improve profiles</p>
             </div>
             <div class="navigation" style="display: flex; align-items: center; gap: 10px;">
                 <select id="group-selector" onchange="switchGroup()">
@@ -331,7 +331,7 @@ $available_teams = $crm->storage->get_available_groups();
                     ?>
                 </select>
 
-                <a href="<?php echo $crm->build_url( 'index.php', array( 'group' => $current_group ) ); ?>" class="nav-link">👥 Team Overview</a>
+                <a href="<?php echo $crm->build_url( 'index.php', array( 'group' => $current_group ) ); ?>" class="nav-link">👥 Overview</a>
                 <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $current_group ) ); ?>" class="nav-link">⚙️ Admin Panel</a>
             </div>
         </div>
@@ -367,7 +367,7 @@ $available_teams = $crm->storage->get_available_groups();
             <span class="filter-label">Filter by:</span>
             <select class="filter-select" id="type-filter" onchange="filterTable()">
                 <option value="">All Types</option>
-                <option value="Team Member">Team Members</option>
+                <option value="Member">Members</option>
                 <option value="Leadership">Leadership</option>
                 <option value="Alumni">Alumni</option>
             </select>

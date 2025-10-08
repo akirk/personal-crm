@@ -97,9 +97,6 @@ $edit_event_index = $_GET['edit_event'] ?? '';
 $edit_data = null;
 $is_editing_event = false;
 
-// Initialize $group early with a default value
-$group = 'team';
-
 // Dynamic is_editing_{type} variables
 $person_editing_vars = array();
 
@@ -107,7 +104,6 @@ if ( ! empty( $edit_member ) ) {
 	// When editing a person, we don't need a current_group since they can belong to multiple groups
 	if ( $current_group ) {
 		$config = $crm->storage->get_group( $current_group );
-		$group = ( $config && isset( $config['type'] ) ) ? $config['type'] : 'team';
 	}
 
 	// Check all person types dynamically
@@ -177,9 +173,6 @@ if ( ! $config ) {
 		$config[ $type['type_key'] ] = array();
 	}
 }
-
-// Set group type label for UI
-$group = ( isset( $config['type'] ) && $config['type'] ) ? $config['type'] : 'team';
 
 // Handle POST requests before any HTML output (to allow redirects)
 $people_tab_included = false;
@@ -258,7 +251,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( ucfirst( $group ?? 'Team' ) . ' Management Admin' ) : ucfirst( $group ?? 'Team' ) . ' Management Admin'; ?></title>
+    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( 'Admin' ) : 'Admin'; ?></title>
     <?php
     if ( ! function_exists( 'wp_app_enqueue_style' ) ) {
         echo '<link rel="stylesheet" href="' . plugin_dir_url( __FILE__ ) . 'assets/style.css">';
@@ -274,7 +267,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
     <div class="container">
         <div class="header">
             <div class="header-content">
-                <h1><a href="<?php echo $crm->build_url( 'admin/index.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo ucfirst( $group ?? 'Team' ); ?> Management Admin</a></h1>
+                <h1><a href="<?php echo $crm->build_url( 'admin/index.php' ); ?>" style="color: inherit; text-decoration: none;">Admin</a></h1>
             </div>
             <div class="navigation">
                 <div class="group-switcher" style="display: inline-block; margin-right: 10px;">
@@ -292,7 +285,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                         ?>
                     </select>
                 <?php endif; ?>
-                    <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'create_team' => 'new' ) ); ?>" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Team</a>
+                    <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'create_team' => 'new' ) ); ?>" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Group</a>
                 </div>
 
             </div>
@@ -337,7 +330,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                 <?php endif; ?>
                 <div class="form-group">
                     <label for="new_team_name">Name *</label>
-                    <input type="text" id="new_team_name" name="new_team_name" required placeholder="e.g., Marketing Team" autofocus>
+                    <input type="text" id="new_team_name" name="new_team_name" required placeholder="e.g., Marketing" autofocus>
                 </div>
                 <div class="form-group">
                     <label for="new_team_slug">Slug *</label>
@@ -347,10 +340,10 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                 <div class="form-group">
                     <label for="new_team_type">Type</label>
                     <select id="new_team_type" name="new_team_type">
-                        <option value="team">Team (work/business context)</option>
-                        <option value="group">Group (personal/social context)</option>
+                        <option value="team">Work (business context)</option>
+                        <option value="group">Personal (social context)</option>
                     </select>
-                    <small class="text-small-muted">Choose "Group" for personal friends/acquaintances, or "Team" for work/business contexts.</small>
+                    <small class="text-small-muted">Choose "Personal" for friends/acquaintances, or "Work" for business contexts.</small>
                 </div>
                 <div style="margin-top: 20px;">
                     <button type="submit" class="btn">Create</button>
@@ -371,7 +364,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
             $nav_tabs = array(
                 array(
                     'slug' => 'members',
-                    'display_name' => 'Team Members',
+                    'display_name' => 'Members',
                     'display_icon' => '👥',
                     'count' => count( $parent_config['members'] ?? array() )
                 )
@@ -396,7 +389,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
             $all_tab_slugs = array_column( $nav_tabs, 'slug' );
             $total_people = array_sum( array_column( $nav_tabs, 'count' ) );
             ?>
-            <?php if ( $group === 'group' ) : ?>
+            <?php if ( $crm->is_social_group( $current_group ) ) : ?>
                 <?php
                 $first_tab = $nav_tabs[0] ?? null;
                 if ( $first_tab ) :
