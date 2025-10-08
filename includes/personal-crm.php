@@ -576,37 +576,49 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         $all_events = array();
 
-        // Collect all people from direct members and child groups
-        $all_people = array();
-        if ( isset( $group_data['members'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['members'] );
-        }
+        // If filtering by person but no group data, fetch person directly
+        if ( $filter_person && ! $group_data ) {
+            $person_data_raw = $this->storage->get_person( $filter_person );
+            if ( $person_data_raw ) {
+                $person_obj = $this->create_person_from_data( $filter_person, $person_data_raw );
+                if ( method_exists( $person_obj, 'get_upcoming_events' ) ) {
+                    $personal_events = $person_obj->get_upcoming_events();
+                    $all_events = array_merge( $all_events, $personal_events );
+                }
+            }
+        } else {
+            // Collect all people from direct members and child groups
+            $all_people = array();
+            if ( isset( $group_data['members'] ) ) {
+                $all_people = array_merge( $all_people, $group_data['members'] );
+            }
 
-        // Add people from all child groups
-        if ( ! empty( $group_data['id'] ) ) {
-            $child_groups = $this->storage->get_child_groups( $group_data['id'] );
-            foreach ( $child_groups as $child ) {
-                $child_slug = $child['slug'];
-                if ( isset( $group_data[$child_slug] ) ) {
-                    $all_people = array_merge( $all_people, $group_data[$child_slug] );
+            // Add people from all child groups
+            if ( ! empty( $group_data['id'] ) ) {
+                $child_groups = $this->storage->get_child_groups( $group_data['id'] );
+                foreach ( $child_groups as $child ) {
+                    $child_slug = $child['slug'];
+                    if ( isset( $group_data[$child_slug] ) ) {
+                        $all_people = array_merge( $all_people, $group_data[$child_slug] );
+                    }
+                }
+            }
+            foreach ( $all_people as $person ) {
+                if ( is_object( $person ) && method_exists( $person, 'get_upcoming_events' ) ) {
+
+                    // Skip if filtering by person and this isn't the person
+                    if ( $filter_person && $person->username !== $filter_person ) {
+                        continue;
+                    }
+
+                    $personal_events = $person->get_upcoming_events();
+                    $all_events = array_merge( $all_events, $personal_events );
                 }
             }
         }
-        foreach ( $all_people as $person ) {
-            if ( is_object( $person ) && method_exists( $person, 'get_upcoming_events' ) ) {
-
-                // Skip if filtering by person and this isn't the person
-                if ( $filter_person && $person->username !== $filter_person ) {
-                    continue;
-                }
-
-                $personal_events = $person->get_upcoming_events();
-                $all_events = array_merge( $all_events, $personal_events );
-            }
-        }
 
 
-        if ( $include_team_events && isset( $group_data['events'] ) ) {
+        if ( $include_team_events && $group_data && isset( $group_data['events'] ) ) {
             foreach ( $group_data['events'] as $event ) {
                 $event_start = $event->date;
                 $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;

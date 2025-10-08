@@ -516,9 +516,7 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 					<h3 class="sidebar-section-heading">🗓️ Upcoming Events</h3>
 				</a>
 				<?php
-				if ( $group_data ) {
-					$crm->render_upcoming_events_sidebar( $group_data, 365, $person, false );
-				}
+				$crm->render_upcoming_events_sidebar( $group_data, 365, $person, false );
 				?>
 
 				<?php

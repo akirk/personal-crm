@@ -272,15 +272,14 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
             <div class="navigation">
                 <div class="group-switcher" style="display: inline-block; margin-right: 10px;">
                     <?php
-                    $available_groups = $crm->storage->get_available_groups( true );
+                    $available_groups = $crm->storage->get_all_groups_with_hierarchy();
                     if ( $available_groups ) :
                     	?>
                     <select id="group-selector" onchange="switchGroup()">
                         <?php
-                        foreach ( $available_groups as $group_slug ) {
-                            $team_display_name = $crm->storage->get_group_name( $group_slug );
-                            $selected = $group_slug === $current_group ? 'selected' : '';
-                            echo '<option value="' . htmlspecialchars( $crm->build_url( 'admin/index.php', array( 'group' => $group_slug ) ) ) . '" ' . $selected . '>' . htmlspecialchars( $team_display_name ) . '</option>';
+                        foreach ( $available_groups as $group ) {
+                            $selected = $group['slug'] === $current_group ? 'selected' : '';
+                            echo '<option value="' . htmlspecialchars( $crm->build_url( 'admin/index.php', array( 'group' => $group['slug'] ) ) ) . '" ' . $selected . '>' . htmlspecialchars( $group['hierarchical_name'] ) . '</option>';
                         }
                         ?>
                     </select>

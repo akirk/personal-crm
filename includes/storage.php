@@ -1317,27 +1317,43 @@ class Storage extends \WpApp\BaseStorage {
             $groups_by_id[ $group['id'] ] = $group;
         }
 
-        $result = array();
+        // Organize groups by parent
+        $top_level = array();
+        $children_by_parent = array();
+
         foreach ( $all_groups as $group ) {
-            $hierarchical_name = '';
-
             if ( $group['parent_id'] ) {
-                $parent = $groups_by_id[ $group['parent_id'] ] ?? null;
-                if ( $parent ) {
-                    $hierarchical_name = $parent['group_name'] . ' → ' . $group['group_name'];
-                } else {
-                    $hierarchical_name = $group['group_name'];
+                if ( ! isset( $children_by_parent[ $group['parent_id'] ] ) ) {
+                    $children_by_parent[ $group['parent_id'] ] = array();
                 }
+                $children_by_parent[ $group['parent_id'] ][] = $group;
             } else {
-                $hierarchical_name = $group['group_name'] . ' (Members)';
+                $top_level[] = $group;
             }
+        }
 
+        // Build result with parents followed by their children
+        $result = array();
+        foreach ( $top_level as $parent_group ) {
+            // Add parent
             $result[] = array(
-                'id' => $group['id'],
-                'slug' => $group['slug'],
-                'hierarchical_name' => $hierarchical_name,
-                'display_icon' => $group['display_icon'] ?: '',
+                'id' => $parent_group['id'],
+                'slug' => $parent_group['slug'],
+                'hierarchical_name' => $parent_group['group_name'],
+                'display_icon' => $parent_group['display_icon'] ?: '',
             );
+
+            // Add children
+            if ( isset( $children_by_parent[ $parent_group['id'] ] ) ) {
+                foreach ( $children_by_parent[ $parent_group['id'] ] as $child_group ) {
+                    $result[] = array(
+                        'id' => $child_group['id'],
+                        'slug' => $child_group['slug'],
+                        'hierarchical_name' => $parent_group['group_name'] . ' → ' . $child_group['group_name'],
+                        'display_icon' => $child_group['display_icon'] ?: '',
+                    );
+                }
+            }
         }
 
         return $result;
