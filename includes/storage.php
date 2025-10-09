@@ -1071,6 +1071,28 @@ class Storage extends \WpApp\BaseStorage {
     }
 
     /**
+     * Create a new group
+     */
+    public function create_group( $group_name, $group_slug, $group_type = 'team' ) {
+        $existing_groups = $this->get_available_groups();
+        if ( in_array( $group_slug, $existing_groups, true ) ) {
+            return false;
+        }
+
+        $config = array(
+            'group_name' => $group_name,
+            'parent_id' => null,
+            'activity_url_prefix' => '',
+            'type' => $group_type,
+            'display_icon' => '',
+            'sort_order' => 0,
+            'default' => empty( $existing_groups ) ? 1 : 0
+        );
+
+        return $this->save_group( null, $config );
+    }
+
+    /**
      * Save a single person (NEW: no group/category context)
      */
     public function save_person( $username, $person_data, $group_ids = array() ) {
@@ -1503,7 +1525,6 @@ class Storage extends \WpApp\BaseStorage {
         }
 
         $person_id = $row['id'];
-        unset( $row['id'], $row['created_at'], $row['updated_at'] );
 
         $row['links'] = $this->get_person_links( $person_id );
         $row['notes'] = $this->get_person_notes( $person_id );
@@ -1518,13 +1539,6 @@ class Storage extends \WpApp\BaseStorage {
         $row['groups'] = $this->get_person_groups( $person_id );
 
         return $row;
-    }
-
-    /**
-     * DEPRECATED: Legacy get_person for backwards compatibility
-     */
-    private function get_person_legacy( $group_slug, $username ) {
-        return $this->get_person( $username );
     }
 
     /**
@@ -1810,98 +1824,6 @@ class Storage extends \WpApp\BaseStorage {
                 );
             }
         }
-    }
-
-    /**
-     * Get person types for a group
-     */
-    /**
-     * DEPRECATED: Person types are now subgroups in the groups table
-     * This method kept for backwards compatibility during migration only
-     */
-    public function get_person_types( $group_slug ) {
-        // Check if person_types table still exists
-        $table_exists = $this->wpdb->get_var( "SHOW TABLES LIKE '{$this->wpdb->prefix}personal_crm_person_types'" );
-
-        if ( ! $table_exists ) {
-            // Fallback: return subgroups as person_types format
-            $group_id = $this->wpdb->get_var( $this->wpdb->prepare(
-                "SELECT id FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
-                $group_slug
-            ) );
-
-            if ( ! $group_id ) {
-                return array();
-            }
-
-            $subgroups = $this->get_child_groups( $group_id );
-            $types = array();
-
-            foreach ( $subgroups as $subgroup ) {
-                // Extract type_key from subgroup slug (e.g., "engineering_leadership" -> "leadership")
-                $type_key = str_replace( $group_slug . '_', '', $subgroup['slug'] );
-                $types[] = array(
-                    'type_key' => $type_key,
-                    'display_name' => $subgroup['group_name'],
-                    'display_icon' => $subgroup['display_icon'],
-                    'can_add' => 1, // All subgroups can add members
-                    'sort_order' => $subgroup['sort_order']
-                );
-            }
-
-            return $types;
-        }
-
-        $results = $this->wpdb->get_results( $this->wpdb->prepare(
-            "SELECT type_key, display_name, display_icon, can_add, sort_order FROM {$this->wpdb->prefix}personal_crm_person_types WHERE group_slug = %s ORDER BY sort_order, type_key",
-            $group_slug
-        ), ARRAY_A );
-
-        return $results ? $results : array();
-    }
-
-    /**
-     * DEPRECATED: Person types are now subgroups
-     */
-    public function save_person_type( $group_slug, $type_data ) {
-        // Redirect to creating a subgroup instead
-        $parent_id = $this->wpdb->get_var( $this->wpdb->prepare(
-            "SELECT id FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
-            $group_slug
-        ) );
-
-        if ( ! $parent_id ) {
-            return false;
-        }
-
-        $subgroup_slug = $group_slug . '_' . $type_data['type_key'];
-
-        return $this->wpdb->insert(
-            $this->wpdb->prefix . 'personal_crm_groups',
-            array(
-                'slug' => $subgroup_slug,
-                'parent_id' => $parent_id,
-                'group_name' => $type_data['display_name'],
-                'display_icon' => $type_data['display_icon'] ?? '',
-                'sort_order' => $type_data['sort_order'] ?? 0,
-                'type' => 'subgroup'
-            ),
-            array( '%s', '%d', '%s', '%s', '%d', '%s' )
-        ) !== false;
-    }
-
-    /**
-     * DEPRECATED: Person types are now subgroups
-     */
-    public function delete_person_type( $group_slug, $type_key ) {
-        // Redirect to deleting subgroup
-        $subgroup_slug = $group_slug . '_' . $type_key;
-
-        return $this->wpdb->delete(
-            $this->wpdb->prefix . 'personal_crm_groups',
-            array( 'slug' => $subgroup_slug ),
-            array( '%s' )
-        ) !== false;
     }
 
     /**

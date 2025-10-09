@@ -110,7 +110,7 @@ if ( ! function_exists( "dbDelta" ) ) {
     }
 
     private function setup_routes() {
-        // Main dashboard (index.php)
+        // Group selector (index.php)
         // Default route handled automatically by wp-app
 
         // Admin interface (admin/index.php)
@@ -131,7 +131,7 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         // Person management (person.php)
         $this->app->route( 'person/{person}', 'person.php' );
-        $this->app->route( 'group/{group}', 'index.php' );
+        $this->app->route( 'group/{group}', 'group.php' );
 
         // Events (events.php)
         $this->app->route( 'events', 'events.php' );
@@ -142,8 +142,8 @@ if ( ! function_exists( "dbDelta" ) ) {
         // Import person (import-person.php)
         $this->app->route( 'import-person', 'import-person.php' );
 
-        // Select interface (select.php)
-        $this->app->route( 'select', 'select.php' );
+        // Select interface (index.php)
+        $this->app->route( 'select', 'index.php' );
     }
 
     private function setup_menu() {
@@ -267,13 +267,13 @@ if ( ! function_exists( "dbDelta" ) ) {
 
         // Check if we're on select.php to prevent redirect loops
         $current_script = basename( $_SERVER['PHP_SELF'] );
-        $is_select_page = ( $current_script === 'select.php' );
+        $is_select_page = ( $current_script === 'index.php' );
 
         if ( ! $current_group && ! $is_select_page ) {
             $current_group = $crm->use_default_group();
             $available_groups = $crm->storage->get_available_groups();
             if ( count( $available_groups ) > 1 && ! $current_group ) {
-                header( 'Location: ' . $crm->build_url( 'select.php' ) );
+                header( 'Location: ' . $crm->build_url( 'index.php' ) );
                 exit;
             }
         }
@@ -285,7 +285,7 @@ if ( ! function_exists( "dbDelta" ) ) {
         if ( ! $group_data && ! $is_select_page ) {
             $available_groups = $crm->storage->get_available_groups();
             if ( ! empty( $available_groups ) ) {
-                header( 'Location: ' . $crm->build_url( 'select.php' ) );
+                header( 'Location: ' . $crm->build_url( 'index.php' ) );
                 exit;
             }
             // No groups exist at all - will show create team page
@@ -759,11 +759,13 @@ if ( ! function_exists( "dbDelta" ) ) {
      * Build URL with group parameter (uses 'group' parameter for group-type groups)
      */
     public function build_url( $base_url, $additional_params = array() ) {
-        if ( $this->app ) {
+        if ( $this->app && defined( 'WPINC' ) ) {
             $route = str_replace( '.php', '', $base_url );
 
-            if ( $route === 'index' || $route === '' || $route === './' ) {
+            if ( $route === 'group' || $route === '' || $route === './' ) {
                 $route = '';
+            } elseif ( $route === 'index' ) {
+                $route = 'select';
             }
 
             if ( ( $route === 'person' || $route === '' ) && isset( $additional_params['person'] ) ) {
@@ -795,8 +797,20 @@ if ( ! function_exists( "dbDelta" ) ) {
                     $group = $this->current_group;
                 }
 
+                $suffix = '';
+                if ( isset( $additional_params['members'] ) && $additional_params['members'] ) {
+                    $suffix = '/members';
+                    unset( $additional_params['members'] );
+                } elseif ( isset( $additional_params['tab'] ) ) {
+                    $tab = $additional_params['tab'];
+                    if ( in_array( $tab, array( 'links', 'events', 'audit' ) ) ) {
+                        $suffix = '/' . $tab;
+                    }
+                    unset( $additional_params['tab'] );
+                }
+
                 if ( $group ) {
-                    $url = home_url( '/crm/admin/group/' . $group );
+                    $url = home_url( '/crm/admin/group/' . $group . $suffix );
                 } else {
                     $url = home_url( '/crm/admin' );
                 }
@@ -923,7 +937,7 @@ if ( ! function_exists( "dbDelta" ) ) {
                 'members' => $members_count,
                 'child_counts' => $child_counts,
                 'total_people' => $total_count,
-                'url' => $this->build_url( 'index.php', array( 'group' => $group_slug ) )
+                'url' => $this->build_url( 'group.php', array( 'group' => $group_slug ) )
             );
 
             // Index direct members

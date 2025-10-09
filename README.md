@@ -5,10 +5,11 @@ A comprehensive team management dashboard for tracking team members, leadership,
 ## Setup
 
 1. Visit `admin/index.php` to create and manage your team configuration through a web interface
-2. View your team dashboard at `index.php`
+2. View your team dashboard at `group.php`
+3. Select from multiple groups at `index.php`
 
 ## Files
 
-- `index.php` - Main team dashboard
+- `index.php` - Group selector (when multiple groups exist)
+- `group.php` - Group overview dashboard
 - `admin/index.php` - Web-based configuration manager
-- `*.json` - Team configuration files (automatically created via admin interface)

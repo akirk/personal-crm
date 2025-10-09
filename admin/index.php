@@ -22,12 +22,12 @@ $is_editing_person = ! empty( $route_person );
 $is_creating_team = isset( $_GET['create_team'] ) && $_GET['create_team'] === 'new';
 $is_post_request = $_SERVER['REQUEST_METHOD'] === 'POST';
 if ( ! $current_group && ! $is_editing_person && ! $is_creating_team && ! $is_post_request ) {
-	header( 'Location: ' . $crm->build_url( 'select.php' ) );
+	header( 'Location: ' . $crm->build_url( 'index.php' ) );
 	exit;
 }
 
 if ( $current_group === 'team' ) {
-	header( 'Location: ' . $crm->build_url( 'select.php' ) );
+	header( 'Location: ' . $crm->build_url( 'index.php' ) );
 	exit;
 }
 
@@ -49,44 +49,28 @@ if ( strpos( $request_uri, '/person/' ) !== false || $is_editing_person ) {
 } elseif ( strpos( $request_uri, '/audit' ) !== false ) {
 	$active_tab = 'audit';
 } elseif ( strpos( $request_uri, '/members' ) !== false ) {
-	$active_tab = 'members';
-} else {
-	// Check for child group tabs dynamically (handle both full and short slugs)
-	$found_person_tab = false;
+	// On a members page - determine if it's parent members or child group members
 	if ( $current_group ) {
 		$temp_config = $crm->storage->get_group( $current_group );
-		if ( $temp_config && ! empty( $temp_config['id'] ) ) {
-			$child_groups = $crm->storage->get_child_groups( $temp_config['id'] );
-			foreach ( $child_groups as $child ) {
-				// Check for full slug
-				if ( strpos( $request_uri, '/' . $child['slug'] ) !== false ) {
-					$active_tab = $child['slug'];
-					$found_person_tab = true;
-					break;
-				}
-				// Check for short slug (without parent prefix)
-				$short_slug = $child['slug'];
-				if ( strpos( $short_slug, $current_group . '_' ) === 0 ) {
-					$short_slug = substr( $short_slug, strlen( $current_group ) + 1 );
-					if ( strpos( $request_uri, '/' . $short_slug ) !== false ) {
-						$active_tab = $child['slug'];
-						$found_person_tab = true;
-						break;
-					}
-				}
-			}
+		if ( $temp_config && ! empty( $temp_config['parent_id'] ) ) {
+			// Viewing a child group's members
+			$active_tab = $temp_config['slug'];
+		} else {
+			// Viewing parent/root group members
+			$active_tab = 'members';
 		}
+	} else {
+		$active_tab = 'members';
 	}
-
-	if ( ! $found_person_tab ) {
-		$active_tab = $_GET['tab'] ?? 'general';
-	}
+} else {
+	// Not on any specific tab - default to general
+	$active_tab = $_GET['tab'] ?? 'general';
 }
 $is_adding_new = isset( $_GET['add'] ) && $_GET['add'] === 'new';
 
 // Check if group exists in database and redirect to selector if not (unless already creating a team or editing a person)
 if ( $current_group && ! $crm->storage->group_exists( $current_group ) && ! $is_creating_team && ! $is_editing_person ) {
-	header( 'Location: ' . $crm->build_url( 'select.php' ) );
+	header( 'Location: ' . $crm->build_url( 'index.php' ) );
 	exit;
 }
 
@@ -101,32 +85,23 @@ $is_editing_event = false;
 $person_editing_vars = array();
 
 if ( ! empty( $edit_member ) ) {
+    $edit_data = $crm->storage->get_person( $edit_member );
+    if ( ! $edit_data ) {
+        // Invalid member - redirect back to main group page
+        header( 'Location: ' . $crm->build_url( 'admin/index.php' ) );
+        exit;
+    }
+
 	// When editing a person, we don't need a current_group since they can belong to multiple groups
-	if ( $current_group ) {
-		$config = $crm->storage->get_group( $current_group );
-	}
+	if ( ! $current_group  ) {
+        $person_groups = $crm->storage->get_person_groups( $edit_data['id'] );
 
-	// Check all person types dynamically
-	$all_person_types = $current_group ? $crm->storage->get_person_types( $current_group ) : array();
-	$all_person_types[] = array( 'type_key' => 'alumni' );
+        if ( ! empty( $person_groups ) ) {
+            $current_group = $person_groups[0]['slug'];
+        }
+    }
 
-	foreach ( $all_person_types as $ptype ) {
-		$type_key = $ptype['type_key'];
-		if ( isset( $config[ $type_key ][ $edit_member ] ) ) {
-			$edit_data = $config[ $type_key ][ $edit_member ];
-			$edit_data['username'] = $edit_member;
-			$active_tab = $type_key;
-			// Set is_editing_{type} variable dynamically
-			$var_name = 'is_editing_' . $type_key;
-			$$var_name = true;
-			$person_editing_vars[ $type_key ] = true;
-			break;
-		} else {
-			// Initialize as false
-			$var_name = 'is_editing_' . $type_key;
-			$$var_name = false;
-		}
-	}
+	$config = $crm->storage->get_group( $current_group );
 } elseif ( $edit_event_index !== '' && is_numeric( $edit_event_index ) ) {
 	$config = $crm->storage->get_group( $current_group );
 	if ( isset( $config['events'][ $edit_event_index ] ) ) {
@@ -167,11 +142,6 @@ if ( ! $config ) {
 		'default' => false,
 		'links' => array(),
 	);
-	// Initialize arrays for person types from database
-	$person_types = $crm->storage->get_person_types( $current_group );
-	foreach ( $person_types as $type ) {
-		$config[ $type['type_key'] ] = array();
-	}
 }
 
 // Handle POST requests before any HTML output (to allow redirects)
@@ -307,7 +277,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                 if ( $parent_group ) {
                     ?>
                     <div style="margin-bottom: 20px;">
-                        <a href="/crm/admin/group/<?php echo htmlspecialchars( $parent_group['slug'] ); ?>/" class="back-link-admin">← Back to <?php echo htmlspecialchars( $parent_group['group_name'] ); ?> Admin</a>
+                        <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $parent_group['slug'] ) ); ?>" class="back-link-admin">← Back to <?php echo htmlspecialchars( $parent_group['group_name'] ); ?> Admin</a>
                     </div>
                     <?php
                 }
@@ -318,7 +288,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
         <?php if ( $is_creating_team ) : ?>
             <!-- Create New Page -->
             <div style="margin-bottom: 20px;">
-                <a href="<?php echo $crm->build_url( 'admin/index.php' ); ?>" class="back-link-admin">← Back to Admin Dashboard</a>
+                <a href="index.php" class="back-link-admin">← Back to Admin Dashboard</a>
             </div>
 
             <h2>Create New</h2>
@@ -352,20 +322,35 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
         <?php else : ?>
 
         <div class="nav-tabs">
-            <a href="/crm/admin/<?php echo $current_group; ?>/" class="nav-tab <?php echo $active_tab === 'general' ? 'active' : ''; ?>">General</a>
-            <a href="/crm/admin/<?php echo $current_group; ?>/links/" class="nav-tab <?php echo $active_tab === 'team_links' ? 'active' : ''; ?>">Links</a>
+            <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $current_group ) ); ?>" class="nav-tab <?php echo $active_tab === 'general' ? 'active' : ''; ?>">General</a>
+            <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $current_group, 'tab' => 'links' ) ); ?>" class="nav-tab <?php echo $active_tab === 'team_links' ? 'active' : ''; ?>">Links</a>
             <?php
-            // Build navigation tabs for direct members + child groups
-            $parent_config = $crm->storage->get_group( $current_group );
-            $parent_group_id = $parent_config['id'];
-            $child_groups = $crm->storage->get_child_groups( $parent_group_id );
+
+            $group_data = $crm->storage->get_group( $current_group );
+            if ( ! $group_data && ! empty( $edit_member ) ) {
+                $person_groups = $crm->storage->get_person_groups( $edit_member );
+                if ( ! empty( $person_groups ) ) {
+                    $group_data = $crm->storage->get_group( $person_groups[0] );
+                }
+            }
+
+            // If current group has a parent, use the parent to build the menu (for consistency)
+            if ( $group_data && ! empty( $group_data['parent_id'] ) ) {
+                $parent_group = $crm->storage->get_group_by_id( $group_data['parent_id'] );
+                if ( $parent_group ) {
+                    $group_data = $parent_group;
+                }
+            }
+
+            $menu_group_id = $group_data ? $group_data['id'] : null;
+            $child_groups = $menu_group_id ? $crm->storage->get_child_groups( $menu_group_id ) : array();
 
             $nav_tabs = array(
                 array(
                     'slug' => 'members',
                     'display_name' => 'Members',
                     'display_icon' => '👥',
-                    'count' => count( $parent_config['members'] ?? array() )
+                    'count' => $menu_group_id ? count( $crm->storage->get_group_members( $menu_group_id, false ) ) : 0
                 )
             );
 
@@ -392,8 +377,10 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                 <?php
                 $first_tab = $nav_tabs[0] ?? null;
                 if ( $first_tab ) :
+                    $tab_group = ( $first_tab['slug'] === 'members' ) ? $current_group : $first_tab['slug'];
+                    $tab_url = $crm->build_url( 'admin/index.php', array( 'group' => $tab_group, 'members' => true ) );
                 ?>
-                <a href="/crm/admin/<?php echo $current_group; ?>/<?php echo $first_tab['slug']; ?>/" class="nav-tab <?php echo $active_tab === $first_tab['slug'] ? 'active' : ''; ?>"><?php echo $first_tab['display_icon']; ?> <?php echo htmlspecialchars( $first_tab['display_name'] ); ?> (<?php echo $first_tab['count']; ?>)</a>
+                <a href="<?php echo $tab_url; ?>" class="nav-tab <?php echo $active_tab === $first_tab['slug'] ? 'active' : ''; ?>"><?php echo $first_tab['display_icon']; ?> <?php echo htmlspecialchars( $first_tab['display_name'] ); ?> (<?php echo $first_tab['count']; ?>)</a>
                 <?php endif; ?>
             <?php else : ?>
             <div class="nav-dropdown">
@@ -402,13 +389,17 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                 </span>
                 <div class="nav-dropdown-menu">
                     <?php foreach ( $nav_tabs as $tab ) : ?>
-                        <a href="/crm/admin/<?php echo $current_group; ?>/<?php echo $tab['url_slug'] ?? $tab['slug']; ?>/" class="nav-dropdown-item <?php echo $active_tab === $tab['slug'] ? 'active' : ''; ?>"><?php echo $tab['display_icon']; ?> <?php echo htmlspecialchars( $tab['display_name'] ); ?> (<?php echo $tab['count']; ?>)</a>
+                        <?php
+                        $tab_group = ( $tab['slug'] === 'members' ) ? $group_data['slug'] : $tab['slug'];
+                        $tab_url = $crm->build_url( 'admin/index.php', array( 'group' => $tab_group, 'members' => true ) );
+                        ?>
+                        <a href="<?php echo $tab_url; ?>" class="nav-dropdown-item <?php echo $active_tab === $tab['slug'] ? 'active' : ''; ?>"><?php echo $tab['display_icon']; ?> <?php echo htmlspecialchars( $tab['display_name'] ); ?> (<?php echo $tab['count']; ?>)</a>
                     <?php endforeach; ?>
                 </div>
             </div>
             <?php endif; ?>
-            <a href="/crm/admin/<?php echo $current_group; ?>/events/" class="nav-tab <?php echo $active_tab === 'events' ? 'active' : ''; ?>">Events</a>
-            <a href="/crm/admin/<?php echo $current_group; ?>/audit/" class="nav-tab <?php echo $active_tab === 'audit' ? 'active' : ''; ?>">Audit</a>
+            <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $current_group, 'tab' => 'events' ) ); ?>" class="nav-tab <?php echo $active_tab === 'events' ? 'active' : ''; ?>">Events</a>
+            <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $current_group, 'tab' => 'audit' ) ); ?>" class="nav-tab <?php echo $active_tab === 'audit' ? 'active' : ''; ?>">Audit</a>
         </div>
 
         <style>
@@ -571,9 +562,27 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                 break;
             default:
                 // Check if it's a people tab (direct members or child group)
-                $parent_config = $crm->storage->get_group( $current_group );
-                $parent_group_id = $parent_config['id'];
-                $child_groups = $crm->storage->get_child_groups( $parent_group_id );
+                $group_data = $crm->storage->get_group( $current_group );
+                if ( ! $group_data && ! empty( $edit_member ) ) {
+                    $person_groups = $crm->storage->get_person_groups( $edit_member );
+                    if ( ! empty( $person_groups ) ) {
+                        $group_data = $crm->storage->get_group( $person_groups[0] );
+                    }
+                }
+
+                // If current group is a child group, get the parent's child groups for comparison
+                if ( $group_data && ! empty( $group_data['parent_id'] ) ) {
+                    $parent_group = $crm->storage->get_group_by_id( $group_data['parent_id'] );
+                    if ( $parent_group ) {
+                        $menu_group_id = $parent_group['id'];
+                    } else {
+                        $menu_group_id = $group_data ? $group_data->id : null;
+                    }
+                } else {
+                    $menu_group_id = $group_data ? $group_data->id : null;
+                }
+
+                $child_groups = $menu_group_id ? $crm->storage->get_child_groups( $menu_group_id ) : array();
 
                 $is_person_tab = false;
                 if ( $active_tab === 'members' ) {
@@ -1112,7 +1121,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
         <a href="#" id="privacy-toggle" onclick="togglePrivacyMode(); return false;" class="text-muted" style="text-decoration: none; margin-right: 15px;">
             <span id="privacy-status">🔓 Privacy Mode OFF</span>
         </a>
-        <a href="<?php echo $crm->build_url( 'index.php' ); ?>" class="text-muted" style="text-decoration: none;">👥 Overview</a>
+        <a href="<?php echo $crm->build_url( 'group.php' ); ?>" class="text-muted" style="text-decoration: none;">👥 Overview</a>
     </footer>
     
     <?php

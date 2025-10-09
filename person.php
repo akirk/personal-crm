@@ -23,14 +23,14 @@ if ( empty( $back_group ) && function_exists( 'get_query_var' ) ) {
 }
 
 if ( empty( $person ) ) {
-	header( 'Location: ' . $crm->build_url( 'index.php' ) );
+	header( 'Location: ' . $crm->build_url( 'group.php' ) );
 	exit;
 }
 
 $person_data_raw = $crm->storage->get_person( $person );
 
 if ( ! $person_data_raw ) {
-	header( 'Location: ' . $crm->build_url( 'index.php' ) );
+	header( 'Location: ' . $crm->build_url( 'group.php' ) );
 	exit;
 }
 
@@ -100,7 +100,7 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 				</h1>
 				<?php if ( $current_group && $group_data ) : ?>
 					<div class="back-nav">
-						<a href="<?php echo $crm->build_url( 'index.php', array( 'group' => $current_group ) ); ?>">← Back to <?php echo htmlspecialchars( $group_data['group_name'] ); ?> Overview</a>
+						<a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $current_group ) ); ?>">← Back to <?php echo htmlspecialchars( $group_data['group_name'] ); ?> Overview</a>
 					</div>
 				<?php endif; ?>
 			</div>
@@ -295,7 +295,7 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 						<h2>Groups</h2>
 						<div class="teams-list">
 							<?php foreach ( $person_data_raw['groups'] as $group ) : ?>
-								<a href="<?php echo esc_url( $crm->build_url( 'index.php', array( 'group' => $group['slug'] ) ) ); ?>" class="team-badge">
+								<a href="<?php echo esc_url( $crm->build_url( 'group.php', array( 'group' => $group['slug'] ) ) ); ?>" class="team-badge">
 									<?php echo htmlspecialchars( $group['group_name'] ); ?>
 								</a>
 							<?php endforeach; ?>

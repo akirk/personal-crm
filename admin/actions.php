@@ -136,55 +136,19 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				break;
 			}
 
-			// Create the parent group
-			$parent_group_data = array(
-				'slug' => $new_team_slug,
-				'parent_id' => null,
-				'group_name' => $new_team_name,
-				'activity_url_prefix' => '',
-				'type' => $new_team_type,
-				'display_icon' => '',
-				'sort_order' => 0,
-				'is_default' => empty( $existing_groups ) ? 1 : 0
+			$new_slug = $crm->storage->create_group(
+				$new_team_name,
+				$new_team_slug,
+				$new_team_type
 			);
 
-			$parent_group_id = $crm->storage->wpdb->insert(
-				$crm->storage->wpdb->prefix . 'personal_crm_groups',
-				$parent_group_data,
-				array( '%s', '%d', '%s', '%s', '%s', '%s', '%d', '%d' )
-			);
-
-			if ( ! $parent_group_id ) {
-				$error = 'Failed to create team.';
+			if ( ! $new_slug ) {
+				$error = 'Failed to create group. Slug may already exist.';
 				break;
 			}
 
-			$parent_group_id = $crm->storage->wpdb->insert_id;
-
-			// Create default subgroups (Leadership, Consultants, Alumni)
-			$default_subgroups = array(
-				array( 'slug' => $new_team_slug . '_leadership', 'name' => 'Leadership', 'icon' => '👑', 'order' => 1 ),
-				array( 'slug' => $new_team_slug . '_consultants', 'name' => 'Consultants', 'icon' => '🤝', 'order' => 2 ),
-				array( 'slug' => $new_team_slug . '_alumni', 'name' => 'Alumni', 'icon' => '🎓', 'order' => 3 )
-			);
-
-			foreach ( $default_subgroups as $subgroup ) {
-				$crm->storage->wpdb->insert(
-					$crm->storage->wpdb->prefix . 'personal_crm_groups',
-					array(
-						'slug' => $subgroup['slug'],
-						'parent_id' => $parent_group_id,
-						'group_name' => $subgroup['name'],
-						'display_icon' => $subgroup['icon'],
-						'sort_order' => $subgroup['order'],
-						'type' => $new_team_type
-					),
-					array( '%s', '%d', '%s', '%s', '%d', '%s' )
-				);
-			}
-
 			$message = ucfirst( $new_team_type ) . ' created successfully!';
-			$redirect_url = 'admin/index.php' . ( $new_team_slug !== 'team' ? '?team=' . urlencode( $new_team_slug ) : '' );
+			$redirect_url = 'index.php' . ( $new_slug ? '?group=' . urlencode( $new_slug ) : '' );
 			header( 'Location: ' . $redirect_url );
 			exit;
 			break;

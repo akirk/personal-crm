@@ -32,6 +32,23 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
 	}
 }
 
+if ( ! function_exists( 'sanitize_title' ) ) {
+	function sanitize_title( $title, $fallback_title = '', $context = 'save' ) {
+		$title = strip_tags( $title );
+		$title = strtolower( $title );
+		$title = preg_replace( '/[^a-z0-9\s\-_]/', '', $title );
+		$title = preg_replace( '/[\s_]+/', '-', $title );
+		$title = preg_replace( '/-+/', '-', $title );
+		$title = trim( $title, '-' );
+
+		if ( empty( $title ) && ! empty( $fallback_title ) ) {
+			return sanitize_title( $fallback_title );
+		}
+
+		return $title;
+	}
+}
+
 if ( ! function_exists( 'sanitize_url' ) ) {
 	function sanitize_url( $url ) {
 		return filter_var( trim( $url ), FILTER_SANITIZE_URL );

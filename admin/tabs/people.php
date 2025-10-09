@@ -502,15 +502,13 @@ function handle_person_action( $action, $config, $person_data ) {
 			do_action( 'personal_crm_admin_person_save', $username, $_POST, $config['section_key'] );
 
 			// Redirect back to the appropriate admin section after adding
-			$section = '';
-			if ( $action === 'add_member' ) {
-				$section = 'members';
-			} elseif ( $action === 'add_leadership' ) {
-				$section = 'leadership';
+			$group_slug = $current_group;
+			if ( $action === 'add_leadership' ) {
+				$group_slug = $current_group . '_leadership';
 			} elseif ( $action === 'add_consultants' ) {
-				$section = 'consultants';
+				$group_slug = $current_group . '_consultants';
 			}
-			$redirect_url = '/crm/admin/' . $current_group . '/' . $section . '/';
+			$redirect_url = $crm->build_url( 'admin/index.php', array( 'group' => $group_slug, 'members' => true ) );
 			header( 'Location: ' . $redirect_url );
 			exit;
 		} else {
@@ -1305,9 +1303,18 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
         }
 
         // Generate tabs for direct members + child groups
-        $parent_config = $crm->storage->get_group( $current_group );
-        $parent_group_id = $parent_config['id'];
-        $child_groups = $crm->storage->get_child_groups( $parent_group_id );
+        $group_data = $crm->storage->get_group( $current_group );
+
+        // If current group is a child group, use the parent to build the tabs (for consistency)
+        if ( $group_data && ! empty( $group_data['parent_id'] ) ) {
+            $parent_group = $crm->storage->get_group_by_id( $group_data['parent_id'] );
+            if ( $parent_group ) {
+                $group_data = $parent_group;
+            }
+        }
+
+        $menu_group_id = $group_data['id'];
+        $child_groups = $crm->storage->get_child_groups( $menu_group_id );
 
         // First tab: Direct members of parent group
         $tabs = array(
@@ -1317,7 +1324,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
                 'display_icon' => '👥',
                 'can_add' => 1,
                 'sort_order' => 0,
-                'group_id' => $parent_group_id
+                'group_id' => $menu_group_id
             )
         );
 
@@ -1366,19 +1373,25 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
                     <h3>
                         <?php echo htmlspecialchars( ( $display_icon ? $display_icon . ' ' : '' ) . $display_name ); ?>
                         <?php if ( $slug !== 'members' ) : ?>
-                            <a href="/crm/admin/<?php echo $slug; ?>/" class="edit-group-link">⚙️ Edit Group</a>
+                            <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $slug ) ); ?>" class="edit-group-link">⚙️ Edit Group</a>
                         <?php endif; ?>
                     </h3>
                     <?php if ( $can_add ) : ?>
-                        <a href="/crm/admin/<?php echo $current_group; ?>/<?php echo $url_slug; ?>/?add=new" class="btn">+ Add <?php echo htmlspecialchars( $display_name ); ?></a>
+                        <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $slug, 'members' => true, 'add' => 'new' ) ); ?>" class="btn">+ Add <?php echo htmlspecialchars( $display_name ); ?></a>
                     <?php endif; ?>
                 </div>
-                <?php if ( ! empty( $config[ $slug ] ) ) : ?>
+                <?php
+                // Fetch members for this tab's group
+                $tab_members = $crm->storage->get_group_members( $tab_group_id, true );
+                ?>
+                <?php if ( ! empty( $tab_members ) ) : ?>
                     <div class="person-list">
                         <?php
-                        $sorted_people = $config[ $slug ];
+                        $sorted_people = $tab_members;
                         uasort( $sorted_people, function( $a, $b ) {
-                            return strcasecmp( $a['name'], $b['name'] );
+                            $a_name = is_object( $a ) ? $a->name : $a['name'];
+                            $b_name = is_object( $b ) ? $b->name : $b['name'];
+                            return strcasecmp( $a_name, $b_name );
                         } );
 
                         foreach ( $sorted_people as $username => $person ) :
@@ -1387,8 +1400,11 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
                         ?>
                             <div class="person-item">
                                 <div class="person-info">
-                                    <h4><?php echo htmlspecialchars( $person['name'] ); ?></h4>
-                                    <small>@<?php echo htmlspecialchars( $username ); ?> • <?php echo htmlspecialchars( $person['location'] ?? $person['town'] ?? '' ); ?></small>
+                                    <h4><?php echo htmlspecialchars( is_object( $person ) ? $person->name : $person['name'] ); ?></h4>
+                                    <small>@<?php echo htmlspecialchars( $username ); ?> • <?php
+                                        $location = is_object( $person ) ? ( $person->location ?? '' ) : ( $person['location'] ?? $person['town'] ?? '' );
+                                        echo htmlspecialchars( $location );
+                                    ?></small>
                                 </div>
                                 <div style="display: flex; gap: 8px;">
                                     <a href="<?php echo $crm->build_url( 'admin/person.php', array( 'person' => $username ) ); ?>" class="btn">Edit</a>
@@ -1409,13 +1425,13 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
             <?php endif; ?>
 
             <?php if ( $is_editing ) : ?>
-                <?php render_person_form_new( $tab_group_id, $parent_group_id, $edit_data, $is_editing ); ?>
+                <?php render_person_form_new( $tab_group_id, $menu_group_id, $edit_data, $is_editing ); ?>
             <?php elseif ( isset( $_GET['add'] ) && $_GET['add'] === 'new' && $can_add ) : ?>
                 <div style="margin-bottom: 20px;">
-                    <a href="/crm/admin/<?php echo $current_group; ?>/<?php echo $slug; ?>/" class="back-link-admin">← Back to <?php echo htmlspecialchars( $display_name ); ?></a>
+                    <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $slug, 'members' => true ) ); ?>" class="back-link-admin">← Back to <?php echo htmlspecialchars( $display_name ); ?></a>
                 </div>
                 <h3>Add <?php echo htmlspecialchars( $display_name ); ?></h3>
-                <?php render_person_form_new( $tab_group_id, $parent_group_id, null, false ); ?>
+                <?php render_person_form_new( $tab_group_id, $menu_group_id, null, false ); ?>
             <?php endif; ?>
         </div>
         <?php endforeach; ?>
