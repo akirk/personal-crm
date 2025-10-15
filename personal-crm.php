@@ -28,6 +28,13 @@ if ( ! file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
 }
 require_once __DIR__ . '/vendor/autoload.php';
 
+// Load DateTime wrappers early (before any other includes)
+require_once __DIR__ . '/includes/datetime.php';
+require_once __DIR__ . '/includes/time-travel.php';
+
+// Initialize time travel (sets simulated date if as_of parameter is present)
+\PersonalCRM\TimeTravel::init();
+
 if ( ! defined( 'WPINC' ) ) {
     // Only load polyfills in standalone mode
     require_once __DIR__ . '/includes/polyfills.php';

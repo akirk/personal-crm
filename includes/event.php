@@ -16,8 +16,8 @@ class Event {
 	public $location;
 	public $details;
 	public $links;
-	public \DateTime $date;
-	public ?\DateTime $end_date = null;
+	public DateTime $date;
+	public ?DateTime $end_date = null;
 	public ?Person $person = null; // Optional Person object
 
 	public function __construct( $type, $date, $description, $person = null ) {
@@ -112,7 +112,7 @@ class Event {
 	}
 
 	public function is_past() {
-		return $this->date < new \DateTime();
+		return $this->date < new DateTime();
 	}
 
 	public function get_title() {
@@ -205,7 +205,7 @@ class Event {
 	 * Create Event from team event data
 	 */
 	public static function from_team_event( $event_data ) {
-		$start_date = \DateTime::createFromFormat( 'Y-m-d', $event_data['start_date'] );
+		$start_date = DateTime::createFromFormat( 'Y-m-d', $event_data['start_date'] );
 		$event = new self( $event_data['type'], $start_date, $event_data['name'], null );
 
 		$event->id = $event_data['id'] ?? null;
@@ -214,7 +214,7 @@ class Event {
 		$event->set_links( $event_data['links'] ?? array() );
 
 		if ( ! empty( $event_data['end_date'] ) ) {
-			$event->set_end_date( \DateTime::createFromFormat( 'Y-m-d', $event_data['end_date'] ) );
+			$event->set_end_date( DateTime::createFromFormat( 'Y-m-d', $event_data['end_date'] ) );
 		}
 
 		return $event;

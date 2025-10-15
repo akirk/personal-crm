@@ -54,6 +54,7 @@ class PersonalCrm {
         $this->setup_menu();
 
         add_filter( 'personal_crm_sort_people', [ $this, 'default_sort_people' ], 5, 3 );
+        add_filter( 'personal_crm_build_url_params', [ 'PersonalCRM\TimeTravel', 'add_to_urls' ], 10, 2 );
 
         // Only initialize wp-app if we're in WordPress environment or can provide required constants
         if ( defined( 'ABSPATH' ) ) {
@@ -570,7 +571,7 @@ if ( ! function_exists( "dbDelta" ) ) {
      * @param bool $include_team_events Whether to include team-wide events
      */
     public function render_upcoming_events_sidebar( $group_data, $days_ahead = 90, $filter_person = null, $include_team_events = true ) {
-        $current_date = new \DateTime();
+        $current_date = new DateTime();
         $cutoff_date = clone $current_date;
         $cutoff_date->add( new \DateInterval( 'P' . $days_ahead . 'D' ) );
 
@@ -1058,7 +1059,7 @@ if ( ! function_exists( "dbDelta" ) ) {
      * Get upcoming events for display (includes ongoing multi-day events)
      */
     public function get_upcoming_events_for_display( $group_data ) {
-        $current_date = new \DateTime();
+        $current_date = new DateTime();
         $cutoff_date = clone $current_date;
         $cutoff_date->add( new \DateInterval( 'P3M' ) );
         $all_events = array();
@@ -1107,7 +1108,7 @@ if ( ! function_exists( "dbDelta" ) ) {
 
     public function get_all_upcoming_events( $group_data ) {
         $all_events = array();
-        $current_date = new \DateTime();
+        $current_date = new DateTime();
         $cutoff_date = clone $current_date;
         $cutoff_date->add( new \DateInterval( 'P3M' ) );
 

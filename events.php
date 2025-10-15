@@ -106,7 +106,7 @@ if ( $view_mode === 'list' ) {
     $all_upcoming_events = $crm->get_upcoming_events_for_display( $group_data );
 } else {
     // For calendar views, show events within a broader date range around the selected month
-    $month_start = new \DateTime( "$calendar_year-$calendar_month-01" );
+    $month_start = new DateTime( "$calendar_year-$calendar_month-01" );
     $month_end = clone $month_start;
     $month_end->modify( 'last day of this month' );
 
@@ -151,8 +151,8 @@ function get_events_for_date( $events, $date ) {
 }
 
 function generate_calendar_grid( $year, $month, $events, $week_starts_monday = true ) {
-    $first_day = new \DateTime( "$year-$month-01" );
-    $last_day = new \DateTime( $first_day->format( 'Y-m-t' ) );
+    $first_day = new DateTime( "$year-$month-01" );
+    $last_day = new DateTime( $first_day->format( 'Y-m-t' ) );
 
     // Calculate first day of calendar grid
     $first_day_of_week = (int) $first_day->format( 'w' );

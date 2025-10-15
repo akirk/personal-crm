@@ -144,11 +144,11 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 							$deceased_date = null;
 							
 							if ( $is_deceased && ! empty( $person_data->deceased_date ) ) {
-								$deceased_date = \DateTime::createFromFormat( 'Y-m-d', $person_data->deceased_date );
+								$deceased_date = DateTime::createFromFormat( 'Y-m-d', $person_data->deceased_date );
 							}
 							
 							if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $person_data->birthday ) ) {
-								$birth_date = \DateTime::createFromFormat( 'Y-m-d', $person_data->birthday );
+								$birth_date = DateTime::createFromFormat( 'Y-m-d', $person_data->birthday );
 								if ( $birth_date ) {
 									if ( $is_deceased && $deceased_date ) {
 										// For deceased people, show birth-death dates with age at death
@@ -156,14 +156,14 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 										$age_display = $birth_date->format( 'F j, Y' ) . ' - ' . $deceased_date->format( 'F j, Y' ) . ' (aged ' . $age_at_death . ')';
 									} else {
 										// For living people, calculate current age
-										$current_date = new \DateTime();
+										$current_date = new DateTime();
 										$age = $current_date->diff( $birth_date )->y;
 										$age_display = $age . ' (born ' . $birth_date->format( 'F j, Y' ) . ')';
 									}
 								}
 							} elseif ( preg_match( '/^\d{2}-\d{2}$/', $person_data->birthday ) ) {
 								// Legacy MM-DD format - limited calculation
-								$display_date = \DateTime::createFromFormat( 'm-d', $person_data->birthday );
+								$display_date = DateTime::createFromFormat( 'm-d', $person_data->birthday );
 								if ( $display_date ) {
 									if ( $is_deceased && $deceased_date ) {
 										$age_display = 'Birthday ' . $display_date->format( 'F j' ) . ' - passed away ' . $deceased_date->format( 'F j, Y' );
@@ -181,9 +181,9 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 
 						<?php if ( ! empty( $person_data->company_anniversary ) && ! ( $is_alumni && ! empty( $person_data->left_company ) ) ) : ?>
 							<?php
-							$anniversary_date = \DateTime::createFromFormat( 'Y-m-d', $person_data->company_anniversary );
+							$anniversary_date = DateTime::createFromFormat( 'Y-m-d', $person_data->company_anniversary );
 							if ( $anniversary_date ) {
-								$current_date = new \DateTime();
+								$current_date = new DateTime();
 								$years_at_company = $current_date->diff( $anniversary_date )->y;
 
 								if ( $years_at_company == 0 ) {
@@ -233,15 +233,15 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 								$partner_age_display = '';
 								if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $person_data->partner_birthday ) ) {
 									// Full date format - can calculate age
-									$birth_date = \DateTime::createFromFormat( 'Y-m-d', $person_data->partner_birthday );
+									$birth_date = DateTime::createFromFormat( 'Y-m-d', $person_data->partner_birthday );
 									if ( $birth_date ) {
-										$current_date = new \DateTime();
+										$current_date = new DateTime();
 										$age = $current_date->diff( $birth_date )->y;
 										$partner_age_display = $age . ' (born ' . $birth_date->format( 'F j, Y' ) . ')';
 									}
 								} elseif ( preg_match( '/^\d{2}-\d{2}$/', $person_data->partner_birthday ) ) {
 									// Year-unknown format - can't calculate exact age
-									$display_date = \DateTime::createFromFormat( 'm-d', $person_data->partner_birthday );
+									$display_date = DateTime::createFromFormat( 'm-d', $person_data->partner_birthday );
 									if ( $display_date ) {
 										$partner_age_display = 'Birthday ' . $display_date->format( 'F j' );
 									}
