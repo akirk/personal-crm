@@ -541,7 +541,7 @@ if ( ! function_exists( "dbDelta" ) ) {
         );
 
         // Set properties with empty string defaults
-        $string_properties = array( 'email', 'birthday', 'company_anniversary', 'partner', 'partner_birthday', 'timezone', 'github', 'wordpress', 'linkedin', 'website', 'new_company', 'new_company_website', 'deceased_date' );
+        $string_properties = array( 'email', 'birthday', 'company_anniversary', 'partner', 'partner_birthday', 'timezone', 'github', 'wordpress', 'linear', 'linkedin', 'website', 'new_company', 'new_company_website', 'deceased_date' );
         foreach ( $string_properties as $property ) {
             $person->$property = $person_data[$property] ?? '';
         }

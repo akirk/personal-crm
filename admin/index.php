@@ -1121,7 +1121,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
         <a href="#" id="privacy-toggle" onclick="togglePrivacyMode(); return false;" class="text-muted" style="text-decoration: none; margin-right: 15px;">
             <span id="privacy-status">🔓 Privacy Mode OFF</span>
         </a>
-        <a href="<?php echo $crm->build_url( 'group.php' ); ?>" class="text-muted" style="text-decoration: none;">👥 Overview</a>
+        <a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $current_group ) ); ?>" class="text-muted" style="text-decoration: none;">👥 Overview</a>
     </footer>
     
     <?php

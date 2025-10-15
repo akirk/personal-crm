@@ -25,6 +25,7 @@ class Person {
 	public $github; // GitHub username
 	public $github_repos; // Array of GitHub repositories
 	public $wordpress; // WordPress.org username
+	public $linear; // Linear id
 	public $linkedin; // LinkedIn username
 	public $website; // Personal website URL
 	public $personal_events; // Array of personal events like "return from AFK", "vacation end", etc.
@@ -56,6 +57,7 @@ class Person {
 		$this->github = '';
 		$this->github_repos = array();
 		$this->wordpress = '';
+		$this->linear = '';
 		$this->linkedin = '';
 		$this->personal_events = array();
 		$this->deceased = 0;
