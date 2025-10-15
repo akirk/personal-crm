@@ -663,7 +663,11 @@ if ( ! function_exists( "dbDelta" ) ) {
         if ( ! empty( $upcoming_events ) ) {
             foreach ( $upcoming_events as $event ) {
                 $formatted_date = $event->date->format( 'M j, Y' );
-                $days_until = $current_date->diff( $event->date )->days;
+                $event_date_start = clone $event->date;
+                $event_date_start->setTime( 0, 0, 0 );
+                $current_date_start = clone $current_date;
+                $current_date_start->setTime( 0, 0, 0 );
+                $days_until = $current_date_start->diff( $event_date_start )->days;
                 $is_past = $event->date < $current_date;
                 ?>
                 <div class="event-item">
