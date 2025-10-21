@@ -67,7 +67,6 @@ if ( strpos( $request_uri, '/person/' ) !== false || $is_editing_person ) {
 	$active_tab = $_GET['tab'] ?? 'general';
 }
 $is_adding_new = isset( $_GET['add'] ) && $_GET['add'] === 'new';
-
 // Check if group exists in database and redirect to selector if not (unless already creating a team or editing a person)
 if ( $current_group && ! $crm->storage->group_exists( $current_group ) && ! $is_creating_team && ! $is_editing_person ) {
 	header( 'Location: ' . $crm->build_url( 'index.php' ) );

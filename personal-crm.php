@@ -35,10 +35,6 @@ require_once __DIR__ . '/includes/time-travel.php';
 // Initialize time travel (sets simulated date if as_of parameter is present)
 \PersonalCRM\TimeTravel::init();
 
-if ( ! defined( 'WPINC' ) ) {
-    // Only load polyfills in standalone mode
-    require_once __DIR__ . '/includes/polyfills.php';
-}
 require_once __DIR__ . '/includes/personal-crm.php';
 
 // Initialize storage and set up PersonalCrm
@@ -51,14 +47,8 @@ if ( defined( 'WPINC' ) ) {
         PersonalCrm::get_instance();
     } );
 } else {
-    // Standalone mode - use SQLite by default
-    // Ensure wp-app database classes are loaded
-    if ( ! class_exists( 'wpdb' ) || ! class_exists( 'sqlite_wpdb' ) ) {
-        require_once __DIR__ . '/vendor/akirk/wp-app/src/wpdb-polyfill.php';
-        require_once __DIR__ . '/vendor/akirk/wp-app/src/sqlite-wpdb.php';
-    }
     $sqlite_file = __DIR__ . '/data/a8c.db';
-    $sqlite_wpdb = new \sqlite_wpdb( $sqlite_file, '' );
+    $sqlite_wpdb = new \WpApp\sqlite_wpdb( $sqlite_file, '' );
     $storage = new Storage( $sqlite_wpdb );
     PersonalCrm::set_storage( $storage );
 }

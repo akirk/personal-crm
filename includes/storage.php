@@ -20,587 +20,144 @@ if ( class_exists( '\PersonalCRM\Storage' ) ) {
 class Storage extends \WpApp\BaseStorage {
 
     /**
-     * Get migrations table name
+     * Get database schema
      */
-    protected function get_migrations_table_name() {
-        return $this->wpdb->prefix . 'personal_crm_migrations';
-    }
-
-    /**
-     * Create database tables using WordPress dbDelta
-     */
-    protected function create_tables() {
-        $charset_collate = $this->wpdb->get_charset_collate();
-
-        // Groups table
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_groups (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            slug varchar(100) NOT NULL,
-            parent_id bigint(20) unsigned DEFAULT NULL,
-            group_name varchar(255) NOT NULL,
-            activity_url_prefix varchar(255) DEFAULT '',
-            type varchar(50) DEFAULT 'team',
-            display_icon varchar(10) DEFAULT '',
-            sort_order int DEFAULT 0,
-            is_default tinyint(1) DEFAULT 0,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY unique_slug (slug),
-            KEY idx_parent_id (parent_id),
-            KEY idx_team_type (type),
-            KEY idx_team_default (is_default),
-            KEY idx_sort_order (parent_id, sort_order)
-        ) $charset_collate;";
-
-        dbDelta( $sql );
-
-        // People table
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_people (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            username varchar(100) NOT NULL,
-            name varchar(255) NOT NULL,
-            nickname varchar(255) DEFAULT '',
-            role varchar(255) DEFAULT '',
-            email varchar(255) DEFAULT '',
-            birthday varchar(20) DEFAULT '',
-            company_anniversary varchar(20) DEFAULT '',
-            partner varchar(255) DEFAULT '',
-            partner_birthday varchar(20) DEFAULT '',
-            location varchar(255) DEFAULT '',
-            timezone varchar(100) DEFAULT '',
-            github varchar(100) DEFAULT '',
-            `linear` varchar(100) DEFAULT '',
-            wordpress varchar(100) DEFAULT '',
-            linkedin varchar(100) DEFAULT '',
-            website varchar(255) DEFAULT '',
-            new_company varchar(255) DEFAULT '',
-            new_company_website varchar(255) DEFAULT '',
-            deceased_date varchar(20) DEFAULT '',
-            left_company tinyint(1) DEFAULT 0,
-            deceased tinyint(1) DEFAULT 0,
-            kids longtext,
-            github_repos longtext,
-            personal_events longtext,
-            notes longtext,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY unique_username (username),
-            KEY idx_people_username (username)
-        ) $charset_collate;";
-
-        dbDelta( $sql );
-
-        // Events table
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_events (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            group_id bigint(20) unsigned NOT NULL,
-            type varchar(50) NOT NULL,
-            name varchar(255) NOT NULL,
-            description text DEFAULT '',
-            start_date varchar(20) NOT NULL,
-            end_date varchar(20) DEFAULT '',
-            location varchar(255) DEFAULT '',
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_events_group_id (group_id),
-            KEY idx_events_type (type),
-            KEY idx_events_start_date (start_date)
-        ) $charset_collate;";
-
-        dbDelta( $sql );
-
-        // Group links table
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_group_links (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            group_id bigint(20) unsigned NOT NULL,
-            link_name varchar(100) NOT NULL,
-            link_url text NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_group_links_group_id (group_id),
-            UNIQUE KEY unique_group_link (group_id, link_name)
-        ) $charset_collate;";
-
-        dbDelta( $sql );
-
-        // People links table
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_people_links (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            person_id bigint(20) unsigned NOT NULL,
-            link_name varchar(100) NOT NULL,
-            link_url text NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_people_links_person_id (person_id),
-            UNIQUE KEY unique_person_link (person_id, link_name)
-        ) $charset_collate;";
-
-        dbDelta( $sql );
-
-        // Event links table
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_event_links (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            event_id bigint(20) unsigned NOT NULL,
-            link_name varchar(100) NOT NULL,
-            link_url text NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_event_links_event_id (event_id),
-            UNIQUE KEY unique_event_link (event_id, link_name)
-        ) $charset_collate;";
-
-        dbDelta( $sql );
-
-        // People-Groups junction table (M:N relationship)
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_people_groups (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            person_id bigint(20) unsigned NOT NULL,
-            group_id bigint(20) unsigned NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            UNIQUE KEY unique_person_group (person_id, group_id),
-            KEY idx_person_groups_person (person_id),
-            KEY idx_person_groups_group (group_id)
-        ) $charset_collate;";
-
-        dbDelta( $sql );
-
-        // Notes table
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_notes (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            person_id bigint(20) unsigned NOT NULL,
-            note_text longtext NOT NULL,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_notes_person_id (person_id),
-            KEY idx_notes_created_at (created_at)
-        ) $charset_collate;";
-
-        dbDelta( $sql );
-
-        // Person types table (DEPRECATED - will be removed in migration)
-        $sql = "CREATE TABLE {$this->wpdb->prefix}personal_crm_person_types (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            group_slug varchar(100) NOT NULL,
-            type_key varchar(50) NOT NULL,
-            display_name varchar(100) NOT NULL,
-            display_icon varchar(10) DEFAULT '',
-            can_add tinyint(1) DEFAULT 1,
-            sort_order int DEFAULT 0,
-            created_at datetime DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY (id),
-            KEY idx_person_types_group (group_slug),
-            KEY idx_person_types_sort (group_slug, sort_order),
-            UNIQUE KEY unique_group_type (group_slug, type_key)
-        ) $charset_collate;";
-
-        dbDelta( $sql );
-    }
-
-    /**
-     * Run database schema migrations
-     */
-    protected function run_migrations() {
-        // Run migrations
-        $this->run_migration( 'add_linear_column_to_people', function() {
-            // Check if linear column already exists
-            $columns = $this->wpdb->get_results( "DESCRIBE {$this->wpdb->prefix}personal_crm_people" );
-            $has_linear_column = false;
-
-            foreach ( $columns as $column ) {
-                if ( $column->Field === 'linear' ) {
-                    $has_linear_column = true;
-                    break;
-                }
-            }
-
-            if ( ! $has_linear_column ) {
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_people ADD COLUMN `linear` varchar(100) DEFAULT ''" );
-            }
-        } );
-
-        $this->run_migration( 'populate_default_person_types', function() {
-            $groups = $this->wpdb->get_col( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_groups" );
-
-            $default_types = array(
-                array(
-                    'type_key' => 'team_members',
-                    'display_name' => 'Members',
-                    'display_icon' => '👥',
-                    'can_add' => 1,
-                    'sort_order' => 1
-                ),
-                array(
-                    'type_key' => 'leadership',
-                    'display_name' => 'Leaders',
-                    'display_icon' => '👑',
-                    'can_add' => 1,
-                    'sort_order' => 2
-                ),
-                array(
-                    'type_key' => 'consultants',
-                    'display_name' => 'Consultants',
-                    'display_icon' => '🤝',
-                    'can_add' => 1,
-                    'sort_order' => 3
-                )
-            );
-
-            foreach ( $groups as $group_slug ) {
-                foreach ( $default_types as $type ) {
-                    $existing = $this->wpdb->get_var( $this->wpdb->prepare(
-                        "SELECT id FROM {$this->wpdb->prefix}personal_crm_person_types WHERE group_slug = %s AND type_key = %s",
-                        $group_slug, $type['type_key']
-                    ) );
-
-                    if ( ! $existing ) {
-                        $this->wpdb->insert(
-                            $this->wpdb->prefix . 'personal_crm_person_types',
-                            array(
-                                'group_slug' => $group_slug,
-                                'type_key' => $type['type_key'],
-                                'display_name' => $type['display_name'],
-                                'display_icon' => $type['display_icon'],
-                                'can_add' => $type['can_add'],
-                                'sort_order' => $type['sort_order']
-                            )
-                        );
-                    }
-                }
-            }
-        } );
-
-        $this->run_migration( 'convert_person_types_to_subgroups', function() {
-            // Step 1: Check if groups table needs migration
-            $columns = $this->wpdb->get_results( "DESCRIBE {$this->wpdb->prefix}personal_crm_groups" );
-            $has_id_column = false;
-            $has_parent_id = false;
-
-            foreach ( $columns as $column ) {
-                if ( $column->Field === 'id' && $column->Key === 'PRI' ) {
-                    $has_id_column = true;
-                }
-                if ( $column->Field === 'parent_id' ) {
-                    $has_parent_id = true;
-                }
-            }
-
-            if ( ! $has_id_column ) {
-                // Step 1a: Alter groups table - add id as primary key
-                // First check which columns already exist
-                $has_display_icon = false;
-                $has_sort_order = false;
-                foreach ( $columns as $column ) {
-                    if ( $column->Field === 'display_icon' ) $has_display_icon = true;
-                    if ( $column->Field === 'sort_order' ) $has_sort_order = true;
-                }
-
-                // Build ALTER statement based on what's needed
-                $alter_parts = array();
-                $alter_parts[] = "DROP PRIMARY KEY";
-                $alter_parts[] = "ADD COLUMN id bigint(20) unsigned NOT NULL AUTO_INCREMENT FIRST";
-                if ( ! $has_parent_id ) {
-                    $alter_parts[] = "ADD COLUMN parent_id bigint(20) unsigned DEFAULT NULL AFTER slug";
-                }
-                if ( ! $has_display_icon ) {
-                    $alter_parts[] = "ADD COLUMN display_icon varchar(10) DEFAULT '' AFTER type";
-                }
-                if ( ! $has_sort_order ) {
-                    $alter_parts[] = "ADD COLUMN sort_order int DEFAULT 0 AFTER display_icon";
-                }
-                $alter_parts[] = "ADD PRIMARY KEY (id)";
-                $alter_parts[] = "ADD UNIQUE KEY unique_slug (slug)";
-                $alter_parts[] = "ADD KEY idx_parent_id (parent_id)";
-                $alter_parts[] = "ADD KEY idx_sort_order (parent_id, sort_order)";
-
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_groups " . implode( ', ', $alter_parts ) );
-            }
-
-            // Step 2: Create subgroups from person_types (except team_members)
-            $person_types = $this->wpdb->get_results(
-                "SELECT * FROM {$this->wpdb->prefix}personal_crm_person_types
-                 WHERE type_key != 'team_members'
-                 ORDER BY group_slug, sort_order",
-                ARRAY_A
-            );
-
-            $subgroup_map = array(); // Maps [parent_slug][type_key] => subgroup_id
-
-            foreach ( $person_types as $type ) {
-                $parent_slug = $type['group_slug'];
-
-                // Get parent group id
-                $parent_id = $this->wpdb->get_var( $this->wpdb->prepare(
-                    "SELECT id FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
-                    $parent_slug
-                ) );
-
-                if ( ! $parent_id ) continue;
-
-                // Create subgroup slug and name
-                $subgroup_slug = $parent_slug . '_' . $type['type_key'];
-                $parent_name = $this->wpdb->get_var( $this->wpdb->prepare(
-                    "SELECT group_name FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
-                    $parent_slug
-                ) );
-                $subgroup_name = $parent_name . ' ' . $type['display_name'];
-
-                // Check if subgroup already exists
-                $existing_id = $this->wpdb->get_var( $this->wpdb->prepare(
-                    "SELECT id FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
-                    $subgroup_slug
-                ) );
-
-                if ( ! $existing_id ) {
-                    // Insert subgroup
-                    $this->wpdb->insert(
-                        $this->wpdb->prefix . 'personal_crm_groups',
-                        array(
-                            'slug' => $subgroup_slug,
-                            'parent_id' => $parent_id,
-                            'group_name' => $subgroup_name,
-                            'type' => 'subgroup',
-                            'display_icon' => $type['display_icon'],
-                            'sort_order' => $type['sort_order']
-                        ),
-                        array( '%s', '%d', '%s', '%s', '%s', '%d' )
-                    );
-                    $subgroup_id = $this->wpdb->insert_id;
-                } else {
-                    $subgroup_id = $existing_id;
-                }
-
-                $subgroup_map[ $parent_slug ][ $type['type_key'] ] = $subgroup_id;
-            }
-
-            // Step 3: Populate people_groups junction table
-            // Check if people table still has team_slug and category columns
-            $people_columns = $this->wpdb->get_results( "DESCRIBE {$this->wpdb->prefix}personal_crm_people" );
-            $has_team_slug = false;
-            $has_category = false;
-
-            foreach ( $people_columns as $col ) {
-                if ( $col->Field === 'team_slug' ) $has_team_slug = true;
-                if ( $col->Field === 'category' ) $has_category = true;
-            }
-
-            if ( $has_team_slug && $has_category ) {
-                $people = $this->wpdb->get_results(
-                    "SELECT id, username, team_slug, category FROM {$this->wpdb->prefix}personal_crm_people",
-                    ARRAY_A
-                );
-
-                foreach ( $people as $person ) {
-                    $person_id = $person['id'];
-                    $team_slug = $person['team_slug'];
-                    $category = $person['category'];
-
-                    // Get parent group id
-                    $parent_id = $this->wpdb->get_var( $this->wpdb->prepare(
-                        "SELECT id FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
-                        $team_slug
-                    ) );
-
-                    if ( ! $parent_id ) continue;
-
-                    if ( $category === 'team_members' ) {
-                        // Add to parent group directly
-                        $group_id = $parent_id;
-                    } else {
-                        // Add to subgroup
-                        if ( isset( $subgroup_map[ $team_slug ][ $category ] ) ) {
-                            $group_id = $subgroup_map[ $team_slug ][ $category ];
-                        } else {
-                            // Fallback to parent if subgroup doesn't exist
-                            $group_id = $parent_id;
-                        }
-                    }
-
-                    // Insert into people_groups if not exists
-                    $existing = $this->wpdb->get_var( $this->wpdb->prepare(
-                        "SELECT id FROM {$this->wpdb->prefix}personal_crm_people_groups
-                         WHERE person_id = %d AND group_id = %d",
-                        $person_id, $group_id
-                    ) );
-
-                    if ( ! $existing ) {
-                        $this->wpdb->insert(
-                            $this->wpdb->prefix . 'personal_crm_people_groups',
-                            array(
-                                'person_id' => $person_id,
-                                'group_id' => $group_id
-                            ),
-                            array( '%d', '%d' )
-                        );
-                    }
-                }
-
-                // Step 4: Check for username conflicts and make unique
-                $duplicates = $this->wpdb->get_results(
-                    "SELECT username, COUNT(*) as cnt
-                     FROM {$this->wpdb->prefix}personal_crm_people
-                     GROUP BY username
-                     HAVING cnt > 1",
-                    ARRAY_A
-                );
-
-                foreach ( $duplicates as $dup ) {
-                    $username = $dup['username'];
-                    $people_with_username = $this->wpdb->get_results( $this->wpdb->prepare(
-                        "SELECT id, team_slug FROM {$this->wpdb->prefix}personal_crm_people WHERE username = %s ORDER BY id",
-                        $username
-                    ), ARRAY_A );
-
-                    // Keep first one, rename others
-                    $counter = 2;
-                    array_shift( $people_with_username ); // Skip first
-
-                    foreach ( $people_with_username as $person ) {
-                        $new_username = $username . '_' . $person['team_slug'];
-                        // If still duplicate, add counter
-                        while ( $this->wpdb->get_var( $this->wpdb->prepare(
-                            "SELECT id FROM {$this->wpdb->prefix}personal_crm_people WHERE username = %s",
-                            $new_username
-                        ) ) ) {
-                            $new_username = $username . '_' . $person['team_slug'] . '_' . $counter;
-                            $counter++;
-                        }
-
-                        $this->wpdb->update(
-                            $this->wpdb->prefix . 'personal_crm_people',
-                            array( 'username' => $new_username ),
-                            array( 'id' => $person['id'] ),
-                            array( '%s' ),
-                            array( '%d' )
-                        );
-                    }
-                }
-
-                // Step 5: Alter people table - remove team_slug and category
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_people
-                    DROP KEY unique_user_team,
-                    DROP KEY idx_people_team_slug,
-                    DROP KEY idx_people_category,
-                    DROP COLUMN team_slug,
-                    DROP COLUMN category,
-                    ADD UNIQUE KEY unique_username (username)" );
-            }
-
-            // Step 6: Drop person_types table
-            $this->wpdb->query( "DROP TABLE IF EXISTS {$this->wpdb->prefix}personal_crm_person_types" );
-        } );
-
-        $this->run_migration( 'migrate_notes_to_separate_table', function() {
-            // Get all people with notes
-            $people = $this->wpdb->get_results(
-                "SELECT id, notes FROM {$this->wpdb->prefix}personal_crm_people WHERE notes IS NOT NULL AND notes != '' AND notes != '[]'",
-                ARRAY_A
-            );
-
-            foreach ( $people as $person ) {
-                $person_id = $person['id'];
-                $notes_json = $person['notes'];
-                $notes = json_decode( $notes_json, true );
-
-                if ( is_array( $notes ) && ! empty( $notes ) ) {
-                    foreach ( $notes as $note ) {
-                        if ( isset( $note['text'] ) && ! empty( $note['text'] ) ) {
-                            $created_at = isset( $note['date'] ) ? $note['date'] : current_time( 'mysql' );
-
-                            $this->wpdb->insert(
-                                $this->wpdb->prefix . 'personal_crm_notes',
-                                array(
-                                    'person_id' => $person_id,
-                                    'note_text' => $note['text'],
-                                    'created_at' => $created_at,
-                                    'updated_at' => $created_at
-                                ),
-                                array( '%d', '%s', '%s', '%s' )
-                            );
-                        }
-                    }
-                }
-            }
-        } );
-
-        $this->run_migration( 'convert_events_team_slug_to_group_id', function() {
-            // Check if we need to migrate
-            $columns = $this->wpdb->get_results( "DESCRIBE {$this->wpdb->prefix}personal_crm_events" );
-            $has_team_slug = false;
-            $has_group_id = false;
-
-            foreach ( $columns as $column ) {
-                if ( $column->Field === 'team_slug' ) {
-                    $has_team_slug = true;
-                }
-                if ( $column->Field === 'group_id' ) {
-                    $has_group_id = true;
-                }
-            }
-
-            if ( $has_team_slug && ! $has_group_id ) {
-                // Add group_id column
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_events ADD COLUMN group_id bigint(20) unsigned DEFAULT NULL AFTER id" );
-
-                // Populate group_id from team_slug
-                $this->wpdb->query( "
-                    UPDATE {$this->wpdb->prefix}personal_crm_events e
-                    INNER JOIN {$this->wpdb->prefix}personal_crm_groups g ON e.team_slug = g.slug
-                    SET e.group_id = g.id
-                " );
-
-                // Drop team_slug column and its index
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_events DROP INDEX idx_events_team_slug" );
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_events DROP COLUMN team_slug" );
-
-                // Add index on group_id
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_events ADD INDEX idx_events_group_id (group_id)" );
-            }
-        } );
-
-        $this->run_migration( 'convert_group_links_group_slug_to_group_id', function() {
-            // Check if we need to migrate
-            $columns = $this->wpdb->get_results( "DESCRIBE {$this->wpdb->prefix}personal_crm_group_links" );
-            $has_group_slug = false;
-            $has_group_id = false;
-
-            foreach ( $columns as $column ) {
-                if ( $column->Field === 'group_slug' ) {
-                    $has_group_slug = true;
-                }
-                if ( $column->Field === 'group_id' ) {
-                    $has_group_id = true;
-                }
-            }
-
-            if ( $has_group_slug && ! $has_group_id ) {
-                // Add group_id column
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_group_links ADD COLUMN group_id bigint(20) unsigned DEFAULT NULL AFTER id" );
-
-                // Populate group_id from group_slug
-                $this->wpdb->query( "
-                    UPDATE {$this->wpdb->prefix}personal_crm_group_links l
-                    INNER JOIN {$this->wpdb->prefix}personal_crm_groups g ON l.group_slug = g.slug
-                    SET l.group_id = g.id
-                " );
-
-                // Drop unique constraint that includes group_slug
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_group_links DROP INDEX unique_group_link" );
-                // Drop index on group_slug
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_group_links DROP INDEX idx_group_links_group_slug" );
-                // Drop group_slug column
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_group_links DROP COLUMN group_slug" );
-
-                // Add new index and unique constraint
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_group_links ADD INDEX idx_group_links_group_id (group_id)" );
-                $this->wpdb->query( "ALTER TABLE {$this->wpdb->prefix}personal_crm_group_links ADD UNIQUE KEY unique_group_link (group_id, link_name)" );
-            }
-        } );
+    public function get_schema() {
+        return array(
+            'personal_crm_groups' => "
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                slug varchar(100) NOT NULL,
+                parent_id bigint(20) unsigned DEFAULT NULL,
+                group_name varchar(255) NOT NULL,
+                activity_url_prefix varchar(255) DEFAULT '',
+                type varchar(50) DEFAULT 'team',
+                display_icon varchar(10) DEFAULT '',
+                sort_order int DEFAULT 0,
+                is_default tinyint(1) DEFAULT 0,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY unique_slug (slug),
+                KEY idx_parent_id (parent_id),
+                KEY idx_team_type (type),
+                KEY idx_team_default (is_default),
+                KEY idx_sort_order (parent_id, sort_order)
+            ",
+            'personal_crm_people' => "
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                username varchar(100) NOT NULL,
+                name varchar(255) NOT NULL,
+                nickname varchar(255) DEFAULT '',
+                role varchar(255) DEFAULT '',
+                email varchar(255) DEFAULT '',
+                birthday varchar(20) DEFAULT '',
+                company_anniversary varchar(20) DEFAULT '',
+                partner varchar(255) DEFAULT '',
+                partner_birthday varchar(20) DEFAULT '',
+                location varchar(255) DEFAULT '',
+                timezone varchar(100) DEFAULT '',
+                github varchar(100) DEFAULT '',
+                `linear` varchar(100) DEFAULT '',
+                wordpress varchar(100) DEFAULT '',
+                linkedin varchar(100) DEFAULT '',
+                website varchar(255) DEFAULT '',
+                new_company varchar(255) DEFAULT '',
+                new_company_website varchar(255) DEFAULT '',
+                deceased_date varchar(20) DEFAULT '',
+                left_company tinyint(1) DEFAULT 0,
+                deceased tinyint(1) DEFAULT 0,
+                kids longtext,
+                github_repos longtext,
+                personal_events longtext,
+                notes longtext,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY unique_username (username),
+                KEY idx_people_username (username)
+            ",
+            'personal_crm_events' => "
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                group_id bigint(20) unsigned NOT NULL,
+                type varchar(50) NOT NULL,
+                name varchar(255) NOT NULL,
+                description text DEFAULT '',
+                start_date varchar(20) NOT NULL,
+                end_date varchar(20) DEFAULT '',
+                location varchar(255) DEFAULT '',
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_events_group_id (group_id),
+                KEY idx_events_type (type),
+                KEY idx_events_start_date (start_date)
+            ",
+            'personal_crm_group_links' => "
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                group_id bigint(20) unsigned NOT NULL,
+                link_name varchar(100) NOT NULL,
+                link_url text NOT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_group_links_group_id (group_id),
+                UNIQUE KEY unique_group_link (group_id, link_name)
+            ",
+            'personal_crm_people_links' => "
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                person_id bigint(20) unsigned NOT NULL,
+                link_name varchar(100) NOT NULL,
+                link_url text NOT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_people_links_person_id (person_id),
+                UNIQUE KEY unique_person_link (person_id, link_name)
+            ",
+            'personal_crm_event_links' => "
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                event_id bigint(20) unsigned NOT NULL,
+                link_name varchar(100) NOT NULL,
+                link_url text NOT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_event_links_event_id (event_id),
+                UNIQUE KEY unique_event_link (event_id, link_name)
+            ",
+            'personal_crm_people_groups' => "
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                person_id bigint(20) unsigned NOT NULL,
+                group_id bigint(20) unsigned NOT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                UNIQUE KEY unique_person_group (person_id, group_id),
+                KEY idx_person_groups_person (person_id),
+                KEY idx_person_groups_group (group_id)
+            ",
+            'personal_crm_notes' => "
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                person_id bigint(20) unsigned NOT NULL,
+                note_text longtext NOT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_notes_person_id (person_id),
+                KEY idx_notes_created_at (created_at)
+            ",
+            'personal_crm_person_types' => "
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                group_slug varchar(100) NOT NULL,
+                type_key varchar(50) NOT NULL,
+                display_name varchar(100) NOT NULL,
+                display_icon varchar(10) DEFAULT '',
+                can_add tinyint(1) DEFAULT 1,
+                sort_order int DEFAULT 0,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_person_types_group (group_slug),
+                KEY idx_person_types_sort (group_slug, sort_order),
+                UNIQUE KEY unique_group_type (group_slug, type_key)
+            "
+        );
     }
 
     /**
@@ -1433,6 +990,7 @@ class Storage extends \WpApp\BaseStorage {
             "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
             $group_slug
         ) );
+        var_dump( $group_slug, $count );
         return (bool) $count;
     }
 

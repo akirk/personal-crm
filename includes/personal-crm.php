@@ -29,14 +29,6 @@ class PersonalCrm {
     public function __construct() {
         $this->storage = self::$storage_instance;
 
-        register_activation_hook( PERSONAL_CRM_PLUGIN_FILE, [ $this, 'activate' ] );
-        register_deactivation_hook( PERSONAL_CRM_PLUGIN_FILE, [ $this, 'deactivate' ] );
-
-        if ( class_exists( '\WP_CLI' ) ) {
-            require_once __DIR__ . '/wp-cli-commands.php';
-            \WP_CLI::add_command( 'crm migrate', 'Personal_CRM_Migrate_Command' );
-        }
-
         $this->app = new \WpApp\WpApp(
             __DIR__ . '/../',
             'crm',
@@ -49,6 +41,14 @@ class PersonalCrm {
                 'clear_admin_bar' => false
             ]
         );
+
+        register_activation_hook( PERSONAL_CRM_PLUGIN_FILE, [ $this, 'activate' ] );
+        register_deactivation_hook( PERSONAL_CRM_PLUGIN_FILE, [ $this, 'deactivate' ] );
+
+        if ( class_exists( '\WP_CLI' ) ) {
+            require_once __DIR__ . '/wp-cli-commands.php';
+            \WP_CLI::add_command( 'crm migrate', 'Personal_CRM_Migrate_Command' );
+        }
 
         $this->setup_routes();
         $this->setup_menu();
@@ -64,25 +64,6 @@ class PersonalCrm {
             // Define required constants for wp-app's DatabaseManager
             if ( ! defined( 'ABSPATH' ) ) {
                 define( 'ABSPATH', __DIR__ . '/../../..' . '/' );
-            }
-
-            // Create a dummy upgrade.php file that wp-app's DatabaseManager requires
-            $upgrade_dir = ABSPATH . 'wp-admin/includes';
-            if ( ! file_exists( $upgrade_dir ) ) {
-                mkdir( $upgrade_dir, 0755, true );
-            }
-
-            $upgrade_file = $upgrade_dir . '/upgrade.php';
-            if ( ! file_exists( $upgrade_file ) ) {
-                file_put_contents( $upgrade_file, '<?php
-// Minimal WordPress upgrade.php simulation for wp-app standalone mode
-if ( ! function_exists( "dbDelta" ) ) {
-    function dbDelta( $queries = "", $execute = true ) {
-        // No-op in standalone mode
-        return [];
-    }
-}
-' );
             }
 
             $this->app->init();

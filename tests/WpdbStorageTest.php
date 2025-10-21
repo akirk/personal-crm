@@ -29,12 +29,6 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
     }
 }
 
-if ( ! function_exists( 'dbDelta' ) ) {
-    function dbDelta( $sql ) {
-        return array();
-    }
-}
-
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../includes/storage.php';
 
