@@ -2797,3 +2797,95 @@ a.calendar-event:hover {
 .edit-note-form .form-actions .cancel-btn:hover {
     background: light-dark(#5a6268, #3d4043);
 }
+
+/* Group membership checkboxes */
+.group-checkboxes {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.group-checkbox-label {
+	display: flex;
+	align-items: center;
+	padding: 10px 14px;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	border: 1px solid light-dark(#ddd, #444);
+	background-color: light-dark(#fff, #2a2a2a);
+}
+
+.group-checkbox-label.selected {
+	background-color: light-dark(#e3f2fd, #1a3a4a);
+	border-color: light-dark(#2196f3, #42a5f5);
+}
+
+.group-checkbox-label:hover {
+	border-color: light-dark(#2196f3, #42a5f5);
+	box-shadow: 0 1px 3px light-dark(rgba(0,0,0,0.1), rgba(0,0,0,0.3));
+}
+
+.group-checkbox-label input[type="checkbox"] {
+	margin-right: 10px;
+	flex-shrink: 0;
+}
+
+.group-checkbox-label .group-icon {
+	font-size: 1.1em;
+	flex-shrink: 0;
+	margin-right: 8px;
+}
+
+.group-checkbox-label .group-name {
+	font-weight: 500;
+	color: light-dark(#212121, #e0e0e0);
+}
+
+.relationship-group {
+	margin-top: 12px;
+	padding-left: 16px;
+	border-left: 3px solid light-dark(#ddd, #444);
+}
+
+.relationship-group.parent-groups {
+	border-left-color: light-dark(#9c27b0, #ba68c8);
+}
+
+.relationship-group.sibling-groups {
+	border-left-color: light-dark(#2196f3, #42a5f5);
+}
+
+.relationship-group.child-groups {
+	border-left-color: light-dark(#4caf50, #66bb6a);
+}
+
+.relationship-label {
+	font-size: 0.75em;
+	font-weight: 700;
+	text-transform: uppercase;
+	color: light-dark(#757575, #aaa);
+	margin-bottom: 10px;
+	letter-spacing: 0.8px;
+}
+
+.relationship-group.parent-groups .relationship-label {
+	color: light-dark(#9c27b0, #ba68c8);
+}
+
+.relationship-group.sibling-groups .relationship-label {
+	color: light-dark(#2196f3, #42a5f5);
+}
+
+.relationship-group.child-groups .relationship-label {
+	color: light-dark(#4caf50, #66bb6a);
+}
+
+.group-checkboxes.suggested {
+	margin-left: 0;
+}
+
+#suggested-groups-container {
+	padding: 12px;
+	border-radius: 6px;
+}

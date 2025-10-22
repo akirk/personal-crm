@@ -141,21 +141,6 @@ class Storage extends \WpApp\BaseStorage {
                 PRIMARY KEY (id),
                 KEY idx_notes_person_id (person_id),
                 KEY idx_notes_created_at (created_at)
-            ",
-            'personal_crm_person_types' => "
-                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-                group_slug varchar(100) NOT NULL,
-                type_key varchar(50) NOT NULL,
-                display_name varchar(100) NOT NULL,
-                display_icon varchar(10) DEFAULT '',
-                can_add tinyint(1) DEFAULT 1,
-                sort_order int DEFAULT 0,
-                created_at datetime DEFAULT CURRENT_TIMESTAMP,
-                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                PRIMARY KEY (id),
-                KEY idx_person_types_group (group_slug),
-                KEY idx_person_types_sort (group_slug, sort_order),
-                UNIQUE KEY unique_group_type (group_slug, type_key)
             "
         );
     }

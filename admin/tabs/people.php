@@ -87,11 +87,12 @@ function get_person_type_config( $person_type ) {
 	global $current_group;
 	$crm = PersonalCrm::get_instance();
 
-	$person_types = $crm->storage->get_person_types( $current_group );
+	$group = $crm->storage->get_group( $current_group );
+	$child_groups = $group ? $group->get_child_groups() : array();
 
 	$configs = array();
-	foreach ( $person_types as $type ) {
-		$type_key = $type['type_key'];
+	foreach ( $child_groups as $child_group ) {
+		$type_key = $child_group->slug;
 		$form_prefix = $type_key === 'team_members' ? '' : $type_key . '-';
 
 		$configs[ $type_key ] = array(
@@ -99,12 +100,12 @@ function get_person_type_config( $person_type ) {
 			'form_prefix' => $form_prefix,
 			'form_id' => $type_key . '-form',
 			'edit_action' => 'edit_' . $type_key,
-			'add_action' => $type['can_add'] ? 'add_' . $type_key : null,
+			'add_action' => 'add_' . $type_key,
 			'delete_action' => 'delete_' . $type_key,
-			'edit_text' => 'Update ' . $type['display_name'],
-			'add_text' => $type['can_add'] ? 'Add ' . $type['display_name'] : null,
-			'display_name' => $type['display_name'],
-			'display_icon' => $type['display_icon'],
+			'edit_text' => 'Update ' . $child_group->group_name,
+			'add_text' => 'Add ' . $child_group->group_name,
+			'display_name' => $child_group->group_name,
+			'display_icon' => $child_group->display_icon,
 		);
 	}
 
@@ -793,18 +794,111 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 				$selected_groups[] = array(
 					'id' => $group['id'],
 					'name' => $group['group_name'],
-					'icon' => $group['display_icon'] ?: ''
+					'icon' => $group['display_icon'] ?: '',
+					'parent_id' => $group['parent_id'] ?? null
 				);
 			}
 		}
 	} else {
-		// For new person, default to the current group
-		$parent_config = $crm->storage->get_group( $current_group );
+		// For new person, default to the parent group
+		$parent_group_data = $crm->storage->get_group_by_id( $parent_group_id );
+		$parent_config = $parent_group_data ? $crm->storage->get_group( $parent_group_data['slug'] ) : null;
 		$selected_groups[] = array(
 			'id' => $default_group_id,
 			'name' => ( $parent_config['group_name'] ?? '' ) . ' (Members)',
-			'icon' => '👥'
+			'icon' => '👥',
+			'parent_id' => $parent_group_data['parent_id'] ?? null
 		);
+	}
+
+	// Get suggested groups: parents, siblings, and children of selected groups
+	$suggested_groups = array();
+	$suggested_group_ids = array();
+
+	if ( ! empty( $selected_groups ) ) {
+		// Collect IDs we need to query
+		$selected_ids = array_column( $selected_groups, 'id' );
+		$parent_ids = array_filter( array_column( $selected_groups, 'parent_id' ) );
+
+		// Build query to fetch only related groups in one go
+		$wpdb = $crm->storage->get_wpdb();
+		$placeholders_selected = implode( ',', array_fill( 0, count( $selected_ids ), '%d' ) );
+		$placeholders_parents = ! empty( $parent_ids ) ? implode( ',', array_fill( 0, count( $parent_ids ), '%d' ) ) : '0';
+
+		// Fetch: parents, siblings (same parent), and children
+		$query = $wpdb->prepare(
+			"SELECT id, slug, group_name, display_icon, parent_id, sort_order
+			FROM {$wpdb->prefix}personal_crm_groups
+			WHERE id IN ($placeholders_parents)
+			   OR parent_id IN ($placeholders_selected)
+			   OR parent_id IN ($placeholders_parents)
+			ORDER BY sort_order, group_name",
+			array_merge( $parent_ids ?: array(), $selected_ids, $parent_ids ?: array() )
+		);
+
+		$related_groups = $wpdb->get_results( $query, ARRAY_A );
+
+		// Index by ID and build parent->children mapping
+		$groups_by_id = array();
+		$children_by_parent = array();
+		foreach ( $related_groups as $group ) {
+			$groups_by_id[ $group['id'] ] = $group;
+			$parent_id = $group['parent_id'] ?? 0;
+			if ( ! isset( $children_by_parent[ $parent_id ] ) ) {
+				$children_by_parent[ $parent_id ] = array();
+			}
+			$children_by_parent[ $parent_id ][] = $group;
+		}
+
+		foreach ( $selected_groups as $selected_group ) {
+			$group_id = $selected_group['id'];
+			$parent_id = $selected_group['parent_id'] ?? null;
+
+			// Get parent group
+			if ( $parent_id && isset( $groups_by_id[ $parent_id ] ) ) {
+				$parent = $groups_by_id[ $parent_id ];
+				if ( ! in_array( $parent['id'], $person_group_ids ) && ! in_array( $parent['id'], $suggested_group_ids ) ) {
+					$suggested_groups[] = array(
+						'id' => $parent['id'],
+						'name' => $parent['group_name'],
+						'icon' => $parent['display_icon'] ?: '',
+						'relationship' => 'parent',
+						'related_to' => $selected_group['name']
+					);
+					$suggested_group_ids[] = $parent['id'];
+				}
+			}
+
+			// Get sibling groups (same parent)
+			$siblings = $children_by_parent[ $parent_id ?? 0 ] ?? array();
+			foreach ( $siblings as $sibling ) {
+				if ( $sibling['id'] !== $group_id && ! in_array( $sibling['id'], $person_group_ids ) && ! in_array( $sibling['id'], $suggested_group_ids ) ) {
+					$suggested_groups[] = array(
+						'id' => $sibling['id'],
+						'name' => $sibling['group_name'],
+						'icon' => $sibling['display_icon'] ?: '',
+						'relationship' => 'sibling',
+						'related_to' => $selected_group['name']
+					);
+					$suggested_group_ids[] = $sibling['id'];
+				}
+			}
+
+			// Get child groups
+			$children = $children_by_parent[ $group_id ] ?? array();
+			foreach ( $children as $child ) {
+				if ( ! in_array( $child['id'], $person_group_ids ) && ! in_array( $child['id'], $suggested_group_ids ) ) {
+					$suggested_groups[] = array(
+						'id' => $child['id'],
+						'name' => $child['group_name'],
+						'icon' => $child['display_icon'] ?: '',
+						'relationship' => 'child',
+						'related_to' => $selected_group['name']
+					);
+					$suggested_group_ids[] = $child['id'];
+				}
+			}
+		}
 	}
 
 	$action = $is_editing ? 'edit_person' : 'add_person';
@@ -1007,25 +1101,44 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 		</div>
 
 		<?php
-		global $config_file;
-		$team_config = $crm->storage->get_group( $current_group );
-		$all_repos = array();
+		// Optimize: Fetch repos directly from database instead of loading all Person objects
+		$wpdb = $crm->storage->get_wpdb();
+		$parent_group_data = $crm->storage->get_group_by_id( $parent_group_id );
 
-		// Merge all people from all person types dynamically
-		$all_people = array();
-		$person_types = $crm->storage->get_person_types( $current_group );
-		foreach ( $person_types as $type ) {
-			$all_people = array_merge( $all_people, $team_config[ $type['type_key'] ] ?? array() );
-		}
-		// Also include alumni
-		$all_people = array_merge( $all_people, $team_config['alumni'] ?? array() );
-		foreach ( $all_people as $person ) {
-			if ( ! empty( $person['github_repos'] ) ) {
-				$person_repos = is_array( $person['github_repos'] ) ? $person['github_repos'] : array_filter( array_map( 'trim', explode( ',', $person['github_repos'] ?? '' ) ) );
-				$all_repos = array_merge( $all_repos, $person_repos );
+		$all_repos = array();
+		if ( $parent_group_data ) {
+			// Get all group IDs (parent + children) to query
+			$group_ids = array( $parent_group_id );
+			$child_groups_raw = $wpdb->get_results( $wpdb->prepare(
+				"SELECT id FROM {$wpdb->prefix}personal_crm_groups WHERE parent_id = %d",
+				$parent_group_id
+			), ARRAY_A );
+			foreach ( $child_groups_raw as $child ) {
+				$group_ids[] = $child['id'];
 			}
+
+			// Fetch github_repos from all people in these groups
+			$placeholders = implode( ',', array_fill( 0, count( $group_ids ), '%d' ) );
+			$repos_raw = $wpdb->get_col( $wpdb->prepare(
+				"SELECT DISTINCT p.github_repos
+				FROM {$wpdb->prefix}personal_crm_people p
+				INNER JOIN {$wpdb->prefix}personal_crm_people_groups pg ON p.id = pg.person_id
+				WHERE pg.group_id IN ($placeholders)
+				AND p.github_repos IS NOT NULL
+				AND p.github_repos != ''
+				AND p.github_repos != '[]'",
+				$group_ids
+			) );
+
+			// Parse JSON arrays and flatten
+			foreach ( $repos_raw as $repos_json ) {
+				$repos = json_decode( $repos_json, true );
+				if ( is_array( $repos ) ) {
+					$all_repos = array_merge( $all_repos, $repos );
+				}
+			}
+			$all_repos = array_unique( array_filter( $all_repos ) );
 		}
-		$all_repos = array_unique( array_filter( $all_repos ) );
 
 		$user_repos = array();
 		if ( $is_editing && ! empty( $edit_data['github_repos'] ) ) {
@@ -1222,18 +1335,66 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 	<!-- Group Membership -->
 	<h4 class="section-heading">Group Membership</h4>
 	<div class="form-group">
-		<label>Currently selected groups:</label>
-		<div id="selected-groups-container" style="margin-top: 10px; margin-bottom: 15px;">
+		<label>Currently in these groups:</label>
+		<div id="selected-groups-container" class="group-checkboxes" style="margin-top: 10px; margin-bottom: 15px;">
 			<?php foreach ( $selected_groups as $group ) : ?>
-				<label style="display: block; margin-bottom: 8px;" data-group-id="<?php echo $group['id']; ?>">
+				<label class="group-checkbox-label selected" data-group-id="<?php echo $group['id']; ?>">
 					<input type="checkbox" name="group_ids[]" value="<?php echo $group['id']; ?>" checked>
-					<?php echo htmlspecialchars( ( $group['icon'] ? $group['icon'] . ' ' : '' ) . $group['name'] ); ?>
+					<?php if ( $group['icon'] ) : ?>
+						<span class="group-icon"><?php echo $group['icon']; ?></span>
+					<?php endif; ?>
+					<span class="group-name"><?php echo htmlspecialchars( $group['name'] ); ?></span>
 				</label>
 			<?php endforeach; ?>
 		</div>
 
-		<label for="add-group-input">Add group:</label>
-		<input type="text" id="add-group-input" list="groups-datalist" placeholder="Search for group..." autocomplete="off" style="width: 100%; max-width: 400px;">
+		<?php if ( ! empty( $suggested_groups ) ) : ?>
+			<label>Related groups (quick add):</label>
+			<div id="suggested-groups-container" class="group-checkboxes suggested" style="margin-top: 10px; margin-bottom: 15px;">
+				<?php
+				$groups_by_relationship = array();
+				foreach ( $suggested_groups as $group ) {
+					$groups_by_relationship[ $group['relationship'] ][] = $group;
+				}
+
+				foreach ( array( 'parent', 'sibling', 'child' ) as $rel_type ) :
+					if ( ! empty( $groups_by_relationship[ $rel_type ] ) ) :
+						?>
+						<div class="relationship-group <?php echo $rel_type; ?>-groups">
+							<div class="relationship-label">
+								<?php
+								switch ( $rel_type ) {
+									case 'parent':
+										echo '↑ Parent groups';
+										break;
+									case 'sibling':
+										echo '↔ Peer groups';
+										break;
+									case 'child':
+										echo '↓ Subgroups';
+										break;
+								}
+								?>
+							</div>
+							<?php foreach ( $groups_by_relationship[ $rel_type ] as $group ) : ?>
+								<label class="group-checkbox-label suggested" data-group-id="<?php echo $group['id']; ?>">
+									<input type="checkbox" name="group_ids[]" value="<?php echo $group['id']; ?>">
+									<?php if ( $group['icon'] ) : ?>
+										<span class="group-icon"><?php echo $group['icon']; ?></span>
+									<?php endif; ?>
+									<span class="group-name"><?php echo htmlspecialchars( $group['name'] ); ?></span>
+								</label>
+							<?php endforeach; ?>
+						</div>
+					<?php
+					endif;
+				endforeach;
+				?>
+			</div>
+		<?php endif; ?>
+
+		<label for="add-group-input">Search all groups:</label>
+		<input type="text" id="add-group-input" list="groups-datalist" placeholder="Type to search..." autocomplete="off" style="width: 100%; max-width: 400px;">
 		<datalist id="groups-datalist">
 			<?php foreach ( $all_groups as $group ) : ?>
 				<option value="<?php echo htmlspecialchars( ( $group['display_icon'] ? $group['display_icon'] . ' ' : '' ) . $group['hierarchical_name'] ); ?>"></option>
