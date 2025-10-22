@@ -975,7 +975,6 @@ class Storage extends \WpApp\BaseStorage {
             "SELECT COUNT(*) FROM {$this->wpdb->prefix}personal_crm_groups WHERE slug = %s",
             $group_slug
         ) );
-        var_dump( $group_slug, $count );
         return (bool) $count;
     }
 

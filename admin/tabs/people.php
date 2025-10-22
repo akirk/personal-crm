@@ -1259,15 +1259,15 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 	</script>
 
 	<?php
-	// Check if default group is an alumni group
-	$default_group = null;
-	foreach ( $selected_groups as $ag ) {
-		if ( $ag['id'] == $default_group_id ) {
-			$default_group = $ag;
+	// Check if person is in any alumni group (check all selected groups)
+	$is_alumni_group = false;
+	foreach ( $selected_groups as $group ) {
+		$group_data = $crm->storage->get_group_by_id( $group['id'] );
+		if ( $group_data && stripos( $group_data['slug'], 'alumni' ) !== false ) {
+			$is_alumni_group = true;
 			break;
 		}
 	}
-	$is_alumni_group = $default_group && stripos( $default_group['name'], 'alumni' ) !== false;
 	?>
 	<?php if ( $is_alumni_group ) : ?>
 	<!-- Alumni-specific fields -->
@@ -1542,8 +1542,8 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
                     <?php endif; ?>
                 </div>
                 <?php
-                // Fetch members for this tab's group
-                $tab_members = $crm->storage->get_group_members( $tab_group_id, true );
+                // Fetch members for this tab's group only (not including children)
+                $tab_members = $crm->storage->get_group_members( $tab_group_id, false );
                 ?>
                 <?php if ( ! empty( $tab_members ) ) : ?>
                     <div class="person-list">
