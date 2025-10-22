@@ -17,28 +17,28 @@ function get_missing_data_points( $person, $person_type = 'member', $group_slug 
 	$is_social_group = PersonalCrm::get_instance()->is_social_group( $group_slug );
 
 	// Core fields (required)
-	if ( empty( $person['name'] ) ) {
+	if ( empty( $person->name ) ) {
 		$missing[] = array( 'field' => 'Name', 'priority' => 'required' );
 	}
 
 	// Role is only required for business teams, not social groups
-	if ( ! $is_social_group && empty( $person['role'] ) ) {
+	if ( ! $is_social_group && empty( $person->role ) ) {
 		$missing[] = array( 'field' => 'Role', 'priority' => 'required' );
 	}
-	if ( empty( $person['location'] ) ) {
+	if ( empty( $person->location ) ) {
 		$missing[] = array( 'field' => 'Location', 'priority' => 'required' );
 	}
-	if ( empty( $person['timezone'] ) ) {
+	if ( empty( $person->timezone ) ) {
 		$missing[] = array( 'field' => 'Timezone', 'priority' => 'required' );
 	}
 
 	// Birthday (not required for consultants)
-	if ( empty( $person['birthday'] ) && $person_type !== 'consultants' ) {
+	if ( empty( $person->birthday ) && $person_type !== 'consultants' ) {
 		$missing[] = array( 'field' => 'Birthday', 'priority' => 'required' );
 	}
 
 	// Company anniversary is only required for business teams, not social groups
-	if ( ! $is_social_group && empty( $person['company_anniversary'] ) ) {
+	if ( ! $is_social_group && empty( $person->company_anniversary ) ) {
 		$missing[] = array( 'field' => 'Company Anniversary', 'priority' => 'required' );
 	}
 
@@ -49,33 +49,33 @@ function get_missing_data_points( $person, $person_type = 'member', $group_slug 
 	}
 
 	foreach ( $expected_links as $expected_link ) {
-		if ( ! isset( $person['links'][ $expected_link ] ) || empty( $person['links'][ $expected_link ] ) ) {
+		if ( ! isset( $person->links[ $expected_link ] ) || empty( $person->links[ $expected_link ] ) ) {
 			$missing[] = array( 'field' => $expected_link . ' link', 'priority' => 'required' );
 		}
 	}
 
 	// Recommended fields - likely to be filled out for most people
-	if ( empty( $person['email'] ) ) {
+	if ( empty( $person->email ) ) {
 		$missing[] = array( 'field' => 'Email address', 'priority' => 'recommended' );
 	}
-	if ( empty( $person['website'] ) ) {
+	if ( empty( $person->website ) ) {
 		$missing[] = array( 'field' => 'Website', 'priority' => 'recommended' );
 	}
-	if ( empty( $person['wordpress'] ) ) {
+	if ( empty( $person->wordpress ) ) {
 		$missing[] = array( 'field' => 'WordPress.org profile', 'priority' => 'recommended' );
 	}
-	if ( empty( $person['linkedin'] ) ) {
+	if ( empty( $person->linkedin ) ) {
 		$missing[] = array( 'field' => 'LinkedIn profile', 'priority' => 'recommended' );
 	}
-	if ( empty( $person['partner'] ) ) {
+	if ( empty( $person->partner ) ) {
 		$missing[] = array( 'field' => 'Partner', 'priority' => 'recommended' );
 	}
 
 	// Optional fields - often rightfully stay empty
-	if ( empty( $person['kids'] ) ) {
+	if ( empty( $person->kids ) ) {
 		$missing[] = array( 'field' => 'Kids info', 'priority' => 'optional' );
 	}
-	if ( empty( $person['notes'] ) || ( is_array( $person['notes'] ) && count( $person['notes'] ) === 0 ) ) {
+	if ( empty( $person->notes ) || ( is_array( $person->notes ) && count( $person->notes ) === 0 ) ) {
 		$missing[] = array( 'field' => 'Notes', 'priority' => 'optional' );
 	}
 

@@ -209,6 +209,7 @@ class Event {
 		$event = new self( $event_data['type'], $start_date, $event_data['name'], null );
 
 		$event->id = $event_data['id'] ?? null;
+		$event->set_name( $event_data['name'] ?? '' );
 		$event->set_location( $event_data['location'] ?? '' );
 		$event->set_details( $event_data['description'] ?? '' );
 		$event->set_links( $event_data['links'] ?? array() );

@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
                 $score = get_completeness_score( $missing, 'member', $current_group );
                 $audit_data[] = array(
                     'type' => ( $config['group_name'] ?? '' ) . ' Member',
-                    'name' => $person['name'],
+                    'name' => $person->name,
                     'username' => $username,
                     'missing' => $missing,
                     'score' => $score,
@@ -50,7 +50,7 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
                         $score = get_completeness_score( $missing, $audit_type, $current_group );
                         $audit_data[] = array(
                             'type' => $child['group_name'],
-                            'name' => $person['name'],
+                            'name' => $person->name,
                             'username' => $username,
                             'missing' => $missing,
                             'score' => $score,
