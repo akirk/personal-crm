@@ -141,6 +141,20 @@ class Storage extends \WpApp\BaseStorage {
                 PRIMARY KEY (id),
                 KEY idx_notes_person_id (person_id),
                 KEY idx_notes_created_at (created_at)
+            ",
+            'personal_crm_vcard_data' => "
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                person_id bigint(20) unsigned NOT NULL,
+                field_name varchar(100) NOT NULL,
+                field_value longtext NOT NULL,
+                field_type varchar(50) DEFAULT '',
+                sort_order int DEFAULT 0,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP,
+                updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_vcard_person_id (person_id),
+                KEY idx_vcard_field_name (field_name),
+                KEY idx_vcard_person_field (person_id, field_name, sort_order)
             "
         );
     }
@@ -713,6 +727,17 @@ class Storage extends \WpApp\BaseStorage {
             $this->save_person_links( $person_id, $person_data['links'] );
         }
 
+        /**
+         * Action fired after a person is saved
+         * Allows plugins to save extended data (e.g., vCard fields)
+         *
+         * @param int    $person_id   The person ID
+         * @param string $username    The username
+         * @param array  $person_data The person data
+         * @param bool   $is_new      Whether this is a new person
+         */
+        do_action( 'personal_crm_person_saved', $person_id, $username, $person_data, ! $existing_id );
+
         return $result;
     }
 
@@ -735,6 +760,15 @@ class Storage extends \WpApp\BaseStorage {
             array( 'person_id' => $person_id ),
             array( '%d' )
         );
+
+        /**
+         * Action fired before a person is deleted
+         * Allows plugins to clean up extended data (e.g., vCard fields)
+         *
+         * @param int    $person_id The person ID
+         * @param string $username  The username
+         */
+        do_action( 'personal_crm_person_deleting', $person_id, $username );
 
         // Delete from people table
         $result = $this->wpdb->delete(
@@ -1080,6 +1114,15 @@ class Storage extends \WpApp\BaseStorage {
         // Add groups this person belongs to
         $row['groups'] = $this->get_person_groups( $person_id );
 
+        /**
+         * Filter person data after loading from database
+         * Allows plugins to add extended data (e.g., vCard fields)
+         *
+         * @param array $row       The person data
+         * @param int   $person_id The person ID
+         */
+        $row = apply_filters( 'personal_crm_get_person', $row, $person_id );
+
         return $row;
     }
 
@@ -1366,6 +1409,132 @@ class Storage extends \WpApp\BaseStorage {
                 );
             }
         }
+    }
+
+    /**
+     * ==================================================
+     * VCARD DATA METHODS
+     * ==================================================
+     */
+
+    /**
+     * Get extended vCard data for a person
+     *
+     * @param int $person_id The person ID
+     * @return array Array of vCard fields grouped by field_name
+     */
+    public function get_vcard_data( $person_id ) {
+        $results = $this->wpdb->get_results( $this->wpdb->prepare(
+            "SELECT field_name, field_value, field_type, sort_order
+             FROM {$this->wpdb->prefix}personal_crm_vcard_data
+             WHERE person_id = %d
+             ORDER BY field_name, sort_order",
+            $person_id
+        ), ARRAY_A );
+
+        $vcard_data = array();
+        foreach ( $results as $row ) {
+            $field_name = $row['field_name'];
+
+            // If field already exists, make it an array
+            if ( isset( $vcard_data[ $field_name ] ) ) {
+                // Convert to array if it's not already
+                if ( ! is_array( $vcard_data[ $field_name ] ) || ! isset( $vcard_data[ $field_name ][0] ) ) {
+                    $vcard_data[ $field_name ] = array( $vcard_data[ $field_name ] );
+                }
+                $vcard_data[ $field_name ][] = array(
+                    'value' => $row['field_value'],
+                    'type'  => $row['field_type'],
+                );
+            } else {
+                $vcard_data[ $field_name ] = array(
+                    'value' => $row['field_value'],
+                    'type'  => $row['field_type'],
+                );
+            }
+        }
+
+        return $vcard_data;
+    }
+
+    /**
+     * Save extended vCard data for a person
+     *
+     * @param int   $person_id  The person ID
+     * @param array $vcard_data Array of vCard fields
+     */
+    public function save_vcard_data( $person_id, $vcard_data ) {
+        // Delete existing vCard data
+        $this->wpdb->delete(
+            $this->wpdb->prefix . 'personal_crm_vcard_data',
+            array( 'person_id' => $person_id ),
+            array( '%d' )
+        );
+
+        // Insert new vCard data
+        if ( is_array( $vcard_data ) && ! empty( $vcard_data ) ) {
+            foreach ( $vcard_data as $field_name => $field_data ) {
+                // Handle multiple values for same field (e.g., multiple phone numbers)
+                if ( is_array( $field_data ) ) {
+                    // Check if it's an array of values or a single value with type
+                    if ( isset( $field_data['value'] ) ) {
+                        // Single value with type
+                        $this->insert_vcard_field( $person_id, $field_name, $field_data['value'], $field_data['type'] ?? '', 0 );
+                    } else {
+                        // Multiple values
+                        $sort_order = 0;
+                        foreach ( $field_data as $item ) {
+                            if ( is_array( $item ) && isset( $item['value'] ) ) {
+                                $this->insert_vcard_field( $person_id, $field_name, $item['value'], $item['type'] ?? '', $sort_order );
+                            } else {
+                                $this->insert_vcard_field( $person_id, $field_name, $item, '', $sort_order );
+                            }
+                            $sort_order++;
+                        }
+                    }
+                } else {
+                    // Simple string value
+                    $this->insert_vcard_field( $person_id, $field_name, $field_data, '', 0 );
+                }
+            }
+        }
+    }
+
+    /**
+     * Insert a single vCard field
+     *
+     * @param int    $person_id   The person ID
+     * @param string $field_name  The field name
+     * @param string $field_value The field value
+     * @param string $field_type  The field type (e.g., 'work', 'home')
+     * @param int    $sort_order  The sort order
+     */
+    private function insert_vcard_field( $person_id, $field_name, $field_value, $field_type, $sort_order ) {
+        $this->wpdb->insert(
+            $this->wpdb->prefix . 'personal_crm_vcard_data',
+            array(
+                'person_id'   => $person_id,
+                'field_name'  => $field_name,
+                'field_value' => $field_value,
+                'field_type'  => $field_type,
+                'sort_order'  => $sort_order,
+                'created_at'  => current_time( 'mysql' ),
+            ),
+            array( '%d', '%s', '%s', '%s', '%d', '%s' )
+        );
+    }
+
+    /**
+     * Delete all vCard data for a person
+     *
+     * @param int $person_id The person ID
+     */
+    public function delete_vcard_data( $person_id ) {
+        return $this->wpdb->delete(
+            $this->wpdb->prefix . 'personal_crm_vcard_data',
+            array( 'person_id' => $person_id ),
+            array( '%d' )
+        );
     }
 
     /**

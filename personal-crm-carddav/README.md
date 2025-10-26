@@ -118,10 +118,16 @@ https://your-site.com/carddav/team/
 
 This plugin integrates with Personal CRM using the following WordPress hooks:
 
-### Actions Hooks Used
+### Action Hooks Used (from Personal CRM)
 
 - `personal_crm_loaded` - Initialize CardDAV integration after Personal CRM loads
 - `personal_crm_dashboard_sidebar` - Add CardDAV sync info to dashboard sidebar
+- `personal_crm_person_saved` - Save extended vCard data when a person is saved
+- `personal_crm_person_deleting` - Delete extended vCard data when a person is deleted
+
+### Filter Hooks Used (from Personal CRM)
+
+- `personal_crm_get_person` - Add extended vCard data when loading a person
 
 ### Action Hooks Provided
 
@@ -216,6 +222,20 @@ The plugin maps Personal CRM fields to vCard properties:
 | linear | X-LINEAR | Custom field |
 | left_company | X-LEFT-COMPANY | Custom field |
 | deceased | X-DECEASED | Custom field |
+
+### Extended vCard Fields
+
+The plugin also supports extended vCard fields that don't directly map to Personal CRM's schema. These are stored in a separate database table and include:
+
+- **TEL** - Phone numbers (multiple, with types like work, home, mobile, fax)
+- **IMPP** - Instant messaging addresses
+- **LANG** - Language preferences
+- **GENDER** - Gender
+- **SOUND** - Pronunciation guide
+- **SOURCE** - Source of directory information
+- **Custom X-fields** - Any custom extended fields
+
+Extended fields are automatically saved and retrieved when syncing via CardDAV, providing full vCard compatibility without losing data.
 
 ## Troubleshooting
 

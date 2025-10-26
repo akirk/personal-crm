@@ -178,6 +178,40 @@ class Personal_CRM_VCard_Converter {
 			$vcard[] = 'PHOTO;MEDIATYPE=image/jpeg:' . self::escape( $gravatar_url );
 		}
 
+		// Extended vCard fields (phone numbers, additional emails, etc.)
+		if ( ! empty( $person->vcard_data ) && is_array( $person->vcard_data ) ) {
+			foreach ( $person->vcard_data as $field_name => $field_data ) {
+				// Handle multiple values
+				if ( isset( $field_data[0] ) && is_array( $field_data[0] ) ) {
+					// Multiple values
+					foreach ( $field_data as $item ) {
+						$value = $item['value'] ?? '';
+						$type = $item['type'] ?? '';
+
+						if ( ! empty( $value ) ) {
+							if ( ! empty( $type ) ) {
+								$vcard[] = $field_name . ';TYPE=' . self::escape( $type ) . ':' . self::escape( $value );
+							} else {
+								$vcard[] = $field_name . ':' . self::escape( $value );
+							}
+						}
+					}
+				} else {
+					// Single value
+					$value = $field_data['value'] ?? '';
+					$type = $field_data['type'] ?? '';
+
+					if ( ! empty( $value ) ) {
+						if ( ! empty( $type ) ) {
+							$vcard[] = $field_name . ';TYPE=' . self::escape( $type ) . ':' . self::escape( $value );
+						} else {
+							$vcard[] = $field_name . ':' . self::escape( $value );
+						}
+					}
+				}
+			}
+		}
+
 		// Custom fields using X- prefix
 		if ( ! empty( $person->linear ) ) {
 			$vcard[] = 'X-LINEAR:' . self::escape( $person->linear );
@@ -217,6 +251,7 @@ class Personal_CRM_VCard_Converter {
 	 */
 	public static function vcard_to_person_data( $vcard_data ) {
 		$person_data = array();
+		$extended_data = array(); // Store fields that don't map to Person schema
 		$lines = explode( "\n", str_replace( "\r\n", "\n", $vcard_data ) );
 
 		$in_vcard = false;
@@ -371,6 +406,25 @@ class Personal_CRM_VCard_Converter {
 				case 'X-DECEASED-DATE':
 					$person_data['deceased_date'] = $value;
 					break;
+
+				// Extended vCard fields that don't map to Person schema
+				case 'TEL':
+				case 'IMPP':
+				case 'LANG':
+				case 'GENDER':
+				case 'SOUND':
+				case 'SOURCE':
+					$field_type = self::get_parameter_value( $property, 'TYPE' );
+					self::add_extended_field( $extended_data, $property_name, $value, $field_type );
+					break;
+
+				default:
+					// Store any other unknown fields as extended data
+					if ( strpos( $property_name, 'X-' ) === 0 && ! in_array( $property_name, array( 'X-LINEAR', 'X-LEFT-COMPANY', 'X-NEW-COMPANY', 'X-NEW-COMPANY-WEBSITE', 'X-DECEASED', 'X-DECEASED-DATE' ), true ) ) {
+						$field_type = self::get_parameter_value( $property, 'TYPE' );
+						self::add_extended_field( $extended_data, $property_name, $value, $field_type );
+					}
+					break;
 			}
 		}
 
@@ -384,7 +438,37 @@ class Personal_CRM_VCard_Converter {
 			);
 		}
 
+		// Add extended fields
+		if ( ! empty( $extended_data ) ) {
+			$person_data['vcard_data'] = $extended_data;
+		}
+
 		return $person_data;
+	}
+
+	/**
+	 * Add a field to extended data
+	 *
+	 * @param array  &$extended_data The extended data array (by reference)
+	 * @param string $field_name     The field name
+	 * @param string $value          The field value
+	 * @param string $type           The field type
+	 */
+	private static function add_extended_field( &$extended_data, $field_name, $value, $type ) {
+		$field_entry = array(
+			'value' => $value,
+			'type'  => $type ?: '',
+		);
+
+		if ( isset( $extended_data[ $field_name ] ) ) {
+			// Convert to array if it's not already
+			if ( ! isset( $extended_data[ $field_name ][0] ) ) {
+				$extended_data[ $field_name ] = array( $extended_data[ $field_name ] );
+			}
+			$extended_data[ $field_name ][] = $field_entry;
+		} else {
+			$extended_data[ $field_name ] = $field_entry;
+		}
 	}
 
 	/**

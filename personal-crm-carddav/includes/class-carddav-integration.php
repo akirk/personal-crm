@@ -86,12 +86,57 @@ class Personal_CRM_CardDAV_Integration {
 		$this->carddav_server = new Personal_CRM_CardDAV_Server();
 		$this->carddav_server->set_storage( $this->storage );
 
+		// Hook into Personal CRM events for vCard data
+		add_filter( 'personal_crm_get_person', array( $this, 'add_vcard_data_to_person' ), 10, 2 );
+		add_action( 'personal_crm_person_saved', array( $this, 'save_vcard_data' ), 10, 4 );
+		add_action( 'personal_crm_person_deleting', array( $this, 'delete_vcard_data' ), 10, 2 );
+
 		/**
 		 * Action fired after CardDAV integration is initialized
 		 *
 		 * @param Personal_CRM_CardDAV_Integration $integration The integration instance
 		 */
 		do_action( 'personal_crm_carddav_initialized', $this );
+	}
+
+	/**
+	 * Add extended vCard data to person when loading
+	 *
+	 * @param array $person_data The person data
+	 * @param int   $person_id   The person ID
+	 * @return array Modified person data
+	 */
+	public function add_vcard_data_to_person( $person_data, $person_id ) {
+		$vcard_data = $this->storage->get_vcard_data( $person_id );
+		if ( ! empty( $vcard_data ) ) {
+			$person_data['vcard_data'] = $vcard_data;
+		}
+		return $person_data;
+	}
+
+	/**
+	 * Save extended vCard data when person is saved
+	 *
+	 * @param int    $person_id   The person ID
+	 * @param string $username    The username
+	 * @param array  $person_data The person data
+	 * @param bool   $is_new      Whether this is a new person
+	 */
+	public function save_vcard_data( $person_id, $username, $person_data, $is_new ) {
+		// Only save vCard data if it's provided
+		if ( isset( $person_data['vcard_data'] ) && is_array( $person_data['vcard_data'] ) ) {
+			$this->storage->save_vcard_data( $person_id, $person_data['vcard_data'] );
+		}
+	}
+
+	/**
+	 * Delete extended vCard data when person is deleted
+	 *
+	 * @param int    $person_id The person ID
+	 * @param string $username  The username
+	 */
+	public function delete_vcard_data( $person_id, $username ) {
+		$this->storage->delete_vcard_data( $person_id );
 	}
 
 	/**
