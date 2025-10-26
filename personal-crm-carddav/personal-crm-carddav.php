@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: Personal CRM CardDAV Integration
+ * Plugin Name: Contact Sync for Personal CRM
  * Plugin URI: https://github.com/akirk/personal-crm
- * Description: Adds CardDAV server capability to the Personal CRM plugin, allowing synchronization with CardDAV-compatible clients.
+ * Description: Sync your Personal CRM contacts with phones, tablets, and desktop apps via CardDAV. Works with iPhone, iPad, Android, macOS, and more.
  * Version: 1.0.0
  * Author: Personal CRM Contributors
  * Requires PHP: 7.4
@@ -60,8 +60,8 @@ function personal_crm_carddav_missing_dependency_notice() {
 	?>
 	<div class="notice notice-error">
 		<p>
-			<strong><?php esc_html_e( 'Personal CRM CardDAV Integration', 'personal-crm-carddav' ); ?>:</strong>
-			<?php esc_html_e( 'The Personal CRM plugin must be installed and activated for the CardDAV integration to work.', 'personal-crm-carddav' ); ?>
+			<strong><?php esc_html_e( 'Contact Sync for Personal CRM', 'personal-crm-carddav' ); ?>:</strong>
+			<?php esc_html_e( 'The Personal CRM plugin must be installed and activated for Contact Sync to work.', 'personal-crm-carddav' ); ?>
 		</p>
 	</div>
 	<?php
@@ -75,7 +75,7 @@ function personal_crm_carddav_activate() {
 	if ( ! class_exists( 'PersonalCrm' ) ) {
 		deactivate_plugins( plugin_basename( __FILE__ ) );
 		wp_die(
-			esc_html__( 'Personal CRM CardDAV Integration requires the Personal CRM plugin to be installed and activated.', 'personal-crm-carddav' ),
+			esc_html__( 'Contact Sync for Personal CRM requires the Personal CRM plugin to be installed and activated.', 'personal-crm-carddav' ),
 			esc_html__( 'Plugin Activation Error', 'personal-crm-carddav' ),
 			array( 'back_link' => true )
 		);

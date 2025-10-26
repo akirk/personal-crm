@@ -196,8 +196,8 @@ class Personal_CRM_CardDAV_Integration {
 	public function add_settings_page() {
 		add_submenu_page(
 			'crm',
-			__( 'CardDAV Settings', 'personal-crm-carddav' ),
-			__( 'CardDAV', 'personal-crm-carddav' ),
+			__( 'Contact Sync Settings', 'personal-crm-carddav' ),
+			__( 'Contact Sync', 'personal-crm-carddav' ),
 			'manage_options',
 			'personal-crm-carddav',
 			array( $this, 'render_settings_page' )
@@ -408,14 +408,14 @@ class Personal_CRM_CardDAV_Integration {
 
 		?>
 		<div class="crm-card" style="margin-top: 20px;">
-			<h3><?php esc_html_e( 'CardDAV Sync', 'personal-crm-carddav' ); ?></h3>
-			<p><?php esc_html_e( 'Sync this address book with your devices:', 'personal-crm-carddav' ); ?></p>
+			<h3><?php esc_html_e( 'Sync to Devices', 'personal-crm-carddav' ); ?></h3>
+			<p><?php esc_html_e( 'Sync these contacts to your phone, tablet, or computer:', 'personal-crm-carddav' ); ?></p>
 			<code style="display: block; padding: 8px; background: #f0f0f0; word-break: break-all; margin-bottom: 10px;">
 				<?php echo esc_html( $addressbook_url ); ?>
 			</code>
 			<p>
 				<a href="<?php echo esc_url( admin_url( 'admin.php?page=personal-crm-carddav' ) ); ?>">
-					<?php esc_html_e( 'View setup instructions', 'personal-crm-carddav' ); ?>
+					<?php esc_html_e( 'Setup instructions →', 'personal-crm-carddav' ); ?>
 				</a>
 			</p>
 		</div>
