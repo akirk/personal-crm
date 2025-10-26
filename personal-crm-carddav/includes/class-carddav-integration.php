@@ -223,6 +223,41 @@ class Personal_CRM_CardDAV_Integration {
 		<div class="wrap">
 			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
 
+			<?php
+			// Show Application Password setup notice
+			if ( Personal_CRM_CardDAV_Auth::is_application_passwords_available() ) :
+				?>
+				<div class="notice notice-info">
+					<h3 style="margin-top: 0.5em;">🔐 Application Password Required</h3>
+					<p><strong>For security, this CardDAV server does NOT accept your regular WordPress password.</strong></p>
+					<p>You must create an Application Password:</p>
+					<ol style="margin-left: 20px;">
+						<li>Go to <a href="<?php echo esc_url( admin_url( 'profile.php#application-passwords-section' ) ); ?>">your WordPress profile</a></li>
+						<li>Scroll to "Application Passwords" section</li>
+						<li>Enter name: <code>CardDAV - iPhone</code> (or your device name)</li>
+						<li>Click "Add New Application Password"</li>
+						<li><strong>Copy the generated password</strong> (shown only once!)</li>
+						<li>Use that password in your CardDAV client</li>
+					</ol>
+					<p><strong>Benefits:</strong> Your admin password stays secure, revoke per-device, track usage.</p>
+				</div>
+				<?php
+			else :
+				?>
+				<div class="notice notice-error">
+					<h3 style="margin-top: 0.5em;">⚠️ Application Passwords Not Available</h3>
+					<p><strong>CardDAV requires Application Passwords, but they're not available on this site.</strong></p>
+					<p><strong>Requirements:</strong></p>
+					<ul style="margin-left: 20px;">
+						<li>WordPress 5.6 or higher</li>
+						<li>HTTPS enabled (SSL certificate)</li>
+					</ul>
+					<p>Please update WordPress and enable SSL to use CardDAV securely.</p>
+				</div>
+				<?php
+			endif;
+			?>
+
 			<div class="card">
 				<h2><?php esc_html_e( 'CardDAV Server Information', 'personal-crm-carddav' ); ?></h2>
 
@@ -245,15 +280,20 @@ class Personal_CRM_CardDAV_Integration {
 						<td>
 							<code><?php echo esc_html( $current_user->user_login ); ?></code>
 							<p class="description">
-								<?php esc_html_e( 'Use your WordPress username for authentication.', 'personal-crm-carddav' ); ?>
+								<?php esc_html_e( 'Use your WordPress username.', 'personal-crm-carddav' ); ?>
 							</p>
 						</td>
 					</tr>
 					<tr>
 						<th><?php esc_html_e( 'Password', 'personal-crm-carddav' ); ?></th>
 						<td>
+							<p class="description" style="color: #d63638; font-weight: 600;">
+								⚠️ <?php esc_html_e( 'Use an Application Password (NOT your WordPress password)', 'personal-crm-carddav' ); ?>
+							</p>
 							<p class="description">
-								<?php esc_html_e( 'Use your WordPress password for authentication.', 'personal-crm-carddav' ); ?>
+								<a href="<?php echo esc_url( admin_url( 'profile.php#application-passwords-section' ) ); ?>">
+									<?php esc_html_e( 'Create Application Password →', 'personal-crm-carddav' ); ?>
+								</a>
 							</p>
 						</td>
 					</tr>

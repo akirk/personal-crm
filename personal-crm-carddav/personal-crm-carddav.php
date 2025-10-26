@@ -26,7 +26,16 @@ define( 'PERSONAL_CRM_CARDDAV_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 // Require the main plugin class
 require_once PERSONAL_CRM_CARDDAV_PLUGIN_DIR . 'includes/class-carddav-server.php';
 require_once PERSONAL_CRM_CARDDAV_PLUGIN_DIR . 'includes/class-vcard-converter.php';
-require_once PERSONAL_CRM_CARDDAV_PLUGIN_DIR . 'includes/class-carddav-auth.php';
+
+// Load authentication class
+// By default, uses Application Passwords ONLY for security
+// To allow regular passwords (NOT recommended), define: PERSONAL_CRM_CARDDAV_ALLOW_REGULAR_PASSWORDS
+if ( defined( 'PERSONAL_CRM_CARDDAV_ALLOW_REGULAR_PASSWORDS' ) && PERSONAL_CRM_CARDDAV_ALLOW_REGULAR_PASSWORDS ) {
+	require_once PERSONAL_CRM_CARDDAV_PLUGIN_DIR . 'includes/class-carddav-auth.php';
+} else {
+	require_once PERSONAL_CRM_CARDDAV_PLUGIN_DIR . 'includes/class-carddav-auth-secure.php';
+}
+
 require_once PERSONAL_CRM_CARDDAV_PLUGIN_DIR . 'includes/class-carddav-integration.php';
 
 /**
