@@ -9,9 +9,65 @@ PORT={{PORT}}
 # Change to resources directory
 cd "$RESOURCES_DIR"
 
+# Function to show error dialog with instructions
+show_requirement_error() {
+    local title="$1"
+    local message="$2"
+    local instructions="$3"
+    local url="$4"
+
+    if [ -n "$url" ]; then
+        # Offer to open URL
+        result=$(osascript <<EOF
+button returned of (display dialog "$message\n\n$instructions" buttons {"Cancel", "Open Instructions"} default button 2 with icon stop with title "$title")
+EOF
+)
+        if [ "$result" = "Open Instructions" ]; then
+            open "$url"
+        fi
+    else
+        osascript -e "display dialog \"$message\n\n$instructions\" buttons {\"OK\"} default button 1 with icon stop with title \"$title\""
+    fi
+}
+
+# Check if Node.js is installed
+if ! command -v node &> /dev/null; then
+    show_requirement_error \
+        "$APP_NAME - Node.js Required" \
+        "Node.js is not installed.\n\n$APP_NAME requires Node.js to run WordPress Playground." \
+        "Install options:\n\n• Download from nodejs.org (Recommended)\n• Install via Homebrew: brew install node" \
+        "https://nodejs.org/"
+    exit 1
+fi
+
+# Check if npm is available
+if ! command -v npm &> /dev/null; then
+    show_requirement_error \
+        "$APP_NAME - npm Required" \
+        "npm is not available.\n\nnpm should be included with Node.js." \
+        "Please reinstall Node.js from nodejs.org" \
+        "https://nodejs.org/"
+    exit 1
+fi
+
 # Check if wp-now is installed
 if ! command -v wp-now &> /dev/null; then
-    osascript -e "display dialog \"WordPress Playground CLI (wp-now) is not installed.\n\nPlease install it first:\n\nnpm install -g @wp-now/wp-now\" buttons {\"OK\"} default button 1 with icon stop with title \"$APP_NAME\""
+    show_requirement_error \
+        "$APP_NAME - WordPress Playground Required" \
+        "WordPress Playground CLI (wp-now) is not installed.\n\n$APP_NAME uses wp-now to run WordPress locally." \
+        "Install by running this command in Terminal:\n\nnpm install -g @wp-now/wp-now\n\nThen restart this app." \
+        "https://github.com/WordPress/playground-tools/tree/trunk/packages/wp-now"
+    exit 1
+fi
+
+# Check Node.js version (wp-now requires Node 20+)
+NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+if [ "$NODE_VERSION" -lt 18 ]; then
+    show_requirement_error \
+        "$APP_NAME - Node.js Update Required" \
+        "Your Node.js version is too old (v$(node -v)).\n\nWordPress Playground requires Node.js 18 or higher." \
+        "Please update Node.js:\n\n• Download latest from nodejs.org\n• Or via Homebrew: brew upgrade node" \
+        "https://nodejs.org/"
     exit 1
 fi
 

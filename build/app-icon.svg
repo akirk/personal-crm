@@ -1,0 +1,22 @@
+<svg width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4F46E5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7C3AED;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded rectangle background -->
+  <rect width="1024" height="1024" rx="180" fill="url(#grad)"/>
+
+  <!-- Icon content - Simple person/contact icon -->
+  <circle cx="512" cy="350" r="140" fill="white" opacity="0.9"/>
+
+  <!-- Body/shoulders -->
+  <ellipse cx="512" cy="750" rx="280" ry="200" fill="white" opacity="0.9"/>
+
+  <!-- Text -->
+  <text x="512" y="950" font-family="Arial, sans-serif" font-size="120" font-weight="bold"
+        fill="white" text-anchor="middle" opacity="0.95">CRM</text>
+</svg>

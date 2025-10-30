@@ -6,6 +6,8 @@ This directory contains scripts to build self-contained macOS `.app` bundles for
 
 ✅ Self-contained `.app` bundle with custom icon
 ✅ Dock-able application
+✅ **Automatic requirement checking** - shows helpful error dialogs if Node.js or wp-now is missing
+✅ **"Open Instructions" button** - launches installation guides directly from error dialogs
 ✅ Small status window with browser launch button
 ✅ All WordPress app files bundled inside
 ✅ Portable - share the `.app` with anyone
@@ -64,10 +66,47 @@ dist/
 ## Using the App
 
 1. Double-click `Personal CRM.app` to launch
-2. A dialog shows startup status
-3. Browser opens automatically to `http://localhost:8080`
-4. Another dialog keeps the server running
-5. Click "Quit" to stop the server
+2. **If requirements are missing**, the app shows a helpful dialog:
+   - Checks for Node.js installation
+   - Checks for npm availability
+   - Checks for wp-now (WordPress Playground CLI)
+   - Verifies Node.js version (requires 18+)
+   - Offers "Open Instructions" button to launch installation guides
+3. A dialog shows startup status
+4. Browser opens automatically to `http://localhost:8080`
+5. Another dialog keeps the server running
+6. Click "Quit" to stop the server
+
+### Example Error Dialogs
+
+**Missing Node.js:**
+```
+Node.js is not installed.
+
+Personal CRM requires Node.js to run WordPress Playground.
+
+Install options:
+
+• Download from nodejs.org (Recommended)
+• Install via Homebrew: brew install node
+
+[Cancel] [Open Instructions]
+```
+
+**Missing wp-now:**
+```
+WordPress Playground CLI (wp-now) is not installed.
+
+Personal CRM uses wp-now to run WordPress locally.
+
+Install by running this command in Terminal:
+
+npm install -g @wp-now/wp-now
+
+Then restart this app.
+
+[Cancel] [Open Instructions]
+```
 
 ## Distributing
 
