@@ -1,0 +1,34 @@
+{
+  "landingPage": "/",
+  "preferredVersions": {
+    "php": "8.0",
+    "wp": "latest"
+  },
+  "steps": [
+    {
+      "step": "login",
+      "username": "admin",
+      "password": "password"
+    },
+    {
+      "step": "installPlugin",
+      "pluginZipFile": {
+        "resource": "wordpress.org/plugins",
+        "slug": "sqlite-database-integration"
+      }
+    },
+    {
+      "step": "activatePlugin",
+      "pluginPath": "sqlite-database-integration/load.php"
+    },
+    {
+      "step": "cp",
+      "fromPath": "/wordpress/wordpress-app",
+      "toPath": "/wordpress/wp-content/plugins/personal-crm"
+    },
+    {
+      "step": "activatePlugin",
+      "pluginPath": "personal-crm/personal-crm.php"
+    }
+  ]
+}

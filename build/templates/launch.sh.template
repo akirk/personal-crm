@@ -1,0 +1,61 @@
+#!/bin/bash
+
+# Get the directory where this script is located (Contents/MacOS/)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+RESOURCES_DIR="$SCRIPT_DIR/../Resources"
+APP_NAME="{{APP_NAME}}"
+PORT={{PORT}}
+
+# Change to resources directory
+cd "$RESOURCES_DIR"
+
+# Check if wp-now is installed
+if ! command -v wp-now &> /dev/null; then
+    osascript -e "display dialog \"WordPress Playground CLI (wp-now) is not installed.\n\nPlease install it first:\n\nnpm install -g @wp-now/wp-now\" buttons {\"OK\"} default button 1 with icon stop with title \"$APP_NAME\""
+    exit 1
+fi
+
+# Create a temporary file for the server URL
+URL_FILE="/tmp/${APP_NAME// /_}_url.txt"
+echo "http://localhost:$PORT" > "$URL_FILE"
+
+# Function to clean up on exit
+cleanup() {
+    rm -f "$URL_FILE"
+    if [ ! -z "$WP_PID" ]; then
+        kill $WP_PID 2>/dev/null
+    fi
+}
+trap cleanup EXIT
+
+# Show startup notification
+osascript <<EOF &
+display dialog "Starting $APP_NAME...\n\nServer will run on http://localhost:$PORT\n\nClick OK to open in browser." buttons {"OK"} default button 1 with title "$APP_NAME"
+EOF
+
+# Start WordPress Playground in the background
+wp-now start --path="$RESOURCES_DIR/wordpress-app" --port=$PORT > /tmp/wp-now-$PORT.log 2>&1 &
+WP_PID=$!
+
+# Wait a moment for server to start
+sleep 3
+
+# Check if server started successfully
+if ! kill -0 $WP_PID 2>/dev/null; then
+    osascript -e "display dialog \"Failed to start WordPress Playground.\n\nCheck the log at /tmp/wp-now-$PORT.log\" buttons {\"OK\"} default button 1 with icon stop with title \"$APP_NAME\""
+    exit 1
+fi
+
+# Open browser
+open "http://localhost:$PORT"
+
+# Show running status with option to quit
+osascript <<EOF
+set response to display dialog "$APP_NAME is running on:\nhttp://localhost:$PORT\n\nThe server will stop when you close this dialog." buttons {"Open Browser Again", "Quit"} default button 1 with title "$APP_NAME"
+if button returned of response is "Open Browser Again" then
+    do shell script "open http://localhost:$PORT"
+end if
+EOF
+
+# User closed dialog, cleanup will happen via trap
+exit 0

@@ -1,0 +1,103 @@
+# macOS App Builder for WordPress Apps
+
+This directory contains scripts to build self-contained macOS `.app` bundles for WordPress applications that run via WordPress Playground CLI.
+
+## Features
+
+✅ Self-contained `.app` bundle with custom icon
+✅ Dock-able application
+✅ Small status window with browser launch button
+✅ All WordPress app files bundled inside
+✅ Portable - share the `.app` with anyone
+
+## Prerequisites
+
+Users need to have WordPress Playground CLI installed:
+
+```bash
+npm install -g @wp-now/wp-now
+```
+
+## Building the App
+
+```bash
+cd build
+./build-mac-app.sh [options]
+```
+
+### Options
+
+- `--name "App Name"` - Application name (default: "Personal CRM")
+- `--bundle-id com.example.app` - Bundle identifier (default: "com.personal-crm.app")
+- `--port 8080` - Server port (default: 8080)
+- `--icon path/to/icon.png` - App icon (.png or .icns)
+- `--output ./dist` - Output directory (default: ./dist)
+
+### Example
+
+```bash
+./build-mac-app.sh \
+    --name "Personal CRM" \
+    --bundle-id "com.personal-crm.app" \
+    --port 8080 \
+    --icon ../assets/icon.png \
+    --output ../dist
+```
+
+## Output
+
+The script creates a `.app` bundle in the output directory:
+```
+dist/
+└── Personal CRM.app/
+    └── Contents/
+        ├── Info.plist
+        ├── MacOS/
+        │   └── launch.sh
+        └── Resources/
+            ├── app-icon.icns
+            ├── blueprint.json
+            └── wordpress-app/
+                └── [all your WordPress app files]
+```
+
+## Using the App
+
+1. Double-click `Personal CRM.app` to launch
+2. A dialog shows startup status
+3. Browser opens automatically to `http://localhost:8080`
+4. Another dialog keeps the server running
+5. Click "Quit" to stop the server
+
+## Distributing
+
+To share the app:
+1. Compress the `.app` bundle: `zip -r PersonalCRM.zip "Personal CRM.app"`
+2. Share the zip file
+3. Recipients just unzip and double-click
+
+## Adapting for Other WordPress Apps
+
+This build system is designed to be reusable:
+
+1. Copy the `build/` directory to another WordPress project
+2. Customize the icon and app name
+3. Run `./build-mac-app.sh`
+4. Get a new self-contained `.app`
+
+The blueprint.json can be customized for different WordPress configurations.
+
+## Technical Details
+
+- **Bundle Structure**: Standard macOS `.app` bundle
+- **Launch Script**: Bash script that spawns `wp-now`
+- **Dialogs**: Native macOS dialogs via AppleScript
+- **Browser**: Opens system default browser
+- **Server**: WordPress Playground CLI (`wp-now`)
+
+## Future Enhancements
+
+This could be extracted into a separate tool:
+- npm package: `npx wp-app-bundle`
+- GitHub repo with install script
+- Homebrew tap: `brew install wp-app-bundler`
