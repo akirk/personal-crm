@@ -34,9 +34,11 @@ cd build
 - `--port 8080` - Server port (default: 8080)
 - `--icon path/to/icon.png` - App icon (.png or .icns)
 - `--output ./dist` - Output directory (default: ./dist)
+- `--sign "Developer ID"` - Code sign with Apple Developer ID (optional)
 
-### Example
+### Examples
 
+**Basic build (unsigned):**
 ```bash
 ./build-mac-app.sh \
     --name "Personal CRM" \
@@ -44,6 +46,22 @@ cd build
     --port 8080 \
     --icon ../assets/icon.png \
     --output ../dist
+```
+
+**Build with code signing:**
+```bash
+./build-mac-app.sh \
+    --name "Personal CRM" \
+    --bundle-id "com.personal-crm.app" \
+    --port 8080 \
+    --icon ../assets/icon.png \
+    --sign "Developer ID Application: Your Name (TEAMID)" \
+    --output ../dist
+```
+
+To find your Developer ID:
+```bash
+security find-identity -v -p codesigning
 ```
 
 ## Output
@@ -110,10 +128,21 @@ Then restart this app.
 
 ## Distributing
 
-To share the app:
-1. Compress the `.app` bundle: `zip -r PersonalCRM.zip "Personal CRM.app"`
+**For unsigned apps:**
+1. Compress: `cd dist && zip -r PersonalCRM.zip "Personal CRM.app" README.txt`
+2. Share the zip file with README.txt
+3. **Important:** Users must right-click → Open on first launch (Gatekeeper workaround)
+
+**For signed apps:**
+1. Compress: `cd dist && zip -r PersonalCRM.zip "Personal CRM.app" README.txt`
 2. Share the zip file
-3. Recipients just unzip and double-click
+3. Users can open normally (reduced Gatekeeper warnings)
+
+**Important:** See [MACOS_DISTRIBUTION.md](MACOS_DISTRIBUTION.md) for:
+- Gatekeeper workarounds for unsigned apps
+- Code signing setup instructions
+- Notarization guide for professional distribution
+- Alternative distribution methods (AirDrop, network shares, etc.)
 
 ## Adapting for Other WordPress Apps
 

@@ -8,6 +8,7 @@ BUNDLE_ID="com.personal-crm.app"
 PORT=8080
 ICON_PATH=""
 OUTPUT_DIR="./dist"
+SIGN_IDENTITY=""
 
 # Script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -36,9 +37,13 @@ while [[ $# -gt 0 ]]; do
             OUTPUT_DIR="$2"
             shift 2
             ;;
+        --sign)
+            SIGN_IDENTITY="$2"
+            shift 2
+            ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--name 'App Name'] [--bundle-id com.example.app] [--port 8080] [--icon path/to/icon.png] [--output ./dist]"
+            echo "Usage: $0 [--name 'App Name'] [--bundle-id com.example.app] [--port 8080] [--icon path/to/icon.png] [--output ./dist] [--sign 'Developer ID']"
             exit 1
             ;;
     esac
@@ -147,14 +152,76 @@ else
     touch "$RESOURCES_DIR/app-icon.icns"
 fi
 
+# Copy user README if it exists
+if [ -f "$SCRIPT_DIR/templates/USER_README.txt" ]; then
+    cp "$SCRIPT_DIR/templates/USER_README.txt" "$OUTPUT_DIR/README.txt"
+fi
+
+# Code signing (if requested)
+if [ -n "$SIGN_IDENTITY" ]; then
+    echo "Code signing app bundle..."
+    echo "  Identity: $SIGN_IDENTITY"
+
+    # Sign the launch script first
+    codesign --force --sign "$SIGN_IDENTITY" "$MACOS_DIR/launch.sh" 2>/dev/null || true
+
+    # Sign the entire app bundle
+    if codesign --force --deep --sign "$SIGN_IDENTITY" "$APP_BUNDLE"; then
+        echo "✅ App bundle signed successfully"
+
+        # Verify signature
+        if codesign --verify --verbose "$APP_BUNDLE" 2>&1 | grep -q "valid on disk"; then
+            echo "✅ Signature verified"
+        else
+            echo "⚠️  Warning: Signature verification had issues"
+        fi
+
+        # Check Gatekeeper status
+        if spctl --assess --type execute --verbose "$APP_BUNDLE" 2>&1 | grep -q "accepted"; then
+            echo "✅ Gatekeeper will accept this app"
+        else
+            echo "ℹ️  Note: App is signed but not notarized"
+            echo "   Users won't see Gatekeeper warnings, but notarization is recommended"
+        fi
+    else
+        echo "❌ Code signing failed"
+        echo "   Make sure the identity '$SIGN_IDENTITY' is valid"
+        echo "   List available identities: security find-identity -v -p codesigning"
+        exit 1
+    fi
+    echo ""
+fi
+
 echo ""
 echo "✅ App bundle created successfully!"
 echo "📦 Location: $APP_BUNDLE"
 echo ""
+
+if [ -z "$SIGN_IDENTITY" ]; then
+    echo "⚠️  App is NOT signed"
+    echo ""
+    echo "Users will see a Gatekeeper warning on first run."
+    echo "They need to right-click → Open to bypass it."
+    echo ""
+    echo "To sign the app, rebuild with:"
+    echo "  --sign 'Developer ID Application: Your Name (TEAMID)'"
+    echo ""
+    echo "See build/MACOS_DISTRIBUTION.md for details."
+    echo ""
+fi
+
 echo "To use:"
 echo "  1. Double-click the app to launch"
-echo "  2. Drag to Applications folder or Dock"
+if [ -z "$SIGN_IDENTITY" ]; then
+    echo "  2. Right-click → Open on first launch (Gatekeeper workaround)"
+    echo "  3. Drag to Applications folder or Dock"
+else
+    echo "  2. Drag to Applications folder or Dock"
+fi
 echo ""
-echo "Prerequisites:"
-echo "  - Install WordPress Playground CLI: npm install -g @wp-now/wp-now"
+echo "Prerequisites for users:"
+echo "  - Node.js 18+ (from nodejs.org)"
+echo "  - WordPress Playground CLI: npm install -g @wp-now/wp-now"
+echo ""
+echo "See README.txt in output directory for user instructions."
 echo ""
