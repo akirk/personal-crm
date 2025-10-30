@@ -314,79 +314,320 @@ class Personal_CRM_CardDAV_Integration {
 			</div>
 
 			<div class="card">
-				<h2><?php esc_html_e( 'Client Setup Instructions', 'personal-crm-carddav' ); ?></h2>
+				<h2><?php esc_html_e( 'Setup Instructions by Platform', 'personal-crm-carddav' ); ?></h2>
+				<p><?php esc_html_e( 'Choose your device or operating system:', 'personal-crm-carddav' ); ?></p>
 
-				<h3><?php esc_html_e( 'macOS Contacts', 'personal-crm-carddav' ); ?></h3>
-				<ol>
-					<li><?php esc_html_e( 'Open Contacts app', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'Go to Contacts > Preferences > Accounts', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'Click the + button to add a new account', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'Select "Add CardDAV Account"', 'personal-crm-carddav' ); ?></li>
-					<li>
-						<?php
-						printf(
-							/* translators: %s: Server URL */
-							esc_html__( 'Enter server: %s', 'personal-crm-carddav' ),
-							'<code>' . esc_html( $base_url ) . '/</code>'
-						);
-						?>
-					</li>
-					<li><?php esc_html_e( 'Enter your WordPress username and password', 'personal-crm-carddav' ); ?></li>
-				</ol>
+				<style>
+					.platform-tabs { margin: 20px 0; border-bottom: 2px solid #ddd; }
+					.platform-tabs button {
+						background: #f0f0f0;
+						border: none;
+						padding: 12px 20px;
+						cursor: pointer;
+						font-size: 14px;
+						border-top-left-radius: 4px;
+						border-top-right-radius: 4px;
+						margin-right: 4px;
+					}
+					.platform-tabs button.active { background: #0073aa; color: white; font-weight: 600; }
+					.platform-tabs button:hover { background: #0085ba; color: white; }
+					.platform-content { display: none; padding: 20px 0; }
+					.platform-content.active { display: block; }
+					.platform-content h3 { margin-top: 0; color: #0073aa; }
+					.platform-content ol { margin-left: 20px; }
+					.platform-content li { margin-bottom: 10px; line-height: 1.6; }
+					.platform-note { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 15px 0; }
+					.platform-note strong { color: #856404; }
+					.download-link { display: inline-block; background: #0073aa; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; margin: 10px 0; }
+					.download-link:hover { background: #0085ba; color: white; }
+				</style>
 
-				<h3><?php esc_html_e( 'iOS/iPadOS', 'personal-crm-carddav' ); ?></h3>
-				<ol>
-					<li><?php esc_html_e( 'Open Settings > Contacts > Accounts', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'Tap "Add Account"', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'Select "Other" > "Add CardDAV Account"', 'personal-crm-carddav' ); ?></li>
-					<li>
-						<?php
-						printf(
-							/* translators: %s: Server URL */
-							esc_html__( 'Enter server: %s', 'personal-crm-carddav' ),
-							'<code>' . esc_html( parse_url( $base_url, PHP_URL_HOST ) ) . '</code>'
-						);
-						?>
-					</li>
-					<li><?php esc_html_e( 'Enter your WordPress username and password', 'personal-crm-carddav' ); ?></li>
-				</ol>
+				<div class="platform-tabs">
+					<button class="platform-tab active" onclick="showPlatform(event, 'ios')">📱 iPhone/iPad</button>
+					<button class="platform-tab" onclick="showPlatform(event, 'android')">🤖 Android</button>
+					<button class="platform-tab" onclick="showPlatform(event, 'macos')">🍎 macOS</button>
+					<button class="platform-tab" onclick="showPlatform(event, 'windows')">🪟 Windows</button>
+					<button class="platform-tab" onclick="showPlatform(event, 'linux')">🐧 Linux</button>
+					<button class="platform-tab" onclick="showPlatform(event, 'thunderbird')">✉️ Thunderbird</button>
+				</div>
 
-				<h3><?php esc_html_e( 'Thunderbird', 'personal-crm-carddav' ); ?></h3>
-				<ol>
-					<li><?php esc_html_e( 'Install the "CardBook" add-on', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'Right-click on "CardBook" in the sidebar', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'Select "New Address Book" > "Remote" > "CardDAV"', 'personal-crm-carddav' ); ?></li>
-					<li>
-						<?php
-						printf(
-							/* translators: %s: Server URL */
-							esc_html__( 'Enter URL: %s', 'personal-crm-carddav' ),
-							'<code>' . esc_html( $base_url ) . '/[group-slug]/</code>'
-						);
-						?>
-					</li>
-					<li><?php esc_html_e( 'Enter your WordPress username and password', 'personal-crm-carddav' ); ?></li>
-				</ol>
+				<!-- iOS/iPadOS -->
+				<div id="ios" class="platform-content active">
+					<h3>iPhone & iPad (iOS/iPadOS)</h3>
+					<p><strong>✅ Native support - no additional apps needed!</strong></p>
+					<ol>
+						<li>Open <strong>Settings</strong> on your device</li>
+						<li>Scroll down and tap <strong>Contacts</strong></li>
+						<li>Tap <strong>Accounts</strong></li>
+						<li>Tap <strong>Add Account</strong></li>
+						<li>Tap <strong>Other</strong> (at the bottom)</li>
+						<li>Tap <strong>Add CardDAV Account</strong></li>
+						<li>Enter the following:
+							<ul>
+								<li><strong>Server:</strong> <code><?php echo esc_html( parse_url( $base_url, PHP_URL_HOST ) ); ?></code></li>
+								<li><strong>User Name:</strong> <code><?php echo esc_html( $current_user->user_login ); ?></code></li>
+								<li><strong>Password:</strong> Your Application Password (NOT WordPress password)</li>
+								<li><strong>Description:</strong> Personal CRM</li>
+							</ul>
+						</li>
+						<li>Tap <strong>Next</strong> in the top right</li>
+						<li>Wait for verification (may take a few seconds)</li>
+						<li>Your contacts will start syncing automatically! 🎉</li>
+					</ol>
+					<div class="platform-note">
+						<strong>💡 Tip:</strong> After setup, your CRM contacts will appear in the Contacts app alongside your other contacts. Changes sync automatically when you're online.
+					</div>
+				</div>
+
+				<!-- Android -->
+				<div id="android" class="platform-content">
+					<h3>Android Devices</h3>
+					<p><strong>Android requires a CardDAV sync app.</strong> We recommend DAVx⁵ (free & open source):</p>
+
+					<h4>Option 1: DAVx⁵ (Recommended - Works on all Android devices)</h4>
+					<ol>
+						<li>Install <strong>DAVx⁵</strong> from:
+							<ul>
+								<li><a href="https://play.google.com/store/apps/details?id=at.bitfire.davdroid" target="_blank" class="download-link">📥 Google Play Store</a></li>
+								<li><a href="https://f-droid.org/packages/at.bitfire.davdroid/" target="_blank" class="download-link">📥 F-Droid (free version)</a></li>
+							</ul>
+						</li>
+						<li>Open DAVx⁵ and tap the <strong>+</strong> button</li>
+						<li>Select <strong>"Login with URL and user name"</strong></li>
+						<li>Enter the following:
+							<ul>
+								<li><strong>Base URL:</strong> <code><?php echo esc_html( $base_url ); ?>/</code></li>
+								<li><strong>User name:</strong> <code><?php echo esc_html( $current_user->user_login ); ?></code></li>
+								<li><strong>Password:</strong> Your Application Password</li>
+							</ul>
+						</li>
+						<li>Tap <strong>Login</strong></li>
+						<li>Select which address books to sync</li>
+						<li>Grant permissions when prompted</li>
+						<li>Your contacts will appear in the Contacts app! 🎉</li>
+					</ol>
+
+					<h4>Option 2: Native CardDAV (Samsung, Xiaomi, Some Other Manufacturers)</h4>
+					<p>Some Android devices have built-in CardDAV support:</p>
+					<ol>
+						<li>Open <strong>Settings</strong></li>
+						<li>Go to <strong>Accounts</strong> or <strong>Cloud and Accounts</strong></li>
+						<li>Tap <strong>Add Account</strong></li>
+						<li>Look for <strong>CardDAV</strong> or <strong>Exchange/Corporate</strong></li>
+						<li>Enter your server details and credentials</li>
+					</ol>
+					<div class="platform-note">
+						<strong>⚠️ Note:</strong> If your device doesn't have native CardDAV support, use DAVx⁵. It's the most reliable option for Android.
+					</div>
+				</div>
+
+				<!-- macOS -->
+				<div id="macos" class="platform-content">
+					<h3>macOS Contacts</h3>
+					<p><strong>✅ Native support - no additional apps needed!</strong></p>
+					<ol>
+						<li>Open the <strong>Contacts</strong> app</li>
+						<li>In the menu bar, click <strong>Contacts > Settings</strong> (or Preferences)</li>
+						<li>Click the <strong>Accounts</strong> tab</li>
+						<li>Click the <strong>+</strong> button at the bottom left</li>
+						<li>Select <strong>Add CardDAV Account</strong></li>
+						<li>Select <strong>Manual</strong> (don't use automatic)</li>
+						<li>Enter the following:
+							<ul>
+								<li><strong>Account Type:</strong> Manual</li>
+								<li><strong>Username:</strong> <code><?php echo esc_html( $current_user->user_login ); ?></code></li>
+								<li><strong>Password:</strong> Your Application Password</li>
+								<li><strong>Server Address:</strong> <code><?php echo esc_html( $base_url ); ?>/</code></li>
+							</ul>
+						</li>
+						<li>Click <strong>Sign In</strong></li>
+						<li>Your contacts will start syncing! 🎉</li>
+					</ol>
+					<div class="platform-note">
+						<strong>💡 Tip:</strong> After setup, your CRM contacts appear alongside iCloud and other contacts. Use Smart Groups to organize them.
+					</div>
+				</div>
+
+				<!-- Windows -->
+				<div id="windows" class="platform-content">
+					<h3>Windows PC</h3>
+					<p><strong>⚠️ Windows doesn't have native CardDAV support.</strong> Choose one of these apps:</p>
+
+					<h4>Option 1: Thunderbird + CardBook (Free & Recommended)</h4>
+					<ol>
+						<li>Install <a href="https://www.thunderbird.net/" target="_blank" class="download-link">📥 Download Thunderbird</a> (free email/contacts app)</li>
+						<li>Open Thunderbird</li>
+						<li>Go to <strong>Tools > Add-ons and Themes</strong> (or press Ctrl+Shift+A)</li>
+						<li>Search for <strong>"CardBook"</strong></li>
+						<li>Install the CardBook add-on and restart Thunderbird</li>
+						<li>Click the <strong>CardBook</strong> icon in the toolbar</li>
+						<li>Right-click in the CardBook window and select <strong>New Address Book</strong></li>
+						<li>Choose <strong>Remote > CardDAV</strong></li>
+						<li>Enter the following:
+							<ul>
+								<li><strong>URL:</strong> <code><?php echo esc_html( $base_url ); ?>/[group-slug]/</code></li>
+								<li><strong>Username:</strong> <code><?php echo esc_html( $current_user->user_login ); ?></code></li>
+								<li><strong>Password:</strong> Your Application Password</li>
+							</ul>
+						</li>
+						<li>Click <strong>Validate</strong> then <strong>OK</strong></li>
+						<li>Your contacts will sync! 🎉</li>
+					</ol>
+
+					<h4>Option 2: eM Client (Commercial - Free for 2 accounts)</h4>
+					<ol>
+						<li>Download <a href="https://www.emclient.com/" target="_blank" class="download-link">📥 eM Client</a></li>
+						<li>Open eM Client</li>
+						<li>Go to <strong>Menu > Accounts</strong></li>
+						<li>Click <strong>+</strong> to add a new account</li>
+						<li>Choose <strong>Contacts (CardDAV)</strong></li>
+						<li>Enter:
+							<ul>
+								<li><strong>Server:</strong> <code><?php echo esc_html( $base_url ); ?>/</code></li>
+								<li><strong>Username:</strong> <code><?php echo esc_html( $current_user->user_login ); ?></code></li>
+								<li><strong>Password:</strong> Your Application Password</li>
+							</ul>
+						</li>
+						<li>Click <strong>Connect</strong></li>
+						<li>Your contacts will appear in eM Client!</li>
+					</ol>
+
+					<h4>Option 3: Outlook (Requires Third-Party Plugin)</h4>
+					<p>Microsoft Outlook doesn't natively support CardDAV. You'll need:</p>
+					<ul>
+						<li><a href="https://www.outlookdav.com/" target="_blank">Outlook CalDav Synchronizer</a> (free/paid plugin)</li>
+						<li>Or use Thunderbird instead (recommended)</li>
+					</ul>
+
+					<div class="platform-note">
+						<strong>💡 Recommendation:</strong> For Windows, we recommend <strong>Thunderbird + CardBook</strong> - it's free, open-source, and works great!
+					</div>
+				</div>
+
+				<!-- Linux -->
+				<div id="linux" class="platform-content">
+					<h3>Linux Desktop</h3>
+					<p>Choose your desktop environment:</p>
+
+					<h4>GNOME (Ubuntu, Fedora, etc.) - Evolution</h4>
+					<ol>
+						<li>Open <strong>GNOME Contacts</strong> or <strong>Evolution</strong></li>
+						<li>Click the hamburger menu (☰) or go to <strong>Edit > Accounts</strong></li>
+						<li>Click <strong>+</strong> or <strong>Add Account</strong></li>
+						<li>Select <strong>CardDAV</strong> or <strong>Other</strong></li>
+						<li>Enter the following:
+							<ul>
+								<li><strong>Server:</strong> <code><?php echo esc_html( parse_url( $base_url, PHP_URL_HOST ) ); ?></code></li>
+								<li><strong>Path:</strong> <code><?php echo esc_html( parse_url( $base_url, PHP_URL_PATH ) ); ?>/</code></li>
+								<li><strong>Username:</strong> <code><?php echo esc_html( $current_user->user_login ); ?></code></li>
+								<li><strong>Password:</strong> Your Application Password</li>
+							</ul>
+						</li>
+						<li>Click <strong>Connect</strong> or <strong>Add</strong></li>
+						<li>Your contacts will sync! 🎉</li>
+					</ol>
+
+					<h4>KDE Plasma - KAddressBook / Kontact</h4>
+					<ol>
+						<li>Open <strong>KAddressBook</strong> or <strong>Kontact</strong></li>
+						<li>Go to <strong>Settings > Configure KAddressBook</strong></li>
+						<li>Go to the <strong>Accounts</strong> section</li>
+						<li>Click <strong>Add Account > DAV groupware resource</strong></li>
+						<li>Select <strong>CardDAV</strong></li>
+						<li>Enter:
+							<ul>
+								<li><strong>URL:</strong> <code><?php echo esc_html( $base_url ); ?>/</code></li>
+								<li><strong>Username:</strong> <code><?php echo esc_html( $current_user->user_login ); ?></code></li>
+								<li><strong>Password:</strong> Your Application Password</li>
+							</ul>
+						</li>
+						<li>Click <strong>OK</strong></li>
+						<li>Your contacts will sync!</li>
+					</ol>
+
+					<h4>Universal Option: Thunderbird</h4>
+					<p>Works on any Linux distribution - follow the Windows Thunderbird instructions above!</p>
+					<a href="https://www.thunderbird.net/" target="_blank" class="download-link">📥 Download Thunderbird for Linux</a>
+				</div>
+
+				<!-- Thunderbird (Cross-platform) -->
+				<div id="thunderbird" class="platform-content">
+					<h3>Mozilla Thunderbird (Windows, macOS, Linux)</h3>
+					<p><strong>Free, open-source, and works great on all platforms!</strong></p>
+					<ol>
+						<li>If you don't have Thunderbird, download it:
+							<ul>
+								<li><a href="https://www.thunderbird.net/" target="_blank" class="download-link">📥 Download Thunderbird</a></li>
+							</ul>
+						</li>
+						<li>Open Thunderbird</li>
+						<li>Go to <strong>Tools > Add-ons and Themes</strong></li>
+						<li>Search for <strong>"CardBook"</strong> and install it</li>
+						<li>Restart Thunderbird</li>
+						<li>Click the <strong>CardBook</strong> button in the toolbar</li>
+						<li>Right-click in the CardBook sidebar and select <strong>New Address Book</strong></li>
+						<li>Choose <strong>Remote > CardDAV</strong></li>
+						<li>Enter the following:
+							<ul>
+								<li><strong>URL:</strong> <code><?php echo esc_html( $base_url ); ?>/[group-slug]/</code>
+									<br><small>Replace [group-slug] with your address book slug from the list above</small>
+								</li>
+								<li><strong>Username:</strong> <code><?php echo esc_html( $current_user->user_login ); ?></code></li>
+								<li><strong>Password:</strong> Your Application Password</li>
+							</ul>
+						</li>
+						<li>Click <strong>Validate</strong> to test the connection</li>
+						<li>Click <strong>OK</strong> to save</li>
+						<li>Your contacts will sync automatically! 🎉</li>
+					</ol>
+					<div class="platform-note">
+						<strong>💡 Pro Tip:</strong> Thunderbird can also sync your email and calendar. It's a complete communication hub!
+					</div>
+				</div>
+
+				<script>
+				function showPlatform(evt, platformName) {
+					// Hide all platform content
+					var contents = document.getElementsByClassName('platform-content');
+					for (var i = 0; i < contents.length; i++) {
+						contents[i].classList.remove('active');
+					}
+
+					// Remove active class from all tabs
+					var tabs = document.getElementsByClassName('platform-tab');
+					for (var i = 0; i < tabs.length; i++) {
+						tabs[i].classList.remove('active');
+					}
+
+					// Show the selected platform
+					document.getElementById(platformName).classList.add('active');
+					evt.currentTarget.classList.add('active');
+				}
+				</script>
 			</div>
 
 			<div class="card">
 				<h2><?php esc_html_e( 'Features', 'personal-crm-carddav' ); ?></h2>
 				<ul>
-					<li><?php esc_html_e( 'Bidirectional sync: Changes made in your CardDAV client will be synced back to Personal CRM', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'Multiple address books: Each group appears as a separate address book', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'Rich contact data: Includes emails, phone numbers, birthdays, websites, and more', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'Secure: Uses WordPress authentication', 'personal-crm-carddav' ); ?></li>
+					<li>✅ <?php esc_html_e( 'Bidirectional sync: Changes made in your CardDAV client will be synced back to Personal CRM', 'personal-crm-carddav' ); ?></li>
+					<li>✅ <?php esc_html_e( 'Multiple address books: Each group appears as a separate address book', 'personal-crm-carddav' ); ?></li>
+					<li>✅ <?php esc_html_e( 'Rich contact data: Includes emails, phone numbers, birthdays, websites, and more', 'personal-crm-carddav' ); ?></li>
+					<li>✅ <?php esc_html_e( 'Secure: Uses Application Passwords (not your admin password)', 'personal-crm-carddav' ); ?></li>
+					<li>✅ <?php esc_html_e( 'Automatic sync: Changes sync whenever you\'re online', 'personal-crm-carddav' ); ?></li>
 				</ul>
 			</div>
 
 			<div class="card">
 				<h2><?php esc_html_e( 'Troubleshooting', 'personal-crm-carddav' ); ?></h2>
+				<h3>Common Issues:</h3>
 				<ul>
-					<li><?php esc_html_e( 'Make sure your server supports rewrite rules (most WordPress installations do)', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'If you get 404 errors, try visiting Settings > Permalinks and clicking "Save Changes" to flush rewrite rules', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'Some clients may require HTTPS - consider using SSL for your WordPress site', 'personal-crm-carddav' ); ?></li>
-					<li><?php esc_html_e( 'If authentication fails, verify your WordPress username and password are correct', 'personal-crm-carddav' ); ?></li>
+					<li><strong><?php esc_html_e( 'Authentication fails:', 'personal-crm-carddav' ); ?></strong> <?php esc_html_e( 'Make sure you\'re using an Application Password, NOT your WordPress password. ', 'personal-crm-carddav' ); ?><a href="<?php echo esc_url( admin_url( 'profile.php#application-passwords-section' ) ); ?>"><?php esc_html_e( 'Create one here', 'personal-crm-carddav' ); ?></a></li>
+					<li><strong><?php esc_html_e( '404 errors:', 'personal-crm-carddav' ); ?></strong> <?php esc_html_e( 'Go to Settings > Permalinks and click "Save Changes" to flush rewrite rules', 'personal-crm-carddav' ); ?></li>
+					<li><strong><?php esc_html_e( 'Connection refused:', 'personal-crm-carddav' ); ?></strong> <?php esc_html_e( 'Some clients require HTTPS. Make sure your WordPress site has an SSL certificate.', 'personal-crm-carddav' ); ?></li>
+					<li><strong><?php esc_html_e( 'Contacts not appearing:', 'personal-crm-carddav' ); ?></strong> <?php esc_html_e( 'Wait a few minutes for initial sync. Check that contacts exist in your Personal CRM group.', 'personal-crm-carddav' ); ?></li>
 				</ul>
+				<h3>Still need help?</h3>
+				<p><?php esc_html_e( 'Check the', 'personal-crm-carddav' ); ?> <a href="<?php echo esc_url( 'https://github.com/akirk/personal-crm' ); ?>" target="_blank"><?php esc_html_e( 'Personal CRM documentation', 'personal-crm-carddav' ); ?></a> <?php esc_html_e( 'or open an issue on GitHub.', 'personal-crm-carddav' ); ?></p>
 			</div>
 		</div>
 		<?php
