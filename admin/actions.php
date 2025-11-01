@@ -22,7 +22,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 
 			// Find alumni subgroup for this team
 			$parent_config = $crm->storage->get_group( $current_group );
-			$parent_group_id = $parent_config['id'];
+			$parent_group_id = $parent_config->id;
 			$child_groups = $crm->storage->get_child_groups( $parent_group_id );
 			$alumni_group_id = null;
 			foreach ( $child_groups as $child ) {
@@ -45,8 +45,8 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			}
 
 			// Remove from current group and add to alumni
-			$crm->storage->remove_person_from_group( $person['id'], $from_group_id );
-			$crm->storage->add_person_to_group( $person['id'], $alumni_group_id );
+			$crm->storage->remove_person_from_group( $person->id, $from_group_id );
+			$crm->storage->add_person_to_group( $person->id, $alumni_group_id );
 
 			$message = 'Person moved to alumni successfully!';
 			break;
@@ -69,8 +69,8 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			}
 
 			// Remove from alumni and add back to original group
-			$crm->storage->remove_person_from_group( $person['id'], $alumni_group_id );
-			$crm->storage->add_person_to_group( $person['id'], $to_group_id );
+			$crm->storage->remove_person_from_group( $person->id, $alumni_group_id );
+			$crm->storage->add_person_to_group( $person->id, $to_group_id );
 
 			$message = 'Person restored from alumni successfully!';
 			break;
@@ -104,11 +104,11 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 				break;
 			}
 
-			$target_group_id = $target_config['id'];
+			$target_group_id = $target_config->id;
 
 			// Move person: remove from current group, add to target group
-			$crm->storage->remove_person_from_group( $person['id'], $from_group_id );
-			$crm->storage->add_person_to_group( $person['id'], $target_group_id );
+			$crm->storage->remove_person_from_group( $person->id, $from_group_id );
+			$crm->storage->add_person_to_group( $person->id, $target_group_id );
 
 			$redirect_url = $crm->build_url( 'person.php', array( 'person' => $username ) );
 			header( 'Location: ' . $redirect_url );

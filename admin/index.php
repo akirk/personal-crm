@@ -52,9 +52,9 @@ if ( strpos( $request_uri, '/person/' ) !== false || $is_editing_person ) {
 	// On a members page - determine if it's parent members or child group members
 	if ( $current_group ) {
 		$temp_config = $crm->storage->get_group( $current_group );
-		if ( $temp_config && ! empty( $temp_config['parent_id'] ) ) {
+		if ( $temp_config && ! empty( $temp_config->parent_id ) ) {
 			// Viewing a child group's members
-			$active_tab = $temp_config['slug'];
+			$active_tab = $temp_config->slug;
 		} else {
 			// Viewing parent/root group members
 			$active_tab = 'members';
@@ -93,7 +93,7 @@ if ( ! empty( $edit_member ) ) {
 
 	// When editing a person, we don't need a current_group since they can belong to multiple groups
 	if ( ! $current_group  ) {
-        $person_groups = $crm->storage->get_person_groups( $edit_data['id'] );
+        $person_groups = $crm->storage->get_person_groups( $edit_data->id );
 
         if ( ! empty( $person_groups ) ) {
             $current_group = $person_groups[0]['slug'];
@@ -103,8 +103,9 @@ if ( ! empty( $edit_member ) ) {
 	$config = $crm->storage->get_group( $current_group );
 } elseif ( $edit_event_index !== '' && is_numeric( $edit_event_index ) ) {
 	$config = $crm->storage->get_group( $current_group );
-	if ( isset( $config['events'][ $edit_event_index ] ) ) {
-		$edit_data = $config['events'][ $edit_event_index ];
+	$events = $config ? $config->get_events() : array();
+	if ( isset( $events[ $edit_event_index ] ) ) {
+		$edit_data = $events[ $edit_event_index ];
 		$edit_data['event_index'] = $edit_event_index;
 		$is_editing_event = true;
 		$active_tab = 'events';
@@ -271,12 +272,12 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
         // Show parent navigation link if this is a child group
         if ( $current_group && ! $is_creating_team ) {
             $current_group_config = $crm->storage->get_group( $current_group );
-            if ( $current_group_config && ! empty( $current_group_config['parent_id'] ) ) {
-                $parent_group = $crm->storage->get_group_by_id( $current_group_config['parent_id'] );
+            if ( $current_group_config && ! empty( $current_group_config->parent_id ) ) {
+                $parent_group = $crm->storage->get_group_by_id( $current_group_config->parent_id );
                 if ( $parent_group ) {
                     ?>
                     <div style="margin-bottom: 20px;">
-                        <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $parent_group['slug'] ) ); ?>" class="back-link-admin">← Back to <?php echo htmlspecialchars( $parent_group['group_name'] ); ?> Admin</a>
+                        <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $parent_group->slug ) ); ?>" class="back-link-admin">← Back to <?php echo htmlspecialchars( $parent_group->group_name ); ?> Admin</a>
                     </div>
                     <?php
                 }
@@ -326,22 +327,22 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
             <?php
 
             $group_data = $crm->storage->get_group( $current_group );
-            if ( ! $group_data && ! empty( $edit_member ) ) {
-                $person_groups = $crm->storage->get_person_groups( $edit_member );
+            if ( ! $group_data && ! empty( $edit_data ) && ! empty( $edit_data->id ) ) {
+                $person_groups = $crm->storage->get_person_groups( $edit_data->id );
                 if ( ! empty( $person_groups ) ) {
-                    $group_data = $crm->storage->get_group( $person_groups[0] );
+                    $group_data = $crm->storage->get_group( $person_groups[0]['slug'] );
                 }
             }
 
             // If current group has a parent, use the parent to build the menu (for consistency)
-            if ( $group_data && ! empty( $group_data['parent_id'] ) ) {
-                $parent_group = $crm->storage->get_group_by_id( $group_data['parent_id'] );
+            if ( $group_data && ! empty( $group_data->parent_id ) ) {
+                $parent_group = $crm->storage->get_group_by_id( $group_data->parent_id );
                 if ( $parent_group ) {
                     $group_data = $parent_group;
                 }
             }
 
-            $menu_group_id = $group_data ? $group_data['id'] : null;
+            $menu_group_id = $group_data ? $group_data->id : null;
             $child_groups = $menu_group_id ? $crm->storage->get_child_groups( $menu_group_id ) : array();
 
             $nav_tabs = array(
@@ -389,7 +390,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                 <div class="nav-dropdown-menu">
                     <?php foreach ( $nav_tabs as $tab ) : ?>
                         <?php
-                        $tab_group = ( $tab['slug'] === 'members' ) ? $group_data['slug'] : $tab['slug'];
+                        $tab_group = ( $tab['slug'] === 'members' ) ? ( $group_data ? $group_data->slug : $current_group ) : $tab['slug'];
                         $tab_url = $crm->build_url( 'admin/index.php', array( 'group' => $tab_group, 'members' => true ) );
                         ?>
                         <a href="<?php echo $tab_url; ?>" class="nav-dropdown-item <?php echo $active_tab === $tab['slug'] ? 'active' : ''; ?>"><?php echo $tab['display_icon']; ?> <?php echo htmlspecialchars( $tab['display_name'] ); ?> (<?php echo $tab['count']; ?>)</a>
@@ -570,10 +571,10 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                 }
 
                 // If current group is a child group, get the parent's child groups for comparison
-                if ( $group_data && ! empty( $group_data['parent_id'] ) ) {
-                    $parent_group = $crm->storage->get_group_by_id( $group_data['parent_id'] );
+                if ( $group_data && ! empty( $group_data->parent_id ) ) {
+                    $parent_group = $crm->storage->get_group_by_id( $group_data->parent_id );
                     if ( $parent_group ) {
-                        $menu_group_id = $parent_group['id'];
+                        $menu_group_id = $parent_group->id;
                     } else {
                         $menu_group_id = $group_data ? $group_data->id : null;
                     }
@@ -606,23 +607,35 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
     <script>
         <?php
         // Export person data as JavaScript constants
-        if ( isset( $config['members'] ) ) {
-            echo "const members = " . json_encode( $config['members'] ) . ";\n        ";
-        }
+        if ( is_object( $config ) ) {
+            $members = $config->get_members();
+            if ( ! empty( $members ) ) {
+                echo "const members = " . json_encode( $members ) . ";\n        ";
+            }
 
-        // Export child groups
-        if ( ! empty( $config['id'] ) ) {
-            $child_groups = $crm->storage->get_child_groups( $config['id'] );
-            foreach ( $child_groups as $child ) {
-                $js_var_name = str_replace( array( '-', '_' ), '', ucwords( $child['slug'], '-_' ) );
-                $js_var_name = lcfirst( $js_var_name );
-                if ( isset( $config[ $child['slug'] ] ) ) {
-                    echo "const {$js_var_name} = " . json_encode( $config[ $child['slug'] ] ) . ";\n        ";
+            // Export child groups
+            if ( ! empty( $config->id ) ) {
+                $child_groups = $crm->storage->get_child_groups( $config->id );
+                foreach ( $child_groups as $child ) {
+                    $js_var_name = str_replace( array( '-', '_' ), '', ucwords( $child['slug'], '-_' ) );
+                    $js_var_name = lcfirst( $js_var_name );
+                    $child_group_obj = $crm->storage->get_group( $child['slug'] );
+                    if ( $child_group_obj ) {
+                        $child_members = $child_group_obj->get_members();
+                        if ( ! empty( $child_members ) ) {
+                            echo "const {$js_var_name} = " . json_encode( $child_members ) . ";\n        ";
+                        }
+                    }
                 }
             }
+
+            $events = $config->get_events();
+            echo "const events = " . json_encode( array_values( $events ) ) . ";\n        ";
+        } else {
+            // Fallback for array config
+            echo "const events = " . json_encode( array_values( $config['events'] ?? array() ) ) . ";\n        ";
         }
         ?>
-        const events = <?php echo json_encode( array_values( $config['events'] ?? array() ) ); ?>;
         
         function showTab(tabName) {
             // Hide all tab content
@@ -641,7 +654,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
         }
 
         // Team links functionality
-        let teamLinkIndex = <?php echo count( $config['team_links'] ?? array() ); ?>;
+        let teamLinkIndex = <?php echo is_object( $config ) ? count( $config->links ?? array() ) : count( $config['team_links'] ?? array() ); ?>;
 
         document.addEventListener('DOMContentLoaded', function() {
             // Function to get next available index

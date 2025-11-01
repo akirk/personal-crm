@@ -92,7 +92,7 @@ if ( $all_teams_mode ) {
 $team_events = array();
 
 // Separate team events into upcoming and past
-$past_team_events = array_filter( $group_data['events'], function( $event ) {
+$past_team_events = array_filter( $all_teams_mode ? $group_data['events'] : $group_data->get_events(), function( $event ) {
 	return $event->is_past();
 });
 
@@ -235,7 +235,7 @@ $available_teams = $crm->storage->get_available_groups();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $group_data['group_name'] ) . ' Events' ) : htmlspecialchars( $group_data['group_name'] ) . ' Events'; ?></title>
+    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $all_teams_mode ? $group_data['group_name'] : $group_data->group_name ) . ' Events' ) : htmlspecialchars( $all_teams_mode ? $group_data['group_name'] : $group_data->group_name ) . ' Events'; ?></title>
     <?php
     if ( function_exists( 'wp_app_enqueue_style' ) ) {
         wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
@@ -258,14 +258,14 @@ $available_teams = $crm->storage->get_available_groups();
                     <?php if ( $all_teams_mode ) : ?>
                         <a href="<?php echo $crm->build_url( 'select.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $group_data['group_name'] ); ?> Events</a>
                     <?php else : ?>
-                        <a href="<?php echo $crm->build_url( 'index.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $group_data['group_name'] ); ?> Events</a>
+                        <a href="<?php echo $crm->build_url( 'index.php' ); ?>" class="title-link"><?php echo htmlspecialchars( $group_data->group_name ); ?> Events</a>
                     <?php endif; ?>
                 </h1>
                 <div class="back-nav">
                     <?php if ( $all_teams_mode ) : ?>
                         <a href="<?php echo $crm->build_url( 'select.php' ); ?>">← Back to Group Selection</a>
                     <?php else : ?>
-                    <a href="<?php echo $crm->build_url( 'index.php' ); ?>">← Back to <?php echo $group_data['group_name']; ?> Overview</a>
+                    <a href="<?php echo $crm->build_url( 'index.php' ); ?>">← Back to <?php echo $group_data->group_name; ?> Overview</a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -427,11 +427,11 @@ $available_teams = $crm->storage->get_available_groups();
                                             <?php endif; ?>
                                             <?php 
                                             // Add edit link for team events (not personal events)
-                                            if ( ! $event->has_person() ) {
+                                            if ( ! $event->has_person() && ! $all_teams_mode ) {
                                                 // Find the event index in the original events array for editing
                                                 $event_index = null;
-                                                foreach ( $group_data['events'] as $index => $team_event ) {
-                                                    if ( $team_event->description === $event->description && 
+                                                foreach ( $group_data->get_events() as $index => $team_event ) {
+                                                    if ( $team_event->description === $event->description &&
                                                          $team_event->date->format( 'Y-m-d' ) === $event->date->format( 'Y-m-d' ) ) {
                                                         $event_index = $index;
                                                         break;
@@ -650,17 +650,19 @@ $available_teams = $crm->storage->get_available_groups();
                                                     <?php endforeach; ?>
                                                 </div>
                                             <?php endif; ?>
-                                            <?php 
+                                            <?php
                                             // Add edit link for past team events
-                                            $event_index = null;
-                                            foreach ( $group_data['events'] as $index => $team_event ) {
-                                                if ( $team_event->description === $event->description && 
-                                                     $team_event->date->format( 'Y-m-d' ) === $event->date->format( 'Y-m-d' ) ) {
-                                                    $event_index = $index;
-                                                    break;
+                                            if ( ! $all_teams_mode ) {
+                                                $event_index = null;
+                                                foreach ( $group_data->get_events() as $index => $team_event ) {
+                                                    if ( $team_event->description === $event->description &&
+                                                         $team_event->date->format( 'Y-m-d' ) === $event->date->format( 'Y-m-d' ) ) {
+                                                        $event_index = $index;
+                                                        break;
+                                                    }
                                                 }
                                             }
-                                            if ( $event_index !== null ) : ?>
+                                            if ( ! $all_teams_mode && $event_index !== null ) : ?>
                                                 <div style="font-size: 12px; margin-top: 4px;">
                                                     <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'events', 'edit_event' => $event_index ) ); ?>"
                                                        style="color: #666; text-decoration: none; font-size: 11px;">

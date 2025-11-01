@@ -64,7 +64,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
         <div class="form-group">
             <div id="team-links-container">
                 <?php
-                $team_links = $config['team_links'] ?? array();
+                $team_links = $config->links ?? array();
                 $link_index = 0;
                 if ( ! empty( $team_links ) ) :
                     foreach ( $team_links as $link_text => $link_url ) : ?>

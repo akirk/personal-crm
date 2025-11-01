@@ -16,11 +16,11 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
             $audit_data = array();
 
             // Process direct members
-            foreach ( $config['members'] ?? array() as $username => $person ) {
+            foreach ( $config->get_members() as $username => $person ) {
                 $missing = get_missing_data_points( $person, 'member', $current_group );
                 $score = get_completeness_score( $missing, 'member', $current_group );
                 $audit_data[] = array(
-                    'type' => ( $config['group_name'] ?? '' ) . ' Member',
+                    'type' => $config->group_name . ' Member',
                     'name' => $person->name,
                     'username' => $username,
                     'missing' => $missing,
@@ -30,26 +30,24 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
             }
 
             // Process child groups dynamically
-            if ( ! empty( $config['id'] ) ) {
-                $child_groups = $crm->storage->get_child_groups( $config['id'] );
+            if ( ! empty( $config->id ) ) {
+                $child_groups = $config->get_child_groups();
                 foreach ( $child_groups as $child ) {
-                    $child_slug = $child['slug'];
-
                     // Determine audit type based on group name
                     $audit_type = 'member';
-                    if ( stripos( $child['group_name'], 'leadership' ) !== false || stripos( $child['group_name'], 'lead' ) !== false ) {
+                    if ( stripos( $child->group_name, 'leadership' ) !== false || stripos( $child->group_name, 'lead' ) !== false ) {
                         $audit_type = 'leader';
-                    } elseif ( stripos( $child['group_name'], 'consultant' ) !== false ) {
+                    } elseif ( stripos( $child->group_name, 'consultant' ) !== false ) {
                         $audit_type = 'consultants';
-                    } elseif ( stripos( $child['group_name'], 'alumni' ) !== false ) {
+                    } elseif ( stripos( $child->group_name, 'alumni' ) !== false ) {
                         $audit_type = 'alumni';
                     }
 
-                    foreach ( $config[$child_slug] ?? array() as $username => $person ) {
+                    foreach ( $child->get_members() as $username => $person ) {
                         $missing = get_missing_data_points( $person, $audit_type, $current_group );
                         $score = get_completeness_score( $missing, $audit_type, $current_group );
                         $audit_data[] = array(
-                            'type' => $child['group_name'],
+                            'type' => $child->group_name,
                             'name' => $person->name,
                             'username' => $username,
                             'missing' => $missing,
@@ -98,12 +96,12 @@ if ( ! defined( 'ABSPATH' ) && ! defined( 'WPINC' ) ) {
                 <span style="margin-right: 15px; font-weight: 600;">Filter by:</span>
                 <select class="form-select-small" style="margin-right: 15px;" id="type-filter" onchange="filterAuditTable()">
                     <option value="">All Types</option>
-                    <option value="<?php echo htmlspecialchars( ( $config['group_name'] ?? '' ) . ' Member' ); ?>"><?php echo htmlspecialchars( $config['group_name'] ?? '' ); ?> Members</option>
+                    <option value="<?php echo htmlspecialchars( $config->group_name . ' Member' ); ?>"><?php echo htmlspecialchars( $config->group_name ); ?> Members</option>
                     <?php
-                    if ( ! empty( $config['id'] ) ) {
-                        $child_groups = $crm->storage->get_child_groups( $config['id'] );
+                    if ( ! empty( $config->id ) ) {
+                        $child_groups = $config->get_child_groups();
                         foreach ( $child_groups as $child ) {
-                            echo '<option value="' . htmlspecialchars( $child['group_name'] ) . '">' . htmlspecialchars( $child['group_name'] ) . '</option>';
+                            echo '<option value="' . htmlspecialchars( $child->group_name ) . '">' . htmlspecialchars( $child->group_name ) . '</option>';
                         }
                     }
                     ?>

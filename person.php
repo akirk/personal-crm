@@ -98,7 +98,7 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 				</h1>
 				<?php if ( $current_group && $group_data ) : ?>
 					<div class="back-nav">
-						<a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $current_group ) ); ?>">← Back to <?php echo htmlspecialchars( $group_data['group_name'] ); ?> Overview</a>
+						<a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $current_group ) ); ?>">← Back to <?php echo htmlspecialchars( $group_data->group_name ); ?> Overview</a>
 					</div>
 				<?php elseif ( ! empty( $person_data->groups ) && count( $person_data->groups ) === 1 ) : ?>
 					<?php
@@ -108,7 +108,7 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 					if ( $single_group_data ) :
 					?>
 						<div class="back-nav">
-							<a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $single_group_data['slug'] ) ); ?>">← Back to <?php echo htmlspecialchars( $single_group['group_name'] ); ?> Overview</a>
+							<a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $single_group_data->slug ) ); ?>">← Back to <?php echo htmlspecialchars( $single_group['group_name'] ); ?> Overview</a>
 						</div>
 					<?php endif; ?>
 				<?php endif; ?>
@@ -361,7 +361,7 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 						}
 					}
 					$has_other_links = ! empty( $filtered_links );
-					$has_activity_links = $is_team_member && ! empty( $person_data->username ) && isset( $group_data['activity_url_prefix'] ) && ! $crm->is_social_group( $current_group );
+					$has_activity_links = $is_team_member && ! empty( $person_data->username ) && ! empty( $group_data->activity_url_prefix ) && ! $crm->is_social_group( $current_group );
 					$has_add_note_link = ! $has_notes;
 					?>
 

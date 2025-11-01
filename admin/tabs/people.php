@@ -408,7 +408,7 @@ function format_kids_for_form( $kids ) {
 	return implode( "\n", $lines );
 }
 
-function get_person_form_value( $field_name, $edit_data = array(), $is_editing = false, $error = '' ) {
+function get_person_form_value( $field_name, $edit_data = null, $is_editing = false, $error = '' ) {
 	// Use global error if no error parameter provided
 	if ( empty( $error ) ) {
 		global $error;
@@ -417,22 +417,22 @@ function get_person_form_value( $field_name, $edit_data = array(), $is_editing =
 	// If there's an error, prioritize POST data
 	if ( ! empty( $error ) && isset( $_POST[ $field_name ] ) ) {
 		$value = sanitize_text_field( $_POST[ $field_name ] );
-	} elseif ( $is_editing && isset( $edit_data[ $field_name ] ) ) {
-		$value = $edit_data[ $field_name ];
+	} elseif ( $is_editing && $edit_data && property_exists( $edit_data, $field_name ) ) {
+		$value = $edit_data->$field_name;
 	} else {
 		$value = '';
 	}
 
 	// Handle special cases
-	if ( $field_name === 'location' && empty( $value ) && $is_editing ) {
+	if ( $field_name === 'location' && empty( $value ) && $is_editing && $edit_data ) {
 		// Fallback to 'town' field for backward compatibility
-		$value = $edit_data['town'] ?? '';
+		$value = property_exists( $edit_data, 'town' ) ? $edit_data->town : '';
 	}
 
 	return htmlspecialchars( $value );
 }
 
-function get_person_checkbox_checked( $field_name, $edit_data = array(), $is_editing = false, $error = '' ) {
+function get_person_checkbox_checked( $field_name, $edit_data = null, $is_editing = false, $error = '' ) {
 	// Use global error if no error parameter provided
 	if ( empty( $error ) ) {
 		global $error;
@@ -441,7 +441,7 @@ function get_person_checkbox_checked( $field_name, $edit_data = array(), $is_edi
 	// If there's an error, prioritize POST data
 	if ( ! empty( $error ) ) {
 		return isset( $_POST[ $field_name ] ) ? 'checked' : '';
-	} elseif ( $is_editing && ! empty( $edit_data[ $field_name ] ) ) {
+	} elseif ( $is_editing && $edit_data && property_exists( $edit_data, $field_name ) && ! empty( $edit_data->$field_name ) ) {
 		return 'checked';
 	}
 	return '';
@@ -557,7 +557,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 				$is_social = false;
 				foreach ( $group_ids as $gid ) {
 					$group_data = $crm->storage->get_group_by_id( intval( $gid ) );
-					if ( $group_data && isset( $group_data['type'] ) && $group_data['type'] === 'group' ) {
+					if ( $group_data && $group_data->type === 'group' ) {
 						$is_social = true;
 						break;
 					}
@@ -607,9 +607,9 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 
 			// Get person to check if they belong to other groups
 			$person = $crm->storage->get_person( $username );
-			if ( $person && ! empty( $person['groups'] ) ) {
+			if ( $person && ! empty( $person->groups ) ) {
 				// Remove from this specific group
-				$person_id = $person['id'];
+				$person_id = $person->id;
 				$crm->storage->remove_person_from_group( $person_id, $group_id );
 
 				// Check if person is in any other groups
@@ -786,11 +786,11 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 	$selected_groups = array();
 	$person_group_ids = array( $default_group_id );
 
-	if ( $is_editing && ! empty( $edit_data['username'] ) ) {
-		$person = $crm->storage->get_person( $edit_data['username'] );
-		if ( $person && ! empty( $person['groups'] ) ) {
-			$person_group_ids = array_column( $person['groups'], 'id' );
-			foreach ( $person['groups'] as $group ) {
+	if ( $is_editing && ! empty( $edit_data->username ) ) {
+		$person = $crm->storage->get_person( $edit_data->username );
+		if ( $person && ! empty( $person->groups ) ) {
+			$person_group_ids = array_column( $person->groups, 'id' );
+			foreach ( $person->groups as $group ) {
 				$selected_groups[] = array(
 					'id' => $group['id'],
 					'name' => $group['group_name'],
@@ -802,12 +802,12 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 	} else {
 		// For new person, default to the parent group
 		$parent_group_data = $crm->storage->get_group_by_id( $parent_group_id );
-		$parent_config = $parent_group_data ? $crm->storage->get_group( $parent_group_data['slug'] ) : null;
+		$parent_config = $parent_group_data ? $crm->storage->get_group( $parent_group_data->slug ) : null;
 		$selected_groups[] = array(
 			'id' => $default_group_id,
-			'name' => ( $parent_config['group_name'] ?? '' ) . ' (Members)',
+			'name' => ( $parent_config ? $parent_config->group_name : '' ) . ' (Members)',
 			'icon' => '👥',
-			'parent_id' => $parent_group_data['parent_id'] ?? null
+			'parent_id' => $parent_group_data ? $parent_group_data->parent_id : null
 		);
 	}
 
@@ -908,7 +908,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 ?>
 <form method="post" action="" id="<?php echo $form_id; ?>">
 	<input type="hidden" name="action" value="<?php echo $action; ?>">
-	<input type="hidden" name="original_username" value="<?php echo $is_editing ? htmlspecialchars( $edit_data['username'] ?? '' ) : ''; ?>">
+	<input type="hidden" name="original_username" value="<?php echo $is_editing ? htmlspecialchars( $edit_data->username ?? '' ) : ''; ?>">
 	<input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ?? '' ); ?>">
 	<button type="submit" class="btn btn-primary" style="float: right; margin-top: -3em"><?php echo $submit_text; ?></button>
 
@@ -948,7 +948,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 
 		<div class="form-group">
 			<label>Birthday</label>
-			<?php render_birthday_dropdown( 'birthday', $edit_data['birthday'] ?? '' ); ?>
+			<?php render_birthday_dropdown( 'birthday', $edit_data->birthday ?? '' ); ?>
 		</div>
 	</div>
 
@@ -964,13 +964,13 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 
 			<div class="form-group">
 				<label>Partner Birthday</label>
-				<?php render_birthday_dropdown( 'partner_birthday', $edit_data['partner_birthday'] ?? '' ); ?>
+				<?php render_birthday_dropdown( 'partner_birthday', $edit_data->partner_birthday ?? '' ); ?>
 			</div>
 		</div>
 
 		<div class="form-group">
 			<label for="kids">Kids (one per line, formats: "Name YYYY-MM-DD", "Name MM-DD", "Name YYYY" or just "Name")</label>
-			<textarea id="kids" name="kids" rows="4" placeholder="Emma 2010-03-15&#10;Jake 12-25&#10;Sam 2012&#10;Alex"><?php echo $is_editing ? htmlspecialchars( format_kids_for_form( $edit_data['kids'] ?? array() ) ) : ''; ?></textarea>
+			<textarea id="kids" name="kids" rows="4" placeholder="Emma 2010-03-15&#10;Jake 12-25&#10;Sam 2012&#10;Alex"><?php echo $is_editing ? htmlspecialchars( format_kids_for_form( $edit_data->kids ?? array() ) ) : ''; ?></textarea>
 		</div>
 	</details>
 
@@ -1006,8 +1006,8 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 			<div id="links-container">
 				<?php
 				$current_links = array();
-				if ( $is_editing && isset( $edit_data['links'] ) ) {
-					$current_links = $edit_data['links'];
+				if ( $is_editing && property_exists( $edit_data, 'links' ) ) {
+					$current_links = $edit_data->links;
 				}
 
 				if ( ! $crm->is_social_group( $current_group ) && ! isset( $current_links['1:1 doc'] ) ) {
@@ -1076,8 +1076,8 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 		<div id="repo_fields">
 			<?php
 			$existing_repos = array();
-			if ( $is_editing && ! empty( $edit_data['github_repos'] ) ) {
-				$existing_repos = is_array( $edit_data['github_repos'] ) ? $edit_data['github_repos'] : array_filter( array_map( 'trim', explode( ',', $edit_data['github_repos'] ) ) );
+			if ( $is_editing && ! empty( $edit_data->github_repos ) ) {
+				$existing_repos = is_array( $edit_data->github_repos ) ? $edit_data->github_repos : array_filter( array_map( 'trim', explode( ',', $edit_data->github_repos ) ) );
 			}
 
 			if ( empty( $existing_repos ) ) {
@@ -1141,8 +1141,8 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 		}
 
 		$user_repos = array();
-		if ( $is_editing && ! empty( $edit_data['github_repos'] ) ) {
-			$user_repos = is_array( $edit_data['github_repos'] ) ? $edit_data['github_repos'] : array_filter( array_map( 'trim', explode( ',', $edit_data['github_repos'] ) ) );
+		if ( $is_editing && ! empty( $edit_data->github_repos ) ) {
+			$user_repos = is_array( $edit_data->github_repos ) ? $edit_data->github_repos : array_filter( array_map( 'trim', explode( ',', $edit_data->github_repos ) ) );
 		}
 		$available_repos = array_diff( $all_repos, $user_repos );
 		sort( $available_repos );
@@ -1216,7 +1216,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 	<div class="form-group">
 		<div id="personal-events-container">
 			<?php
-			$personal_events = $is_editing && isset( $edit_data['personal_events'] ) ? $edit_data['personal_events'] : array();
+			$personal_events = $is_editing && property_exists( $edit_data, 'personal_events' ) ? $edit_data->personal_events : array();
 			if ( ! empty( $personal_events ) ) :
 				foreach ( $personal_events as $index => $event ) :
 			?>
@@ -1263,7 +1263,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 	$is_alumni_group = false;
 	foreach ( $selected_groups as $group ) {
 		$group_data = $crm->storage->get_group_by_id( $group['id'] );
-		if ( $group_data && stripos( $group_data['slug'], 'alumni' ) !== false ) {
+		if ( $group_data && stripos( $group_data->slug, 'alumni' ) !== false ) {
 			$is_alumni_group = true;
 			break;
 		}
@@ -1307,7 +1307,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 
 		<div id="deceased-date-container" style="margin-top: 10px; margin-left: 20px; <?php
 			global $error;
-			echo (!empty($error) && isset($_POST['deceased'])) || ($is_editing && !empty($edit_data['deceased'])) ? '' : 'display: none;';
+			echo (!empty($error) && isset($_POST['deceased'])) || ($is_editing && !empty($edit_data->deceased)) ? '' : 'display: none;';
 		?>">
 			<label for="deceased_date">Date of passing:</label>
 			<input type="date" id="deceased_date" name="deceased_date" value="<?php echo get_person_form_value( 'deceased_date', $edit_data, $is_editing ); ?>">
@@ -1409,9 +1409,9 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 	<h4 class="section-heading">Notes</h4>
 	<div class="form-group">
 
-		<?php if ( $is_editing && ! empty( $edit_data['notes'] ) && is_array( $edit_data['notes'] ) ) : ?>
+		<?php if ( $is_editing && ! empty( $edit_data->notes ) && is_array( $edit_data->notes ) ) : ?>
 			<div class="existing-notes">
-				<?php foreach ( $edit_data['notes'] as $note ) : ?>
+				<?php foreach ( $edit_data->notes as $note ) : ?>
 					<div class="note">
 						<small class="note-date"><?php echo htmlspecialchars( $note['date'] ); ?></small>
 						<p class="note-text"><?php echo nl2br( htmlspecialchars( $note['text'] ) ); ?></p>
@@ -1445,24 +1445,24 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
         if ( ! empty( $edit_member ) ) {
             $person = $crm->storage->get_person( $edit_member );
             if ( $person ) {
-                $person['username'] = $edit_member;
+                $person->username = $edit_member;
                 // Default group is the first group they belong to (if any)
-                $default_group_id = ! empty( $person['groups'] ) ? $person['groups'][0]['id'] : 0;
+                $default_group_id = ! empty( $person->groups ) ? $person->groups[0]['id'] : 0;
                 $parent_group_id = $default_group_id;
 
                 // Show back link if person belongs to only one group
-                if ( ! empty( $person['groups'] ) && count( $person['groups'] ) === 1 ) {
-                    $single_group = $person['groups'][0];
+                if ( ! empty( $person->groups ) && count( $person->groups ) === 1 ) {
+                    $single_group = $person->groups[0];
                     $group_obj = $crm->storage->get_group_by_id( $single_group['id'] );
                     if ( $group_obj ) {
                         echo '<div class="back-link" style="margin-bottom: 15px;">';
-                        echo '<a href="' . $crm->build_url( 'admin/index.php', array( 'group' => $group_obj['slug'], 'members' => true ) ) . '">';
+                        echo '<a href="' . $crm->build_url( 'admin/index.php', array( 'group' => $group_obj->slug, 'members' => true ) ) . '">';
                         echo '← Back to ' . htmlspecialchars( $single_group['group_name'] ) . '</a>';
                         echo '</div>';
                     }
                 }
 
-                echo '<h2>Edit Person: ' . htmlspecialchars( $person['name'] ?? $edit_member ) . '</h2>';
+                echo '<h2>Edit Person: ' . htmlspecialchars( $person->name ?? $edit_member ) . '</h2>';
                 render_person_form_new( $default_group_id, $parent_group_id, $person, true );
             } else {
                 echo '<p>Person not found.</p>';
@@ -1480,14 +1480,14 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
         $group_data = $crm->storage->get_group( $current_group );
 
         // If current group is a child group, use the parent to build the tabs (for consistency)
-        if ( $group_data && ! empty( $group_data['parent_id'] ) ) {
-            $parent_group = $crm->storage->get_group_by_id( $group_data['parent_id'] );
+        if ( $group_data && ! empty( $group_data->parent_id ) ) {
+            $parent_group = $crm->storage->get_group_by_id( $group_data->parent_id );
             if ( $parent_group ) {
                 $group_data = $parent_group;
             }
         }
 
-        $menu_group_id = $group_data['id'];
+        $menu_group_id = $group_data->id;
         $child_groups = $crm->storage->get_child_groups( $menu_group_id );
 
         // First tab: Direct members of parent group

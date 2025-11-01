@@ -191,7 +191,6 @@ class PersonalCrm {
     }
 
     public function admin_settings() {
-        register_setting( 'personal_crm_settings', 'personal_crm_storage_type' );
         register_setting( 'personal_crm_settings', 'personal_crm_default_team' );
 
         add_settings_section(
@@ -199,14 +198,6 @@ class PersonalCrm {
             'General Settings',
             [ $this, 'settings_section_callback' ],
             'personal_crm_settings'
-        );
-
-        add_settings_field(
-            'storage_type',
-            'Storage Type',
-            [ $this, 'storage_type_callback' ],
-            'personal_crm_settings',
-            'personal_crm_general'
         );
 
         add_settings_field(
@@ -229,18 +220,32 @@ class PersonalCrm {
                 submit_button();
                 ?>
             </form>
-
-            <hr>
-
-            <h2>Migration Tools</h2>
-            <p>Need to migrate data between storage systems? Access the migration script directly via command line:</p>
-            <p><code>php <?php echo PERSONAL_CRM_PLUGIN_DIR; ?>migrate.php --help</code></p>
         </div>
         <?php
     }
 
     public function settings_section_callback() {
         echo '<p>Configure the basic settings for the Personal CRM.</p>';
+    }
+
+    public function default_team_callback() {
+        $value = get_option( 'personal_crm_default_team', '' );
+        $available_groups = $this->storage->get_available_groups();
+        ?>
+        <select name="personal_crm_default_team" id="personal_crm_default_team">
+            <option value="">None</option>
+            <?php foreach ( $available_groups as $group_slug ) : ?>
+                <?php
+                $group_obj = $this->storage->get_group( $group_slug );
+                $display_name = $group_obj ? $group_obj->get_hierarchical_name() : ucfirst( str_replace( '_', ' ', $group_slug ) );
+                ?>
+                <option value="<?php echo esc_attr( $group_slug ); ?>" <?php selected( $value, $group_slug ); ?>>
+                    <?php echo esc_html( $display_name ); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <p class="description">Select the default team to use when none is specified.</p>
+        <?php
     }
 
     public static function get_globals() {
@@ -467,17 +472,18 @@ class PersonalCrm {
         }
 
         // Check if person is in direct members
-        if ( isset( $config['members'][ $username ] ) ) {
+        $members = $config->get_members();
+        if ( isset( $members[ $username ] ) ) {
             $person_obj->category = 'members';
-            $person_obj->category_group = $config['group_name'];
+            $person_obj->category_group = $config->group_name;
         } else {
             // Check if they're in any child groups
-            $child_groups = $this->storage->get_child_groups( $config['id'] );
+            $child_groups = $config->get_child_groups();
             foreach ( $child_groups as $child ) {
-                $child_slug = $child['slug'];
-                if ( isset( $config[$child_slug][ $username ] ) ) {
-                    $person_obj->category = $child_slug;
-                    $person_obj->category_group = $child['group_name'];
+                $child_members = $child->get_members();
+                if ( isset( $child_members[ $username ] ) ) {
+                    $person_obj->category = $child->slug;
+                    $person_obj->category_group = $child->group_name;
                     break;
                 }
             }
@@ -513,18 +519,15 @@ class PersonalCrm {
         } else {
             // Collect all people from direct members and child groups
             $all_people = array();
-            if ( isset( $group_data['members'] ) ) {
-                $all_people = array_merge( $all_people, $group_data['members'] );
+            if ( $group_data ) {
+                $all_people = array_merge( $all_people, $group_data->get_members() );
             }
 
             // Add people from all child groups
-            if ( ! empty( $group_data['id'] ) ) {
-                $child_groups = $this->storage->get_child_groups( $group_data['id'] );
+            if ( $group_data ) {
+                $child_groups = $group_data->get_child_groups();
                 foreach ( $child_groups as $child ) {
-                    $child_slug = $child['slug'];
-                    if ( isset( $group_data[$child_slug] ) ) {
-                        $all_people = array_merge( $all_people, $group_data[$child_slug] );
-                    }
+                    $all_people = array_merge( $all_people, $child->get_members() );
                 }
             }
             foreach ( $all_people as $person ) {
@@ -542,8 +545,8 @@ class PersonalCrm {
         }
 
 
-        if ( $include_team_events && $group_data && isset( $group_data['events'] ) ) {
-            foreach ( $group_data['events'] as $event ) {
+        if ( $include_team_events && $group_data ) {
+            foreach ( $group_data->get_events() as $event ) {
                 $event_start = $event->date;
                 $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
 
@@ -824,11 +827,11 @@ class PersonalCrm {
         }
 
         wp_send_json_success( array(
-            'role' => $person['role'] ?? '',
-            'location' => $person['location'] ?? '',
-            'birthday' => $person['birthday'] ?? '',
-            'links' => $person['links'] ?? array(),
-            'linear' => $person['linear'] ?? ''
+            'role' => $person->role ?? '',
+            'location' => $person->location ?? '',
+            'birthday' => $person->birthday ?? '',
+            'links' => $person->links ?? array(),
+            'linear' => $person->linear ?? ''
         ) );
     }
 
@@ -931,18 +934,15 @@ class PersonalCrm {
 
         // Collect all people from direct members and child groups
         $all_people = array();
-        if ( isset( $group_data['members'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['members'] );
+        if ( $group_data ) {
+            $all_people = array_merge( $all_people, $group_data->get_members() );
         }
 
         // Add people from all child groups
-        if ( ! empty( $group_data['id'] ) ) {
-            $child_groups = $this->storage->get_child_groups( $group_data['id'] );
+        if ( $group_data ) {
+            $child_groups = $group_data->get_child_groups();
             foreach ( $child_groups as $child ) {
-                $child_slug = $child['slug'];
-                if ( isset( $group_data[$child_slug] ) ) {
-                    $all_people = array_merge( $all_people, $group_data[$child_slug] );
-                }
+                $all_people = array_merge( $all_people, $child->get_members() );
             }
         }
 
@@ -960,8 +960,8 @@ class PersonalCrm {
             }
         }
 
-        if ( isset( $group_data['events'] ) ) {
-            foreach ( $group_data['events'] as $event ) {
+        if ( $group_data ) {
+            foreach ( $group_data->get_events() as $event ) {
                 $event_start = $event->date;
                 $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
 
@@ -989,18 +989,15 @@ class PersonalCrm {
 
         // Collect all people from direct members and child groups
         $all_people = array();
-        if ( isset( $group_data['members'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['members'] );
+        if ( $group_data ) {
+            $all_people = array_merge( $all_people, $group_data->get_members() );
         }
 
         // Add people from all child groups
-        if ( ! empty( $group_data['id'] ) ) {
-            $child_groups = $this->storage->get_child_groups( $group_data['id'] );
+        if ( $group_data ) {
+            $child_groups = $group_data->get_child_groups();
             foreach ( $child_groups as $child ) {
-                $child_slug = $child['slug'];
-                if ( isset( $group_data[$child_slug] ) ) {
-                    $all_people = array_merge( $all_people, $group_data[$child_slug] );
-                }
+                $all_people = array_merge( $all_people, $child->get_members() );
             }
         }
 
@@ -1011,8 +1008,8 @@ class PersonalCrm {
             }
         }
 
-        if ( isset( $group_data['events'] ) ) {
-            foreach ( $group_data['events'] as $event ) {
+        if ( $group_data ) {
+            foreach ( $group_data->get_events() as $event ) {
                 $event_start = $event->date;
                 $event_end = isset( $event->end_date ) && $event->end_date ? $event->end_date : $event->date;
 
@@ -1039,25 +1036,22 @@ class PersonalCrm {
 
         // Collect all people from direct members
         $all_people = array();
-        if ( isset( $group_data['members'] ) ) {
-            $all_people = array_merge( $all_people, $group_data['members'] );
+        if ( $group_data ) {
+            $all_people = array_merge( $all_people, $group_data->get_members() );
         }
 
         // Add people from child groups (optionally excluding alumni)
-        if ( ! empty( $group_data['id'] ) ) {
-            $child_groups = $this->storage->get_child_groups( $group_data['id'] );
+        if ( $group_data ) {
+            $child_groups = $group_data->get_child_groups();
             foreach ( $child_groups as $child ) {
-                $child_slug = $child['slug'];
-                $is_alumni = stripos( $child_slug, 'alumni' ) !== false || stripos( $child['group_name'], 'alumni' ) !== false;
+                $is_alumni = stripos( $child->slug, 'alumni' ) !== false || stripos( $child->group_name, 'alumni' ) !== false;
 
                 // Skip alumni groups if not explicitly included
                 if ( $is_alumni && ! $include_alumni ) {
                     continue;
                 }
 
-                if ( isset( $group_data[$child_slug] ) ) {
-                    $all_people = array_merge( $all_people, $group_data[$child_slug] );
-                }
+                $all_people = array_merge( $all_people, $child->get_members() );
             }
         }
         foreach ( $all_people as $person ) {
@@ -1065,7 +1059,7 @@ class PersonalCrm {
             $all_events = array_merge( $all_events, $personal_events );
         }
 
-        foreach ( $group_data['events'] as $event ) {
+        foreach ( $group_data->get_events() as $event ) {
             $start_date = $event->date;
             $end_date = isset( $event->end_date ) && $event->end_date ? $event->end_date : $start_date;
 

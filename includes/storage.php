@@ -345,7 +345,11 @@ class Storage extends \WpApp\BaseStorage {
             $group_id
         ), ARRAY_A );
 
-        return $group;
+        if ( ! $group ) {
+            return null;
+        }
+
+        return new Group( $group, $this );
     }
 
     /**
@@ -532,7 +536,7 @@ class Storage extends \WpApp\BaseStorage {
         if ( ! empty( $parent_id ) ) {
             $parent = $this->get_group_by_id( $parent_id );
             if ( $parent ) {
-                $new_slug = $parent['slug'] . '_' . $base_slug;
+                $new_slug = $parent->slug . '_' . $base_slug;
             } else {
                 $new_slug = $base_slug;
             }
@@ -1080,6 +1084,8 @@ class Storage extends \WpApp\BaseStorage {
             $links,
             $row['role'] ?? ''
         );
+
+        $person->id = $person_id;
 
         $string_properties = array( 'email', 'birthday', 'company_anniversary', 'partner', 'partner_birthday', 'timezone', 'github', 'wordpress', 'linear', 'linkedin', 'website', 'new_company', 'new_company_website', 'deceased_date' );
         foreach ( $string_properties as $property ) {

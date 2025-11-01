@@ -98,7 +98,7 @@ function get_completeness_score( $missing_data, $person_type = 'member' ) {
 $audit_data = array();
 
 // Team members
-foreach ( $group_data['team_members'] as $username => $member ) {
+foreach ( $group_data->get_members() as $username => $member ) {
 	$missing = get_missing_data_points( $member, 'member' );
 	$score = get_completeness_score( $missing, 'member' );
 	$audit_data[] = array(
@@ -112,31 +112,49 @@ foreach ( $group_data['team_members'] as $username => $member ) {
 }
 
 // Leadership
-foreach ( $group_data['leadership'] as $username => $leader ) {
-	$missing = get_missing_data_points( $leader, 'leader' );
-	$score = get_completeness_score( $missing, 'leader' );
-	$audit_data[] = array(
-		'type' => 'Leadership',
-		'name' => $leader->name,
-		'username' => $username,
-		'missing' => $missing,
-		'score' => $score,
-		'person' => $leader
-	);
+$leadership_group = null;
+foreach ( $group_data->get_child_groups() as $child_group ) {
+	if ( str_ends_with( $child_group->slug, '_leadership' ) ) {
+		$leadership_group = $child_group;
+		break;
+	}
+}
+if ( $leadership_group ) {
+	foreach ( $leadership_group->get_members() as $username => $leader ) {
+		$missing = get_missing_data_points( $leader, 'leader' );
+		$score = get_completeness_score( $missing, 'leader' );
+		$audit_data[] = array(
+			'type' => 'Leadership',
+			'name' => $leader->name,
+			'username' => $username,
+			'missing' => $missing,
+			'score' => $score,
+			'person' => $leader
+		);
+	}
 }
 
 // Alumni
-foreach ( $group_data['alumni'] as $username => $alumnus ) {
-	$missing = get_missing_data_points( $alumnus, 'alumni' );
-	$score = get_completeness_score( $missing, 'alumni' );
-	$audit_data[] = array(
-		'type' => 'Alumni',
-		'name' => $alumnus->name,
-		'username' => $username,
-		'missing' => $missing,
-		'score' => $score,
-		'person' => $alumnus
-	);
+$alumni_group = null;
+foreach ( $group_data->get_child_groups() as $child_group ) {
+	if ( str_ends_with( $child_group->slug, '_alumni' ) ) {
+		$alumni_group = $child_group;
+		break;
+	}
+}
+if ( $alumni_group ) {
+	foreach ( $alumni_group->get_members() as $username => $alumnus ) {
+		$missing = get_missing_data_points( $alumnus, 'alumni' );
+		$score = get_completeness_score( $missing, 'alumni' );
+		$audit_data[] = array(
+			'type' => 'Alumni',
+			'name' => $alumnus->name,
+			'username' => $username,
+			'missing' => $missing,
+			'score' => $score,
+			'person' => $alumnus
+		);
+	}
 }
 
 // Sort by completeness score (lowest first to prioritize fixes)
@@ -157,7 +175,7 @@ $available_teams = $crm->storage->get_available_groups();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
-    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $group_data['group_name'] ) . ' Audit' ) : htmlspecialchars( $group_data['group_name'] ) . ' Audit'; ?></title>
+    <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $group_data->group_name ) . ' Audit' ) : htmlspecialchars( $group_data->group_name ) . ' Audit'; ?></title>
     <?php
     if ( function_exists( 'wp_app_enqueue_style' ) ) {
         wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
@@ -317,7 +335,7 @@ $available_teams = $crm->storage->get_available_groups();
     <div class="container">
         <div class="header">
             <div style="flex-grow: 1;">
-                <h1><a href="<?php echo $crm->build_url( 'audit.php' ); ?>" style="color: inherit; text-decoration: none;">📊 <?php echo htmlspecialchars( $group_data['group_name'] ); ?> Audit</a></h1>
+                <h1><a href="<?php echo $crm->build_url( 'audit.php' ); ?>" style="color: inherit; text-decoration: none;">📊 <?php echo htmlspecialchars( $group_data->group_name ); ?> Audit</a></h1>
                 <p style="color: #666; margin: 5px 0 0 0; font-size: 14px;">Identify missing data points and improve profiles</p>
             </div>
             <div class="navigation" style="display: flex; align-items: center; gap: 10px;">

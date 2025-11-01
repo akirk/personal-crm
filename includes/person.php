@@ -9,6 +9,7 @@ if ( class_exists( '\PersonalCRM\Person' ) ) {
 }
 
 class Person {
+	public $id; // Database ID
 	public $name;
 	public $nickname; // Preferred nickname or short name
 	public $username;
@@ -41,6 +42,7 @@ class Person {
 	private $original_username; // Store original username for data lookups
 
 	public function __construct( $name, $username = '', $links = array(), $role = '' ) {
+		$this->id = null; // Will be set by storage layer
 		$this->name = $name;
 		$this->nickname = ''; // Will be set later
 		$this->original_username = $username;

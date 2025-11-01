@@ -11,7 +11,7 @@ if ( class_exists( '\PersonalCRM\Group' ) ) {
 	return;
 }
 
-class Group implements \ArrayAccess {
+class Group {
 	public $id;
 	public $slug;
 	public $group_name;
@@ -97,6 +97,24 @@ class Group implements \ArrayAccess {
 	}
 
 	/**
+	 * Get hierarchical name showing parent → child relationship
+	 *
+	 * @return string Group name with parent hierarchy
+	 */
+	public function get_hierarchical_name() {
+		if ( ! $this->parent_id ) {
+			return $this->group_name;
+		}
+
+		$parent_group = $this->storage->get_group_by_id( $this->parent_id );
+		if ( ! $parent_group ) {
+			return $this->group_name;
+		}
+
+		return $parent_group->group_name . ' → ' . $this->group_name;
+	}
+
+	/**
 	 * Get deceased members as Person objects
 	 *
 	 * @return array Array of deceased Person objects
@@ -106,65 +124,5 @@ class Group implements \ArrayAccess {
 		return array_filter( $members, function( $member ) {
 			return ! empty( $member->deceased );
 		} );
-	}
-
-	// ArrayAccess implementation for backwards compatibility
-
-	public function offsetExists( $offset ): bool {
-		if ( property_exists( $this, $offset ) ) {
-			return true;
-		}
-
-		switch ( $offset ) {
-			case 'members':
-			case 'events':
-			case 'team_links':
-			case 'default':
-				return true;
-			default:
-				$child_groups = $this->get_child_groups();
-				foreach ( $child_groups as $child ) {
-					if ( $child->slug === $offset ) {
-						return true;
-					}
-				}
-				return false;
-		}
-	}
-
-	public function offsetGet( $offset ): mixed {
-		if ( property_exists( $this, $offset ) ) {
-			return $this->$offset;
-		}
-
-		switch ( $offset ) {
-			case 'members':
-				return $this->get_members();
-			case 'events':
-				return $this->get_events();
-			case 'team_links':
-				return $this->links;
-			case 'default':
-				return $this->is_default;
-			default:
-				// Check if it's a child group slug
-				$child_groups = $this->get_child_groups();
-				foreach ( $child_groups as $child ) {
-					if ( $child->slug === $offset ) {
-						return $child->get_members();
-					}
-				}
-				return null;
-		}
-	}
-
-	public function offsetSet( $offset, $value ): void {
-		// Read-only for now - modifications should go through storage methods
-		throw new \BadMethodCallException( 'Group objects are read-only. Use storage methods to modify groups.' );
-	}
-
-	public function offsetUnset( $offset ): void {
-		// Read-only for now
-		throw new \BadMethodCallException( 'Group objects are read-only. Use storage methods to modify groups.' );
 	}
 }
