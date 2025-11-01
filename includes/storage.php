@@ -12,6 +12,7 @@ namespace PersonalCRM;
 // They're loaded via wp-app's autoload system
 
 require_once __DIR__ . '/group.php';
+require_once __DIR__ . '/person.php';
 
 if ( class_exists( '\PersonalCRM\Storage' ) ) {
     return;
@@ -222,7 +223,10 @@ class Storage extends \WpApp\BaseStorage {
         $people = array();
         foreach ( $results as $person ) {
             $username = $person['username'];
-            $people[ $username ] = $this->format_person_data( $person );
+            $person_obj = $this->get_person( $username );
+            if ( $person_obj ) {
+                $people[ $username ] = $person_obj;
+            }
         }
 
         return $people;
@@ -1068,19 +1072,32 @@ class Storage extends \WpApp\BaseStorage {
 
         $person_id = $row['id'];
 
-        $row['links'] = $this->get_person_links( $person_id );
-        $row['notes'] = $this->get_person_notes( $person_id );
-        $row['kids'] = json_decode( $row['kids'] ?: '[]', true );
-        $row['github_repos'] = json_decode( $row['github_repos'] ?: '[]', true );
-        $row['personal_events'] = json_decode( $row['personal_events'] ?: '[]', true );
+        $links = $this->get_person_links( $person_id );
 
-        $row['left_company'] = (bool) $row['left_company'];
-        $row['deceased'] = (bool) $row['deceased'];
+        $person = new Person(
+            $row['name'],
+            $username,
+            $links,
+            $row['role'] ?? ''
+        );
 
-        // Add groups this person belongs to
-        $row['groups'] = $this->get_person_groups( $person_id );
+        $string_properties = array( 'email', 'birthday', 'company_anniversary', 'partner', 'partner_birthday', 'timezone', 'github', 'wordpress', 'linear', 'linkedin', 'website', 'new_company', 'new_company_website', 'deceased_date' );
+        foreach ( $string_properties as $property ) {
+            $person->$property = $row[$property] ?? '';
+        }
 
-        return $row;
+        $person->notes = $this->get_person_notes( $person_id );
+        $person->kids = json_decode( $row['kids'] ?: '[]', true );
+        $person->github_repos = json_decode( $row['github_repos'] ?: '[]', true );
+        $person->personal_events = json_decode( $row['personal_events'] ?: '[]', true );
+        $person->groups = $this->get_person_groups( $person_id );
+
+        $person->nickname = $row['nickname'] ?? '';
+        $person->location = $row['location'] ?? '';
+        $person->left_company = (bool) ( $row['left_company'] ?? 0 );
+        $person->deceased = (bool) ( $row['deceased'] ?? 0 );
+
+        return $person;
     }
 
     /**

@@ -452,13 +452,12 @@ class PersonalCrm {
      * Returns a Person object with category information
      */
     public function get_person_with_category( $group_slug, $username ) {
-        $person_data_raw = $this->storage->get_person( $username );
+        $person_obj = $this->storage->get_person( $username );
 
-        if ( ! $person_data_raw ) {
+        if ( ! $person_obj ) {
             return null;
         }
 
-        $person_obj = $this->create_person_from_data( $username, $person_data_raw );
         $person_obj->team = $group_slug;
 
         // Get the parent group config
@@ -488,62 +487,6 @@ class PersonalCrm {
     }
 
     /**
-     * Create Person object from person data array
-     */
-    public function create_person_from_data( $username, $person_data ) {
-        // Handle migration from old format to new format
-        $links = array();
-        if ( isset( $person_data['links'] ) ) {
-            // New format - use links directly
-            $links = $person_data['links'];
-        } else {
-            // Old format - migrate one_on_one to links
-            if ( ! empty( $person_data['one_on_one'] ) ) {
-                $links['1:1 doc'] = $person_data['one_on_one'];
-            }
-        }
-
-        if ( isset( $person_data['linear'] ) && ! empty( $person_data['linear'] ) ) {
-            $links['Linear'] = 'https://linear.app/a8c/profiles/' . $person_data['linear'];
-        }
-
-        if ( isset( $person_data['wordpress'] ) && ! empty( $person_data['wordpress'] ) ) {
-            $links['WordPress.org'] = 'https://profiles.wordpress.org/' . $person_data['wordpress'];
-        }
-
-        if ( isset( $person_data['linkedin'] ) && ! empty( $person_data['linkedin'] ) ) {
-            $links['LinkedIn'] = 'https://linkedin.com/in/' . $person_data['linkedin'];
-        }
-
-        $person = new Person(
-            $person_data['name'],
-            $username,
-            $links,
-            $person_data['role'] ?? ''
-        );
-
-        // Set properties with empty string defaults
-        $string_properties = array( 'email', 'birthday', 'company_anniversary', 'partner', 'partner_birthday', 'timezone', 'github', 'wordpress', 'linear', 'linkedin', 'website', 'new_company', 'new_company_website', 'deceased_date' );
-        foreach ( $string_properties as $property ) {
-            $person->$property = $person_data[$property] ?? '';
-        }
-
-        // Set properties with array defaults
-        $array_properties = array( 'kids', 'github_repos', 'personal_events', 'notes' );
-        foreach ( $array_properties as $property ) {
-            $person->$property = $person_data[$property] ?? array();
-        }
-
-        // Special cases
-        $person->nickname = $person_data['nickname'] ?? '';
-        $person->location = $person_data['location'] ?? $person_data['town'] ?? ''; // Support both 'location' and legacy 'town'
-        $person->left_company = $person_data['left_company'] ?? 0;
-        $person->deceased = $person_data['deceased'] ?? 0;
-
-        return $person;
-    }
-
-    /**
      * Render upcoming events sidebar section
      *
      * @param array $group_data Group data containing people and events
@@ -560,9 +503,8 @@ class PersonalCrm {
 
         // If filtering by person but no group data, fetch person directly
         if ( $filter_person && ! $group_data ) {
-            $person_data_raw = $this->storage->get_person( $filter_person );
-            if ( $person_data_raw ) {
-                $person_obj = $this->create_person_from_data( $filter_person, $person_data_raw );
+            $person_obj = $this->storage->get_person( $filter_person );
+            if ( $person_obj ) {
                 if ( method_exists( $person_obj, 'get_upcoming_events' ) ) {
                     $personal_events = $person_obj->get_upcoming_events();
                     $all_events = array_merge( $all_events, $personal_events );

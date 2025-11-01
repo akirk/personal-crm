@@ -27,14 +27,12 @@ if ( empty( $person ) ) {
 	exit;
 }
 
-$person_data_raw = $crm->storage->get_person( $person );
+$person_data = $crm->storage->get_person( $person );
 
-if ( ! $person_data_raw ) {
+if ( ! $person_data ) {
 	header( 'Location: ' . $crm->build_url( 'group.php' ) );
 	exit;
 }
-
-$person_data = $crm->create_person_from_data( $person, $person_data_raw );
 
 $current_group = null;
 $group_data = null;
@@ -102,6 +100,17 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 					<div class="back-nav">
 						<a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $current_group ) ); ?>">← Back to <?php echo htmlspecialchars( $group_data['group_name'] ); ?> Overview</a>
 					</div>
+				<?php elseif ( ! empty( $person_data->groups ) && count( $person_data->groups ) === 1 ) : ?>
+					<?php
+					// If person belongs to exactly one group and no back group specified, show link to that group
+					$single_group = $person_data->groups[0];
+					$single_group_data = $crm->storage->get_group_by_id( $single_group['id'] );
+					if ( $single_group_data ) :
+					?>
+						<div class="back-nav">
+							<a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $single_group_data['slug'] ) ); ?>">← Back to <?php echo htmlspecialchars( $single_group['group_name'] ); ?> Overview</a>
+						</div>
+					<?php endif; ?>
 				<?php endif; ?>
 			</div>
 
@@ -290,11 +299,11 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 					</div>
 				<?php endif; ?>
 
-				<?php if ( ! empty( $person_data_raw['groups'] ) && is_array( $person_data_raw['groups'] ) ) : ?>
+				<?php if ( ! empty( $person_data->groups ) && is_array( $person_data->groups ) ) : ?>
 					<div class="section">
 						<h2>Groups</h2>
 						<div class="teams-list">
-							<?php foreach ( $person_data_raw['groups'] as $group ) : ?>
+							<?php foreach ( $person_data->groups as $group ) : ?>
 								<a href="<?php echo esc_url( $crm->build_url( 'group.php', array( 'group' => $group['slug'] ) ) ); ?>" class="team-badge">
 									<?php echo htmlspecialchars( $group['group_name'] ); ?>
 								</a>

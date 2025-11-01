@@ -37,6 +37,7 @@ class Person {
 	public $deceased_date; // Date of passing (YYYY-MM-DD format)
 	public $team; // Team/group slug this person belongs to
 	public $category; // Category: team_members, leadership, consultants, or alumni
+	public $groups; // Array of groups this person belongs to (with id, group_name, slug, etc.)
 	private $original_username; // Store original username for data lookups
 
 	public function __construct( $name, $username = '', $links = array(), $role = '' ) {
@@ -62,6 +63,7 @@ class Person {
 		$this->personal_events = array();
 		$this->deceased = 0;
 		$this->deceased_date = '';
+		$this->groups = array();
 	}
 
 	/**
@@ -589,5 +591,41 @@ class Person {
 		// Check if Gravatar returns 404 (no custom avatar) or 200 (has avatar)
 		$headers = @get_headers( $url );
 		return $headers && strpos( $headers[0], '200' ) !== false;
+	}
+
+	/**
+	 * Get Linear profile URL
+	 *
+	 * @return string|null Linear URL or null if no Linear ID
+	 */
+	public function get_linear_url() {
+		if ( empty( $this->linear ) ) {
+			return null;
+		}
+		return 'https://linear.app/a8c/profiles/' . $this->linear;
+	}
+
+	/**
+	 * Get WordPress.org profile URL
+	 *
+	 * @return string|null WordPress.org URL or null if no username
+	 */
+	public function get_wordpress_url() {
+		if ( empty( $this->wordpress ) ) {
+			return null;
+		}
+		return 'https://profiles.wordpress.org/' . $this->wordpress;
+	}
+
+	/**
+	 * Get LinkedIn profile URL
+	 *
+	 * @return string|null LinkedIn URL or null if no username
+	 */
+	public function get_linkedin_url() {
+		if ( empty( $this->linkedin ) ) {
+			return null;
+		}
+		return 'https://linkedin.com/in/' . $this->linkedin;
 	}
 }

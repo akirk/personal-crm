@@ -63,12 +63,7 @@ class Group implements \ArrayAccess {
 	 */
 	public function get_members() {
 		if ( $this->_members === null ) {
-			$raw_members = $this->storage->get_group_members( $this->id, false );
-			$crm = PersonalCrm::get_instance();
-			$this->_members = array();
-			foreach ( $raw_members as $username => $member_data ) {
-				$this->_members[$username] = $crm->create_person_from_data( $username, $member_data );
-			}
+			$this->_members = $this->storage->get_group_members( $this->id, false );
 		}
 		return $this->_members;
 	}

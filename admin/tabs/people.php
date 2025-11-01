@@ -1449,6 +1449,19 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
                 // Default group is the first group they belong to (if any)
                 $default_group_id = ! empty( $person['groups'] ) ? $person['groups'][0]['id'] : 0;
                 $parent_group_id = $default_group_id;
+
+                // Show back link if person belongs to only one group
+                if ( ! empty( $person['groups'] ) && count( $person['groups'] ) === 1 ) {
+                    $single_group = $person['groups'][0];
+                    $group_obj = $crm->storage->get_group_by_id( $single_group['id'] );
+                    if ( $group_obj ) {
+                        echo '<div class="back-link" style="margin-bottom: 15px;">';
+                        echo '<a href="' . $crm->build_url( 'admin/index.php', array( 'group' => $group_obj['slug'], 'members' => true ) ) . '">';
+                        echo '← Back to ' . htmlspecialchars( $single_group['group_name'] ) . '</a>';
+                        echo '</div>';
+                    }
+                }
+
                 echo '<h2>Edit Person: ' . htmlspecialchars( $person['name'] ?? $edit_member ) . '</h2>';
                 render_person_form_new( $default_group_id, $parent_group_id, $person, true );
             } else {
