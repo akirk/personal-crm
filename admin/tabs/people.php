@@ -80,50 +80,6 @@ function render_birthday_dropdown( $field_prefix, $value ) {
 	<?php
 }
 
-/**
- * Get person type configuration
- */
-function get_person_type_config( $person_type ) {
-	global $current_group;
-	$crm = PersonalCrm::get_instance();
-
-	$group = $crm->storage->get_group( $current_group );
-	$child_groups = $group ? $group->get_child_groups() : array();
-
-	$configs = array();
-	foreach ( $child_groups as $child_group ) {
-		$type_key = $child_group->slug;
-		$form_prefix = $type_key === 'team_members' ? '' : $type_key . '-';
-
-		$configs[ $type_key ] = array(
-			'section_key' => $type_key,
-			'form_prefix' => $form_prefix,
-			'form_id' => $type_key . '-form',
-			'edit_action' => 'edit_' . $type_key,
-			'add_action' => 'add_' . $type_key,
-			'delete_action' => 'delete_' . $type_key,
-			'edit_text' => 'Update ' . $child_group->group_name,
-			'add_text' => 'Add ' . $child_group->group_name,
-			'display_name' => $child_group->group_name,
-			'display_icon' => $child_group->display_icon,
-		);
-	}
-
-	$configs['alumni'] = array(
-		'section_key' => 'alumni',
-		'form_prefix' => 'alumni-',
-		'form_id' => 'alumni-form',
-		'edit_action' => 'edit_alumni',
-		'add_action' => null,
-		'delete_action' => 'delete_alumni',
-		'edit_text' => 'Update Alumni',
-		'add_text' => null,
-		'display_name' => 'Alumni',
-		'display_icon' => '🎓',
-	);
-
-	return $configs[ $person_type ] ?? null;
-}
 
 
 /**
@@ -447,88 +403,6 @@ function get_person_checkbox_checked( $field_name, $edit_data = null, $is_editin
 	return '';
 }
 
-/**
- * Unified person CRUD operations
- */
-function handle_person_action( $action, $config, $person_data ) {
-	global $config_file, $current_group;
-	$crm = PersonalCrm::get_instance();
-
-	$main_config = $crm->storage->get_group( $current_group );
-
-	if ( strpos( $action, 'edit_' ) === 0 ) {
-		$username = $person_data['username'] ?? '';
-		$original_username = sanitize_text_field( $_POST['original_username'] ?? '' );
-
-		if ( empty( $username ) ) {
-			return array( 'error' => 'Username is required.' );
-		}
-
-		// If username changed, delete old entry first
-		if ( $original_username !== $username && ! empty( $original_username ) ) {
-			global $wpdb;
-			$wpdb->delete(
-				$wpdb->prefix . 'personal_crm_people',
-				array( 'username' => $original_username, 'team_slug' => $current_group ),
-				array( '%s', '%s' )
-			);
-		}
-
-		// Save the person directly without loading entire group
-		$result = $crm->storage->save_person( $current_group, $username, $config['section_key'], $person_data );
-
-		if ( $result !== false ) {
-			// Allow plugins to save additional data
-			do_action( 'personal_crm_admin_person_save', $username, $_POST, $config['section_key'] );
-
-			// Redirect to person view
-			$redirect_url = $crm->build_url( 'person.php', array( 'person' => $username ) );
-			header( 'Location: ' . $redirect_url );
-			exit;
-		} else {
-			return array( 'error' => 'Failed to update ' . strtolower( $config['display_name'] ) . '.' );
-		}
-	} elseif ( strpos( $action, 'add_' ) === 0 ) {
-		$username = $person_data['username'] ?? '';
-
-		if ( empty( $username ) ) {
-			return array( 'error' => 'Username is required.' );
-		}
-
-		// Save the person directly without loading entire group
-		$result = $crm->storage->save_person( $current_group, $username, $config['section_key'], $person_data );
-
-		if ( $result !== false ) {
-			// Allow plugins to save additional data
-			do_action( 'personal_crm_admin_person_save', $username, $_POST, $config['section_key'] );
-
-			// Redirect back to the appropriate admin section after adding
-			$group_slug = $current_group;
-			if ( $action === 'add_leadership' ) {
-				$group_slug = $current_group . '_leadership';
-			} elseif ( $action === 'add_consultants' ) {
-				$group_slug = $current_group . '_consultants';
-			}
-			$redirect_url = $crm->build_url( 'admin/index.php', array( 'group' => $group_slug, 'members' => true ) );
-			header( 'Location: ' . $redirect_url );
-			exit;
-		} else {
-			return array( 'error' => 'Failed to save ' . strtolower( $config['display_name'] ) . '.' );
-		}
-	} elseif ( strpos( $action, 'delete_' ) === 0 ) {
-		$username = $_POST['username'] ?? '';
-		if ( isset( $main_config[ $config['section_key'] ][ $username ] ) ) {
-			unset( $main_config[ $config['section_key'] ][ $username ] );
-			if ( $crm->storage->save_group( $current_group, $main_config ) ) {
-				return array( 'message' => $config['display_name'] . ' deleted successfully!' );
-			} else {
-				return array( 'error' => 'Failed to delete ' . strtolower( $config['display_name'] ) . '.' );
-			}
-		}
-	}
-
-	return array();
-}
 
 /**
  * ==================================================
@@ -586,6 +460,9 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 			$save_result = $crm->storage->save_person( $username, $person_data, $group_ids );
 
 			if ( $save_result ) {
+				// Allow plugins to save additional data
+				do_action( 'personal_crm_admin_person_save', $username, $_POST, 'person' );
+
 				$message = $action === 'edit_person' ? 'Person updated successfully!' : 'Person added successfully!';
 				// Redirect to person view
 				$redirect_url = $crm->build_url( 'person.php', array( 'person' => $username ) );
@@ -736,31 +613,6 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 				$error = 'Person not found in current team.';
 			}
 			break;
-		}
-	} elseif ( preg_match( '/^(edit|add|delete)_(.+)$/', $action, $matches ) ) {
-		// Dynamic person type handler - matches edit_{type}, add_{type}, delete_{type}
-		$operation = $matches[1];
-		$type_key = $matches[2];
-
-		// Get person type config
-		$type_config = get_person_type_config( $type_key );
-		if ( $type_config ) {
-			// Handle based on operation
-			if ( $operation === 'delete' ) {
-				$result = handle_person_action( $action, $type_config, array() );
-			} else {
-				$person_data = create_person_data_from_form();
-				$result = handle_person_action( $action, $type_config, $person_data );
-			}
-
-			// Set message/error
-			if ( isset( $result['error'] ) ) {
-				$error = $result['error'];
-			} elseif ( isset( $result['message'] ) ) {
-				$message = $result['message'];
-			}
-		} else {
-			$error = 'Invalid person type.';
 		}
 	}
 }
@@ -1348,62 +1200,66 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 			<?php endforeach; ?>
 		</div>
 
-		<?php if ( ! empty( $suggested_groups ) ) : ?>
-			<label>Related groups (quick add):</label>
-			<div id="suggested-groups-container" class="group-checkboxes suggested" style="margin-top: 10px; margin-bottom: 15px;">
-				<?php
-				$groups_by_relationship = array();
-				foreach ( $suggested_groups as $group ) {
-					$groups_by_relationship[ $group['relationship'] ][] = $group;
-				}
+		<details style="margin: 20px 0;">
+			<summary class="summary-toggle">Manage group membership</summary>
 
-				foreach ( array( 'parent', 'sibling', 'child' ) as $rel_type ) :
-					if ( ! empty( $groups_by_relationship[ $rel_type ] ) ) :
-						?>
-						<div class="relationship-group <?php echo $rel_type; ?>-groups">
-							<div class="relationship-label">
-								<?php
-								switch ( $rel_type ) {
-									case 'parent':
-										echo '↑ Parent groups';
-										break;
-									case 'sibling':
-										echo '↔ Peer groups';
-										break;
-									case 'child':
-										echo '↓ Subgroups';
-										break;
-								}
-								?>
-							</div>
-							<?php foreach ( $groups_by_relationship[ $rel_type ] as $group ) : ?>
-								<label class="group-checkbox-label suggested" data-group-id="<?php echo $group['id']; ?>">
-									<input type="checkbox" name="group_ids[]" value="<?php echo $group['id']; ?>">
-									<?php if ( $group['icon'] ) : ?>
-										<span class="group-icon"><?php echo $group['icon']; ?></span>
-									<?php endif; ?>
-									<span class="group-name"><?php echo htmlspecialchars( $group['name'] ); ?></span>
-								</label>
-							<?php endforeach; ?>
-						</div>
+			<?php if ( ! empty( $suggested_groups ) ) : ?>
+				<label>Related groups (quick add):</label>
+				<div id="suggested-groups-container" class="group-checkboxes suggested" style="margin-top: 10px; margin-bottom: 15px;">
 					<?php
-					endif;
-				endforeach;
-				?>
-			</div>
-		<?php endif; ?>
+					$groups_by_relationship = array();
+					foreach ( $suggested_groups as $group ) {
+						$groups_by_relationship[ $group['relationship'] ][] = $group;
+					}
 
-		<label for="add-group-input">Search all groups:</label>
-		<input type="text" id="add-group-input" list="groups-datalist" placeholder="Type to search..." autocomplete="off" style="width: 100%; max-width: 400px;">
-		<datalist id="groups-datalist">
-			<?php foreach ( $all_groups as $group ) : ?>
-				<option value="<?php echo htmlspecialchars( ( $group['display_icon'] ? $group['display_icon'] . ' ' : '' ) . $group['hierarchical_name'] ); ?>"></option>
-			<?php endforeach; ?>
-		</datalist>
+					foreach ( array( 'parent', 'sibling', 'child' ) as $rel_type ) :
+						if ( ! empty( $groups_by_relationship[ $rel_type ] ) ) :
+							?>
+							<div class="relationship-group <?php echo $rel_type; ?>-groups">
+								<div class="relationship-label">
+									<?php
+									switch ( $rel_type ) {
+										case 'parent':
+											echo '↑ Parent groups';
+											break;
+										case 'sibling':
+											echo '↔ Peer groups';
+											break;
+										case 'child':
+											echo '↓ Subgroups';
+											break;
+									}
+									?>
+								</div>
+								<?php foreach ( $groups_by_relationship[ $rel_type ] as $group ) : ?>
+									<label class="group-checkbox-label suggested" data-group-id="<?php echo $group['id']; ?>">
+										<input type="checkbox" name="group_ids[]" value="<?php echo $group['id']; ?>">
+										<?php if ( $group['icon'] ) : ?>
+											<span class="group-icon"><?php echo $group['icon']; ?></span>
+										<?php endif; ?>
+										<span class="group-name"><?php echo htmlspecialchars( $group['name'] ); ?></span>
+									</label>
+								<?php endforeach; ?>
+							</div>
+						<?php
+						endif;
+					endforeach;
+					?>
+				</div>
+			<?php endif; ?>
 
-		<script type="application/json" id="all-groups-data">
-			<?php echo json_encode( $all_groups ); ?>
-		</script>
+			<label for="add-group-input">Search all groups:</label>
+			<input type="text" id="add-group-input" list="groups-datalist" placeholder="Type to search..." autocomplete="off" style="width: 100%; max-width: 400px;">
+			<datalist id="groups-datalist">
+				<?php foreach ( $all_groups as $group ) : ?>
+					<option value="<?php echo htmlspecialchars( ( $group['display_icon'] ? $group['display_icon'] . ' ' : '' ) . $group['hierarchical_name'] ); ?>"></option>
+				<?php endforeach; ?>
+			</datalist>
+
+			<script type="application/json" id="all-groups-data">
+				<?php echo json_encode( $all_groups ); ?>
+			</script>
+		</details>
 	</div>
 
 	<h4 class="section-heading">Notes</h4>

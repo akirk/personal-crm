@@ -283,6 +283,9 @@ class Person {
 			return $a->date <=> $b->date;
 		} );
 
+		// Allow other plugins to add custom events
+		$events = apply_filters( 'personal_crm_person_upcoming_events', $events, $this );
+
 		return $events;
 	}
 

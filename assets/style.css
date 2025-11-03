@@ -547,6 +547,12 @@ body {
     background: light-dark(#fff3e6, #4d3d2a);
     color: light-dark(#fd7e14, #ffb366);
 }
+
+.event-type.recurring {
+    background: light-dark(#f0e6ff, #3d2d4d);
+    color: light-dark(#6f42c1, #b89dd9);
+}
+
 .feedback-status.review {
     background: #cce5ff;
     color: #004085;
