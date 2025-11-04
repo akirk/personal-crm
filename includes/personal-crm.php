@@ -544,6 +544,8 @@ class PersonalCrm {
             }
         }
 
+        // Allow plugins to add or modify events in sidebar context
+        $all_events = apply_filters( 'personal_crm_sidebar_all_events', $all_events, $group_data, $filter_person );
 
         if ( $include_team_events && $group_data ) {
             foreach ( $group_data->get_events() as $event ) {
