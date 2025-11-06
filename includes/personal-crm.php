@@ -113,6 +113,7 @@ class PersonalCrm {
 
         // Person management (person.php)
         $this->app->route( 'person/{person}', 'person.php' );
+        $this->app->route( 'group/{group}/history', 'group-history.php' );
         $this->app->route( 'group/{group}', 'group.php' );
 
         // Events (events.php)
@@ -747,6 +748,18 @@ class PersonalCrm {
                 } else {
                     $url = home_url( '/crm/admin' );
                 }
+            } elseif ( $route === 'group-history' ) {
+                if ( isset( $additional_params['group'] ) ) {
+                    $group = $additional_params['group'];
+                    unset( $additional_params['group'] );
+                } elseif ( isset( $additional_params['team'] ) ) {
+                    $group = $additional_params['team'];
+                    unset( $additional_params['team'] );
+                } else {
+                    $group = $this->current_group;
+                }
+
+                $url = home_url( '/crm/group/' . $group . '/history' );
             } elseif ( $route === '' && ( isset( $additional_params['group'] ) || isset( $additional_params['team'] ) ) ) {
                 // Index page with group parameter
                 if ( isset( $additional_params['group'] ) ) {
@@ -1122,6 +1135,137 @@ class PersonalCrm {
             $day_text = $days === 1 ? 'day' : 'days';
             return "{$days} {$day_text}";
         }
+    }
+
+    /**
+     * Compile group history timeline grouped by month
+     *
+     * @param int $group_id The group ID
+     * @return array Array of events grouped by month (YYYY-MM)
+     */
+    public function compile_group_history( $group_id ) {
+        $membership_changes = $this->storage->get_group_membership_history( $group_id, true );
+        $team_events = $this->storage->get_group_events( $group_id );
+
+        $main_group = $this->storage->get_group_by_id( $group_id );
+        $main_group_name = $main_group->group_name;
+
+        $timeline = array();
+        $processed_transitions = array();
+
+        foreach ( $membership_changes as $i => $change ) {
+            if ( isset( $processed_transitions[ $i ] ) ) {
+                continue;
+            }
+
+            $date = new \DateTime( $change['date'] );
+            $month_key = $date->format( 'Y-m' );
+
+            if ( ! isset( $timeline[ $month_key ] ) ) {
+                $timeline[ $month_key ] = array(
+                    'month_key'   => $month_key,
+                    'month_label' => $date->format( 'F Y' ),
+                    'events'      => array(),
+                );
+            }
+
+            $display_name = $change['name'];
+            if ( ! empty( $change['nickname'] ) ) {
+                $display_name .= ' (' . $change['nickname'] . ')';
+            }
+
+            $event_data = array(
+                'type'        => $change['event_type'],
+                'date'        => $change['date'],
+                'person'      => $display_name,
+                'username'    => $change['username'],
+                'group_name'  => $change['group_name'],
+            );
+
+            $is_child_group_event = ( $change['group_name'] !== $main_group_name );
+
+            for ( $j = 0; $j < count( $membership_changes ); $j++ ) {
+                if ( $i === $j || isset( $processed_transitions[ $j ] ) ) {
+                    continue;
+                }
+
+                $other = $membership_changes[ $j ];
+                if ( $other['username'] !== $change['username'] ) {
+                    continue;
+                }
+
+                $date_diff = abs( strtotime( $change['date'] ) - strtotime( $other['date'] ) );
+                if ( $date_diff > 86400 ) {
+                    continue;
+                }
+
+                if ( $change['event_type'] === 'join' && $other['event_type'] === 'leave' &&
+                     $change['group_name'] === $main_group_name && $other['group_name'] !== $main_group_name ) {
+                    $event_data['from_group'] = $other['group_name'];
+                    $processed_transitions[ $j ] = true;
+                    break;
+                } elseif ( $change['event_type'] === 'leave' && $other['event_type'] === 'join' &&
+                          $change['group_name'] === $main_group_name && $other['group_name'] !== $main_group_name ) {
+                    $event_data['to_group'] = $other['group_name'];
+                    $processed_transitions[ $j ] = true;
+                    break;
+                } elseif ( $change['event_type'] === 'join' && $other['event_type'] === 'leave' &&
+                          $change['group_name'] !== $main_group_name && $other['group_name'] === $main_group_name ) {
+                    $processed_transitions[ $i ] = true;
+                    break;
+                } elseif ( $change['event_type'] === 'leave' && $other['event_type'] === 'join' &&
+                          $change['group_name'] !== $main_group_name && $other['group_name'] === $main_group_name ) {
+                    $processed_transitions[ $i ] = true;
+                    break;
+                }
+            }
+
+            if ( isset( $processed_transitions[ $i ] ) ) {
+                continue;
+            }
+
+            if ( $change['event_type'] === 'leave' && ! empty( $change['new_company'] ) ) {
+                $event_data['new_company'] = $change['new_company'];
+                $event_data['new_company_website'] = $change['new_company_website'] ?? null;
+            }
+
+            $timeline[ $month_key ]['events'][] = $event_data;
+        }
+
+        foreach ( $team_events as $event ) {
+            if ( empty( $event->date ) ) {
+                continue;
+            }
+
+            $month_key = $event->date->format( 'Y-m' );
+
+            if ( ! isset( $timeline[ $month_key ] ) ) {
+                $timeline[ $month_key ] = array(
+                    'month_key'   => $month_key,
+                    'month_label' => $event->date->format( 'F Y' ),
+                    'events'      => array(),
+                );
+            }
+
+            $timeline[ $month_key ]['events'][] = array(
+                'type'        => 'team_event',
+                'date'        => $event->date->format( 'Y-m-d H:i:s' ),
+                'event_type'  => $event->type,
+                'name'        => $event->name,
+                'description' => $event->details ?? null,
+                'location'    => $event->location ?? null,
+            );
+        }
+
+        krsort( $timeline );
+
+        foreach ( $timeline as &$month_data ) {
+            usort( $month_data['events'], function( $a, $b ) {
+                return strcmp( $b['date'], $a['date'] );
+            } );
+        }
+
+        return $timeline;
     }
 
 }

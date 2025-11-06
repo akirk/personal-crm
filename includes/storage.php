@@ -388,6 +388,88 @@ class Storage extends \WpApp\BaseStorage {
     }
 
     /**
+     * Get all membership changes for a group (joins and leaves) with person details
+     *
+     * @param int $group_id The group ID
+     * @param bool $include_children Include child groups
+     * @return array Array of membership change events with person details
+     */
+    public function get_group_membership_history( $group_id, $include_children = true ) {
+        $group_ids = array( $group_id );
+        if ( $include_children ) {
+            $descendant_groups = $this->get_all_descendant_groups( $group_id );
+            foreach ( $descendant_groups as $descendant ) {
+                $group_ids[] = $descendant['id'];
+            }
+        }
+
+        $placeholders = implode( ',', array_fill( 0, count( $group_ids ), '%d' ) );
+        $events = array();
+
+        $current_members = $this->wpdb->get_results( $this->wpdb->prepare(
+            "SELECT p.username, p.name, p.nickname, p.new_company, p.new_company_website,
+                    pg.created_at as date, g.group_name, g.id as group_id, 'join' as event_type,
+                    NULL as left_date
+             FROM {$this->wpdb->prefix}personal_crm_people_groups pg
+             INNER JOIN {$this->wpdb->prefix}personal_crm_people p ON pg.person_id = p.id
+             INNER JOIN {$this->wpdb->prefix}personal_crm_groups g ON pg.group_id = g.id
+             WHERE pg.group_id IN ($placeholders)",
+            ...$group_ids
+        ), ARRAY_A );
+
+        foreach ( $current_members as $member ) {
+            $events[] = $member;
+        }
+
+        $historical_joins = $this->wpdb->get_results( $this->wpdb->prepare(
+            "SELECT p.username, p.name, p.nickname, p.new_company, p.new_company_website,
+                    pgh.created_at as date, g.group_name, g.id as group_id, 'join' as event_type,
+                    pgh.left_at as left_date
+             FROM {$this->wpdb->prefix}personal_crm_people_groups_history pgh
+             INNER JOIN {$this->wpdb->prefix}personal_crm_people p ON pgh.person_id = p.id
+             INNER JOIN {$this->wpdb->prefix}personal_crm_groups g ON pgh.group_id = g.id
+             WHERE pgh.group_id IN ($placeholders)",
+            ...$group_ids
+        ), ARRAY_A );
+
+        foreach ( $historical_joins as $join ) {
+            $events[] = $join;
+
+            if ( $join['left_date'] ) {
+                $events[] = array(
+                    'username'             => $join['username'],
+                    'name'                 => $join['name'],
+                    'nickname'             => $join['nickname'],
+                    'new_company'          => $join['new_company'],
+                    'new_company_website'  => $join['new_company_website'],
+                    'date'                 => $join['left_date'],
+                    'group_name'           => $join['group_name'],
+                    'group_id'             => $join['group_id'],
+                    'event_type'           => 'leave',
+                    'left_date'            => null,
+                );
+            }
+        }
+
+        usort( $events, function( $a, $b ) {
+            return strcmp( $a['date'], $b['date'] );
+        } );
+
+        $deduplicated = array();
+        $seen = array();
+        foreach ( $events as $event ) {
+            $date_only = substr( $event['date'], 0, 10 );
+            $key = $event['username'] . '|' . $event['event_type'] . '|' . $event['group_id'] . '|' . $date_only;
+            if ( ! isset( $seen[ $key ] ) ) {
+                $deduplicated[] = $event;
+                $seen[ $key ] = true;
+            }
+        }
+
+        return $deduplicated;
+    }
+
+    /**
      * Format person data for API output (remove internal fields)
      */
     private function format_person_data( $row ) {

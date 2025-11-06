@@ -62,6 +62,9 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 				// Allow other plugins to add header content
 				do_action( 'personal_crm_header_content', $group_data, $current_group );
 				?>
+				<div style="display: flex; gap: 10px; align-items: center;">
+					<a href="<?php echo $crm->build_url( 'group-history.php', array( 'group' => $current_group ) ); ?>" class="footer-link">📜 History</a>
+				</div>
 				<div class="navigation" style="display: flex; align-items: center; gap: 10px;">
 					<select id="group-selector" onchange="switchGroup()">
 						<?php
@@ -325,6 +328,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 			// Allow other plugins to add footer links
 			do_action( 'personal_crm_footer_links', $group_data, $current_group );
 			?>
+			<a href="<?php echo $crm->build_url( 'group-history.php', array( 'group' => $current_group ) ); ?>" class="footer-link">📜 History</a>
 			<a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $current_group ) ); ?>" class="footer-link">⚙️ Admin Panel</a>
 		</footer>
 	</div>
