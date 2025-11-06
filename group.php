@@ -138,11 +138,28 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 						<?php if ( ! empty( $members ) ) : ?>
 							<ul class="people-list">
 								<?php foreach ( $members as $username => $member ) : ?>
+									<?php
+									$member_group_join_date = null;
+									if ( ! empty( $member->groups ) ) {
+										foreach ( $member->groups as $group ) {
+											if ( $group['id'] == $group_data->id ) {
+												$member_group_join_date = $group['group_joined_date'] ?? null;
+												break;
+											}
+										}
+									}
+									$tenure = $member_group_join_date ? $crm->format_tenure( $member_group_join_date ) : '';
+									?>
 									<li>
 										<div class="person-row-container">
 											<a href="<?php echo $member->get_profile_url( array( 'back' => $current_group ) ); ?>" class="person-row">
 												<div class="person-info">
-													<div class="person-name"><?php echo htmlspecialchars( $member->get_display_name_with_nickname() ); ?></div>
+													<div class="person-name">
+														<?php echo htmlspecialchars( $member->get_display_name_with_nickname() ); ?>
+														<?php if ( $tenure ) : ?>
+															<small style="font-weight: normal; opacity: 0.7; margin-left: 8px;">(<?php echo htmlspecialchars( $tenure ); ?>)</small>
+														<?php endif; ?>
+													</div>
 													<div class="person-username">
 														<?php if ( $crm->is_social_group( $current_group ) ) : ?>
 															<?php if ( ! empty( $member->location ) ) : ?>
@@ -168,7 +185,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 								<?php endforeach; ?>
 							</ul>
 						<?php else : ?>
-							<p class="empty-state-message">No members yet. <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'tab' => 'members', 'add' => 'new' ) ); ?>" class="action-link">Add your first member →</a></p>
+							<p class="empty-state-message">No members yet. <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $group_data->slug, 'members' => true, 'add' => 'new' ) ); ?>" class="action-link">Add your first member →</a></p>
 						<?php endif; ?>
 					</div>
 
@@ -185,12 +202,27 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 						<?php if ( ! empty( $child_members ) ) : ?>
 							<ul class="people-list">
 								<?php foreach ( $child_members as $username => $leader ) : ?>
+									<?php
+									$leader_group_join_date = null;
+									if ( ! empty( $leader->groups ) ) {
+										foreach ( $leader->groups as $group ) {
+											if ( $group['id'] == $child_group_obj->id ) {
+												$leader_group_join_date = $group['group_joined_date'] ?? null;
+												break;
+											}
+										}
+									}
+									$leader_tenure = $leader_group_join_date ? $crm->format_tenure( $leader_group_join_date ) : '';
+									?>
 									<li>
 										<div class="person-row-container">
 											<a href="<?php echo $leader->get_profile_url( array( 'back' => $current_group ) ); ?>" class="person-row">
 												<div class="person-info">
 													<div class="person-name">
 														<?php echo htmlspecialchars( $leader->get_display_name_with_nickname() ); ?>
+														<?php if ( $leader_tenure ) : ?>
+															<small style="font-weight: normal; opacity: 0.7; margin-left: 8px;">(<?php echo htmlspecialchars( $leader_tenure ); ?>)</small>
+														<?php endif; ?>
 														<?php if ( ! empty( $leader->role ) ) : ?>
 															<span class="person-role">(<?php echo htmlspecialchars( $leader->role ); ?>)</span>
 														<?php endif; ?>

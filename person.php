@@ -300,12 +300,81 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 				<?php endif; ?>
 
 				<?php if ( ! empty( $person_data->groups ) && is_array( $person_data->groups ) ) : ?>
+					<?php
+					// Separate current and historical memberships
+					$current_groups = array();
+					$historical_groups = array();
+					foreach ( $person_data->groups as $group ) {
+						if ( ! empty( $group['group_left_date'] ) ) {
+							$historical_groups[] = $group;
+						} else {
+							$current_groups[] = $group;
+						}
+					}
+					?>
 					<div class="section">
 						<h2>Groups</h2>
 						<div class="teams-list">
-							<?php foreach ( $person_data->groups as $group ) : ?>
-								<a href="<?php echo esc_url( $crm->build_url( 'group.php', array( 'group' => $group['slug'] ) ) ); ?>" class="team-badge">
-									<?php echo htmlspecialchars( $group['group_name'] ); ?>
+							<?php foreach ( $current_groups as $group ) : ?>
+								<?php
+								// Build hierarchical name if this is a child group
+								$display_name = $group['group_name'];
+								if ( ! empty( $group['parent_id'] ) ) {
+									$parent = $crm->storage->get_group_by_id( $group['parent_id'] );
+									if ( $parent ) {
+										$display_name = $parent->group_name . ' → ' . $group['group_name'];
+									}
+								}
+								?>
+								<a href="<?php echo esc_url( $crm->build_url( 'group.php', array( 'group' => $group['slug'] ) ) ); ?>" class="group-badge">
+									<?php echo htmlspecialchars( $display_name ); ?>
+									<?php if ( ! empty( $group['group_joined_date'] ) ) : ?>
+										<?php $tenure = $crm->format_tenure( $group['group_joined_date'] ); ?>
+										<?php if ( $tenure ) : ?>
+											<small style="font-weight: normal; opacity: 0.8;"> · <?php echo htmlspecialchars( $tenure ); ?></small>
+										<?php endif; ?>
+									<?php endif; ?>
+								</a>
+							<?php endforeach; ?>
+							<?php foreach ( $historical_groups as $group ) : ?>
+								<?php
+								// Build hierarchical name if this is a child group
+								$display_name = $group['group_name'];
+								if ( ! empty( $group['parent_id'] ) ) {
+									$parent = $crm->storage->get_group_by_id( $group['parent_id'] );
+									if ( $parent ) {
+										$display_name = $parent->group_name . ' → ' . $group['group_name'];
+									}
+								}
+
+								$start_year = ! empty( $group['group_joined_date'] ) ? date( 'Y', strtotime( $group['group_joined_date'] ) ) : '?';
+								$end_year = ! empty( $group['group_left_date'] ) ? date( 'Y', strtotime( $group['group_left_date'] ) ) : '?';
+								$date_range = $start_year === $end_year ? $start_year : $start_year . '–' . $end_year;
+
+								// Build tooltip: joindate - leavedate (duration)
+								$tooltip = '';
+								if ( ! empty( $group['group_joined_date'] ) && ! empty( $group['group_left_date'] ) ) {
+									$join_date = date( 'M j, Y', strtotime( $group['group_joined_date'] ) );
+									$leave_date = date( 'M j, Y', strtotime( $group['group_left_date'] ) );
+
+									$start = new DateTime( $group['group_joined_date'] );
+									$end = new DateTime( $group['group_left_date'] );
+									$interval = $start->diff( $end );
+									$duration_parts = array();
+									if ( $interval->y > 0 ) {
+										$duration_parts[] = $interval->y . ( $interval->y === 1 ? ' year' : ' years' );
+									}
+									if ( $interval->m > 0 ) {
+										$duration_parts[] = $interval->m . ( $interval->m === 1 ? ' month' : ' months' );
+									}
+									$duration = ! empty( $duration_parts ) ? implode( ', ', $duration_parts ) : '0 months';
+
+									$tooltip = $join_date . ' - ' . $leave_date . ' (' . $duration . ')';
+								}
+								?>
+								<a href="<?php echo esc_url( $crm->build_url( 'group.php', array( 'group' => $group['slug'] ) ) ); ?>" class="group-badge group-badge-historical" title="<?php echo htmlspecialchars( $tooltip ); ?>">
+									<?php echo htmlspecialchars( $display_name ); ?>
+									<small style="font-weight: normal; opacity: 0.8;"> · <?php echo htmlspecialchars( $date_range ); ?></small>
 								</a>
 							<?php endforeach; ?>
 						</div>
@@ -381,18 +450,16 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 									<?php endforeach; ?>
 							<?php endif; ?>
 
-							
-								<a href="#" onclick="toggleAddNoteForm(); return false;" class="quick-link">
-									<span style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; margin-right: 8px; font-size: 14px;">📝</span>
-									Add note
-								</a>
-							<?php endif; ?>
+							<a href="#" onclick="toggleAddNoteForm(); return false;" class="quick-link">
+								<span style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; margin-right: 8px; font-size: 14px;">📝</span>
+								Add note
+							</a>
 
 							<?php
 							// Allow plugins to add quick links
 							do_action( 'personal_crm_person_quick_links', $person_data, $is_team_member, $group_data );
 							?>
-							</div>
+						</div>
 						</div>
 					<?php endif; ?>
 
@@ -459,22 +526,22 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 										<p class="notes-content"><?php echo nl2br( esc_html( trim( $compiled_text ) ) ); ?></p>
 									</div>
 								<?php endif; ?>
-
-								<form method="post" action="<?php echo $crm->build_url( 'admin/person.php', array( 'person' => $person ) ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
-									<input type="hidden" name="action" value="add_note">
-									<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
-									<input type="hidden" name="return_to_person" value="1">
-									<?php if ( isset( $_GET['notes_view'] ) ) : ?>
-										<input type="hidden" name="notes_view" value="<?php echo esc_attr( $_GET['notes_view'] ); ?>">
-									<?php endif; ?>
-									<textarea name="new_note" placeholder="Add a new note..." rows="3" required></textarea>
-									<div class="form-actions">
-										<button type="submit">Save Note</button>
-										<button type="button" onclick="toggleAddNoteForm()" class="cancel-btn">Cancel</button>
-									</div>
-								</form>
 							</div>
 						<?php endif; ?>
+
+						<form method="post" action="<?php echo $crm->build_url( 'admin/person.php', array( 'person' => $person ) ); ?>" class="add-note-form" id="add-note-form" style="display: none;">
+							<input type="hidden" name="action" value="add_note">
+							<input type="hidden" name="username" value="<?php echo esc_attr( $person ); ?>">
+							<input type="hidden" name="return_to_person" value="1">
+							<?php if ( isset( $_GET['notes_view'] ) ) : ?>
+								<input type="hidden" name="notes_view" value="<?php echo esc_attr( $_GET['notes_view'] ); ?>">
+							<?php endif; ?>
+							<textarea name="new_note" placeholder="Add a new note..." rows="3" required></textarea>
+							<div class="form-actions">
+								<button type="submit">Save Note</button>
+								<button type="button" onclick="toggleAddNoteForm()" class="cancel-btn">Cancel</button>
+							</div>
+						</form>
 
 					<?php if ( $has_any_accounts ) : ?>
 						<div class="section">
@@ -518,6 +585,7 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 							</div>
 						</div>
 					<?php endif; ?>
+				<?php endif; ?>
 			</div>
 
 			<div class="events-sidebar">

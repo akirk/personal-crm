@@ -1090,4 +1090,38 @@ class PersonalCrm {
         return $all_events;
     }
 
+    public function format_tenure( $join_date ) {
+        if ( empty( $join_date ) ) {
+            return '';
+        }
+
+        $start = new \DateTime( $join_date );
+        $now = new \DateTime();
+        $interval = $start->diff( $now );
+
+        $years = $interval->y;
+        $months = $interval->m;
+
+        if ( $years > 0 ) {
+            if ( $months > 0 ) {
+                $year_text = $years === 1 ? 'year' : 'years';
+                $month_text = $months === 1 ? 'month' : 'months';
+                return "{$years} {$year_text}, {$months} {$month_text}";
+            } else {
+                $year_text = $years === 1 ? 'year' : 'years';
+                return "{$years} {$year_text}";
+            }
+        } elseif ( $months > 0 ) {
+            $month_text = $months === 1 ? 'month' : 'months';
+            return "{$months} {$month_text}";
+        } else {
+            $days = $interval->d;
+            if ( $days === 0 ) {
+                return 'less than a day';
+            }
+            $day_text = $days === 1 ? 'day' : 'days';
+            return "{$days} {$day_text}";
+        }
+    }
+
 }

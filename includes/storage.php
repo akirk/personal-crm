@@ -133,6 +133,17 @@ class Storage extends \WpApp\BaseStorage {
                 KEY idx_person_groups_person (person_id),
                 KEY idx_person_groups_group (group_id)
             ",
+            'personal_crm_people_groups_history' => "
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                person_id bigint(20) unsigned NOT NULL,
+                group_id bigint(20) unsigned NOT NULL,
+                created_at datetime NOT NULL,
+                left_at datetime NOT NULL,
+                PRIMARY KEY (id),
+                KEY idx_history_person (person_id),
+                KEY idx_history_group (group_id),
+                KEY idx_history_dates (created_at, left_at)
+            ",
             'personal_crm_notes' => "
                 id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
                 person_id bigint(20) unsigned NOT NULL,
@@ -235,7 +246,7 @@ class Storage extends \WpApp\BaseStorage {
     /**
      * Add person to group
      */
-    public function add_person_to_group( $person_id, $group_id ) {
+    public function add_person_to_group( $person_id, $group_id, $created_at = 'default' ) {
         // Check if already exists
         $existing = $this->wpdb->get_var( $this->wpdb->prepare(
             "SELECT id FROM {$this->wpdb->prefix}personal_crm_people_groups
@@ -247,14 +258,80 @@ class Storage extends \WpApp\BaseStorage {
             return true; // Already exists
         }
 
+        $data = array(
+            'person_id' => $person_id,
+            'group_id' => $group_id
+        );
+        $format = array( '%d', '%d' );
+
+        if ( $created_at !== 'default' ) {
+            $data['created_at'] = $created_at;
+            $format[] = $created_at === null ? 'NULL' : '%s';
+        }
+
         return $this->wpdb->insert(
             $this->wpdb->prefix . 'personal_crm_people_groups',
+            $data,
+            $format
+        );
+    }
+
+    /**
+     * Update group membership created_at date
+     */
+    public function update_group_membership_date( $person_id, $group_id, $created_at ) {
+        return $this->wpdb->update(
+            $this->wpdb->prefix . 'personal_crm_people_groups',
+            array( 'created_at' => $created_at ),
             array(
                 'person_id' => $person_id,
                 'group_id' => $group_id
             ),
+            array( '%s' ),
             array( '%d', '%d' )
         );
+    }
+
+    /**
+     * Move a group membership to history (when person leaves a group)
+     */
+    public function move_membership_to_history( $person_id, $group_id, $left_at ) {
+        // Get the current membership to preserve the join date
+        $membership = $this->wpdb->get_row( $this->wpdb->prepare(
+            "SELECT created_at FROM {$this->wpdb->prefix}personal_crm_people_groups
+             WHERE person_id = %d AND group_id = %d",
+            $person_id, $group_id
+        ) );
+
+        if ( ! $membership ) {
+            return false;
+        }
+
+        // Insert into history
+        $result = $this->wpdb->insert(
+            $this->wpdb->prefix . 'personal_crm_people_groups_history',
+            array(
+                'person_id' => $person_id,
+                'group_id' => $group_id,
+                'created_at' => $membership->created_at,
+                'left_at' => $left_at
+            ),
+            array( '%d', '%d', '%s', '%s' )
+        );
+
+        if ( $result ) {
+            // Remove from current memberships
+            $this->wpdb->delete(
+                $this->wpdb->prefix . 'personal_crm_people_groups',
+                array(
+                    'person_id' => $person_id,
+                    'group_id' => $group_id
+                ),
+                array( '%d', '%d' )
+            );
+        }
+
+        return $result;
     }
 
     /**
@@ -272,17 +349,34 @@ class Storage extends \WpApp\BaseStorage {
     }
 
     /**
-     * Get all groups a person belongs to
+     * Get all groups a person belongs to (current and historical)
      */
     public function get_person_groups( $person_id ) {
-        return $this->wpdb->get_results( $this->wpdb->prepare(
-            "SELECT g.*
+        // Get current memberships
+        $current = $this->wpdb->get_results( $this->wpdb->prepare(
+            "SELECT g.*, pg.created_at as group_joined_date, NULL as group_left_date
              FROM {$this->wpdb->prefix}personal_crm_groups g
              INNER JOIN {$this->wpdb->prefix}personal_crm_people_groups pg ON g.id = pg.group_id
-             WHERE pg.person_id = %d
-             ORDER BY g.group_name",
+             WHERE pg.person_id = %d",
             $person_id
         ), ARRAY_A );
+
+        // Get historical memberships
+        $historical = $this->wpdb->get_results( $this->wpdb->prepare(
+            "SELECT g.*, pgh.created_at as group_joined_date, pgh.left_at as group_left_date
+             FROM {$this->wpdb->prefix}personal_crm_groups g
+             INNER JOIN {$this->wpdb->prefix}personal_crm_people_groups_history pgh ON g.id = pgh.group_id
+             WHERE pgh.person_id = %d",
+            $person_id
+        ), ARRAY_A );
+
+        // Merge and sort by group name
+        $all_groups = array_merge( $current, $historical );
+        usort( $all_groups, function( $a, $b ) {
+            return strcmp( $a['group_name'], $b['group_name'] );
+        } );
+
+        return $all_groups;
     }
 
     /**
@@ -645,7 +739,7 @@ class Storage extends \WpApp\BaseStorage {
     /**
      * Save a single person (NEW: no group/category context)
      */
-    public function save_person( $username, $person_data, $group_ids = array() ) {
+    public function save_person( $username, $person_data, $groups_with_dates = array() ) {
         // Check if person already exists
         $existing_id = $this->wpdb->get_var( $this->wpdb->prepare(
             "SELECT id FROM {$this->wpdb->prefix}personal_crm_people WHERE username = %s",
@@ -702,17 +796,91 @@ class Storage extends \WpApp\BaseStorage {
         }
 
         // Update group memberships if provided
-        if ( ! empty( $group_ids ) && $person_id ) {
-            // Remove existing memberships
+        if ( ! empty( $groups_with_dates ) && $person_id ) {
+            // Get existing current memberships
+            $existing_current = $this->wpdb->get_results( $this->wpdb->prepare(
+                "SELECT group_id, created_at FROM {$this->wpdb->prefix}personal_crm_people_groups WHERE person_id = %d",
+                $person_id
+            ), ARRAY_A );
+
+            // Get existing historical memberships
+            $existing_history = $this->wpdb->get_results( $this->wpdb->prepare(
+                "SELECT group_id, created_at, left_at FROM {$this->wpdb->prefix}personal_crm_people_groups_history WHERE person_id = %d",
+                $person_id
+            ), ARRAY_A );
+
+            $existing_dates = array();
+            foreach ( $existing_current as $membership ) {
+                $existing_dates[ $membership['group_id'] ] = array(
+                    'joined' => $membership['created_at'],
+                    'left' => null,
+                );
+            }
+            foreach ( $existing_history as $membership ) {
+                $existing_dates[ $membership['group_id'] ] = array(
+                    'joined' => $membership['created_at'],
+                    'left' => $membership['left_at'],
+                );
+            }
+
+            // Remove existing memberships from both tables (we'll re-add them)
             $this->wpdb->delete(
                 $this->wpdb->prefix . 'personal_crm_people_groups',
                 array( 'person_id' => $person_id ),
                 array( '%d' )
             );
+            $this->wpdb->delete(
+                $this->wpdb->prefix . 'personal_crm_people_groups_history',
+                array( 'person_id' => $person_id ),
+                array( '%d' )
+            );
 
-            // Add new memberships
-            foreach ( $group_ids as $group_id ) {
-                $this->add_person_to_group( $person_id, $group_id );
+            // Process each group membership
+            foreach ( $groups_with_dates as $group_id => $date_info ) {
+                $created_at = null;
+                $left_at = null;
+
+                // Handle both old format (string) and new format (array)
+                if ( is_array( $date_info ) ) {
+                    $joined_date = $date_info['joined_date'] ?? null;
+                    $left_date = $date_info['left_date'] ?? null;
+
+                    if ( ! empty( $joined_date ) ) {
+                        $created_at = $joined_date . ' 00:00:00';
+                    } elseif ( isset( $existing_dates[ $group_id ]['joined'] ) ) {
+                        $created_at = $existing_dates[ $group_id ]['joined'];
+                    }
+
+                    if ( ! empty( $left_date ) ) {
+                        $left_at = $left_date . ' 00:00:00';
+                    } elseif ( isset( $existing_dates[ $group_id ]['left'] ) ) {
+                        $left_at = $existing_dates[ $group_id ]['left'];
+                    }
+                } else {
+                    // Old format: single date string
+                    if ( ! empty( $date_info ) ) {
+                        $created_at = $date_info . ' 00:00:00';
+                    } elseif ( isset( $existing_dates[ $group_id ]['joined'] ) ) {
+                        $created_at = $existing_dates[ $group_id ]['joined'];
+                    }
+                }
+
+                if ( $left_at ) {
+                    // Person has left - add to history only
+                    $this->wpdb->insert(
+                        $this->wpdb->prefix . 'personal_crm_people_groups_history',
+                        array(
+                            'person_id' => $person_id,
+                            'group_id' => $group_id,
+                            'created_at' => $created_at ?: current_time( 'mysql' ),
+                            'left_at' => $left_at
+                        ),
+                        array( '%d', '%d', '%s', '%s' )
+                    );
+                } else {
+                    // Person is currently in group - add to current memberships
+                    $this->add_person_to_group( $person_id, $group_id, $created_at );
+                }
             }
         }
 

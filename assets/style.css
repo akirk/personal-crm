@@ -1792,7 +1792,7 @@ details summary span:last-child {
     margin-top: 8px;
 }
 
-.team-badge {
+.group-badge {
     display: inline-flex;
     align-items: center;
     background: light-dark(#f0f7ff, #1e2836);
@@ -1807,16 +1807,29 @@ details summary span:last-child {
     box-shadow: 0 1px 2px light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.2));
 }
 
-.team-badge:hover {
+.group-badge:hover {
     background: light-dark(#e3f0ff, #2a3a4a);
     border-color: light-dark(#b3d4ff, #3a4a5a);
     transform: translateY(-1px);
     box-shadow: 0 2px 4px light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.3));
 }
 
-.team-badge:active {
+.group-badge:active {
     transform: translateY(0);
     box-shadow: 0 1px 2px light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.2));
+}
+
+.group-badge-historical {
+    opacity: 0.7;
+    background: light-dark(#f5f5f5, #2a2a2a);
+    color: light-dark(#666, #999);
+    border-color: light-dark(#e0e0e0, #3a3a3a);
+}
+
+.group-badge-historical:hover {
+    opacity: 0.85;
+    background: light-dark(#ebebeb, #333);
+    border-color: light-dark(#d0d0d0, #444);
 }
 
 .external-account-links {

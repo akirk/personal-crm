@@ -423,13 +423,35 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 			$person_data = create_person_data_from_form();
 			$username = sanitize_text_field( $_POST['username'] ?? '' );
 			$original_username = sanitize_text_field( $_POST['original_username'] ?? '' );
-			$group_ids = $_POST['group_ids'] ?? array();
+			$groups = $_POST['groups'] ?? array();
+
+			// Extract current group memberships (no left date)
+			$groups_with_dates = array();
+			foreach ( $groups as $group_id => $group_data ) {
+				if ( ! empty( $group_data['checked'] ) ) {
+					$groups_with_dates[ intval( $group_id ) ] = array(
+						'joined_date' => ! empty( $group_data['joined_date'] ) ? $group_data['joined_date'] : null,
+						'left_date' => null,
+					);
+				}
+			}
+
+			// Add historical group memberships (with both dates)
+			$historical_groups_data = $_POST['historical_groups'] ?? array();
+			foreach ( $historical_groups_data as $historical ) {
+				if ( ! empty( $historical['group_id'] ) && ! empty( $historical['joined_date'] ) && ! empty( $historical['left_date'] ) ) {
+					$groups_with_dates[ intval( $historical['group_id'] ) ] = array(
+						'joined_date' => $historical['joined_date'],
+						'left_date' => $historical['left_date'],
+					);
+				}
+			}
 
 			// Auto-generate username if empty and belongs to a social group
 			if ( empty( $username ) ) {
 				// Check if any of the selected groups are social groups
 				$is_social = false;
-				foreach ( $group_ids as $gid ) {
+				foreach ( array_keys( $groups_with_dates ) as $gid ) {
 					$group_data = $crm->storage->get_group_by_id( intval( $gid ) );
 					if ( $group_data && $group_data->type === 'group' ) {
 						$is_social = true;
@@ -454,10 +476,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 				$crm->storage->delete_person( $original_username );
 			}
 
-			// Convert group_ids to integers
-			$group_ids = array_map( 'intval', array_filter( $group_ids ) );
-
-			$save_result = $crm->storage->save_person( $username, $person_data, $group_ids );
+			$save_result = $crm->storage->save_person( $username, $person_data, $groups_with_dates );
 
 			if ( $save_result ) {
 				// Allow plugins to save additional data
@@ -636,19 +655,29 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 
 	// Get groups this person is currently a member of
 	$selected_groups = array();
+	$historical_groups = array();
 	$person_group_ids = array( $default_group_id );
 
 	if ( $is_editing && ! empty( $edit_data->username ) ) {
 		$person = $crm->storage->get_person( $edit_data->username );
 		if ( $person && ! empty( $person->groups ) ) {
-			$person_group_ids = array_column( $person->groups, 'id' );
 			foreach ( $person->groups as $group ) {
-				$selected_groups[] = array(
+				$group_data = array(
 					'id' => $group['id'],
 					'name' => $group['group_name'],
 					'icon' => $group['display_icon'] ?: '',
-					'parent_id' => $group['parent_id'] ?? null
+					'parent_id' => $group['parent_id'] ?? null,
+					'group_joined_date' => $group['group_joined_date'] ?? null,
+					'group_left_date' => $group['group_left_date'] ?? null
 				);
+
+				// Separate current vs historical based on left_date
+				if ( ! empty( $group['group_left_date'] ) ) {
+					$historical_groups[] = $group_data;
+				} else {
+					$selected_groups[] = $group_data;
+					$person_group_ids[] = $group['id'];
+				}
 			}
 		}
 	} else {
@@ -710,9 +739,16 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 			if ( $parent_id && isset( $groups_by_id[ $parent_id ] ) ) {
 				$parent = $groups_by_id[ $parent_id ];
 				if ( ! in_array( $parent['id'], $person_group_ids ) && ! in_array( $parent['id'], $suggested_group_ids ) ) {
+					$display_name = $parent['group_name'];
+					if ( ! empty( $parent['parent_id'] ) ) {
+						$_parent = $crm->storage->get_group_by_id( $parent['parent_id'] );
+						if ( $_parent ) {
+							$display_name = $_parent->group_name . ' → ' . $parent['group_name'];
+						}
+					}
 					$suggested_groups[] = array(
 						'id' => $parent['id'],
-						'name' => $parent['group_name'],
+						'name' => $display_name,
 						'icon' => $parent['display_icon'] ?: '',
 						'relationship' => 'parent',
 						'related_to' => $selected_group['name']
@@ -725,9 +761,16 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 			$siblings = $children_by_parent[ $parent_id ?? 0 ] ?? array();
 			foreach ( $siblings as $sibling ) {
 				if ( $sibling['id'] !== $group_id && ! in_array( $sibling['id'], $person_group_ids ) && ! in_array( $sibling['id'], $suggested_group_ids ) ) {
+					$display_name = $sibling['group_name'];
+					if ( ! empty( $sibling['parent_id'] ) ) {
+						$parent = $crm->storage->get_group_by_id( $sibling['parent_id'] );
+						if ( $parent ) {
+							$display_name = $parent->group_name . ' → ' . $sibling['group_name'];
+						}
+					}
 					$suggested_groups[] = array(
 						'id' => $sibling['id'],
-						'name' => $sibling['group_name'],
+						'name' => $display_name,
 						'icon' => $sibling['display_icon'] ?: '',
 						'relationship' => 'sibling',
 						'related_to' => $selected_group['name']
@@ -740,9 +783,16 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 			$children = $children_by_parent[ $group_id ] ?? array();
 			foreach ( $children as $child ) {
 				if ( ! in_array( $child['id'], $person_group_ids ) && ! in_array( $child['id'], $suggested_group_ids ) ) {
+					$display_name = $child['group_name'];
+					if ( ! empty( $child['parent_id'] ) ) {
+						$parent = $crm->storage->get_group_by_id( $child['parent_id'] );
+						if ( $parent ) {
+							$display_name = $parent->group_name . ' → ' . $child['group_name'];
+						}
+					}
 					$suggested_groups[] = array(
 						'id' => $child['id'],
-						'name' => $child['group_name'],
+						'name' => $display_name,
 						'icon' => $child['display_icon'] ?: '',
 						'relationship' => 'child',
 						'related_to' => $selected_group['name']
@@ -1190,21 +1240,61 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 		<label>Currently in these groups:</label>
 		<div id="selected-groups-container" class="group-checkboxes" style="margin-top: 10px; margin-bottom: 15px;">
 			<?php foreach ( $selected_groups as $group ) : ?>
-				<label class="group-checkbox-label selected" data-group-id="<?php echo $group['id']; ?>">
-					<input type="checkbox" name="group_ids[]" value="<?php echo $group['id']; ?>" checked>
+				<?php
+				// Build hierarchical name if this is a child group
+				$display_name = $group['name'];
+				if ( ! empty( $group['parent_id'] ) ) {
+					$parent = $crm->storage->get_group_by_id( $group['parent_id'] );
+					if ( $parent ) {
+						$display_name = $parent->group_name . ' → ' . $group['name'];
+					}
+				}
+				?>
+				<label class="group-checkbox-label selected" data-group-id="<?php echo $group['id']; ?>" style="display: flex; align-items: center; gap: 10px;">
+					<input type="checkbox" name="groups[<?php echo $group['id']; ?>][checked]" value="1" checked>
 					<?php if ( $group['icon'] ) : ?>
 						<span class="group-icon"><?php echo $group['icon']; ?></span>
 					<?php endif; ?>
-					<span class="group-name"><?php echo htmlspecialchars( $group['name'] ); ?></span>
+					<span class="group-name"><?php echo htmlspecialchars( $display_name ); ?></span>
+					<input type="date" name="groups[<?php echo $group['id']; ?>][joined_date]" value="<?php echo isset( $group['group_joined_date'] ) && $group['group_joined_date'] ? date( 'Y-m-d', strtotime( $group['group_joined_date'] ) ) : ''; ?>" style="margin-left: auto; width: 140px; font-size: 0.9em;" title="Date joined this group (optional)" placeholder="Joined">
 				</label>
 			<?php endforeach; ?>
+		</div>
+
+		<div id="historical-groups-section" style="margin-top: 20px; <?php echo empty( $historical_groups ) ? 'display: none;' : ''; ?>">
+			<label style="display: block;">Historical group memberships:</label>
+			<div id="historical-groups-container" class="group-checkboxes" style="margin-top: 10px; margin-bottom: 15px; opacity: 0.7;">
+				<?php foreach ( $historical_groups as $index => $group ) : ?>
+					<?php
+					// Build hierarchical name if this is a child group
+					$display_name = $group['name'];
+					if ( ! empty( $group['parent_id'] ) ) {
+						$parent = $crm->storage->get_group_by_id( $group['parent_id'] );
+						if ( $parent ) {
+							$display_name = $parent->group_name . ' → ' . $group['name'];
+						}
+					}
+					?>
+					<div class="historical-group-row" style="display: flex; align-items: center; gap: 10px; padding: 8px; background: light-dark(#f5f5f5, #2a2a2a); border-radius: 8px; margin-bottom: 8px;">
+						<input type="hidden" name="historical_groups[<?php echo $index; ?>][group_id]" value="<?php echo $group['id']; ?>">
+						<?php if ( $group['icon'] ) : ?>
+							<span class="group-icon"><?php echo $group['icon']; ?></span>
+						<?php endif; ?>
+						<span class="group-name" style="min-width: 150px;"><?php echo htmlspecialchars( $display_name ); ?></span>
+						<input type="date" name="historical_groups[<?php echo $index; ?>][joined_date]" value="<?php echo isset( $group['group_joined_date'] ) && $group['group_joined_date'] ? date( 'Y-m-d', strtotime( $group['group_joined_date'] ) ) : ''; ?>" style="width: 140px; font-size: 0.9em;" title="Date joined" placeholder="Joined" required>
+						<span>→</span>
+						<input type="date" name="historical_groups[<?php echo $index; ?>][left_date]" value="<?php echo isset( $group['group_left_date'] ) && $group['group_left_date'] ? date( 'Y-m-d', strtotime( $group['group_left_date'] ) ) : ''; ?>" style="width: 140px; font-size: 0.9em;" title="Date left" placeholder="Left" required>
+						<button type="button" class="remove-historical-membership" data-index="<?php echo $index; ?>" style="margin-left: auto; padding: 4px 8px; font-size: 0.9em;">Remove</button>
+					</div>
+				<?php endforeach; ?>
+			</div>
 		</div>
 
 		<details style="margin: 20px 0;">
 			<summary class="summary-toggle">Manage group membership</summary>
 
 			<?php if ( ! empty( $suggested_groups ) ) : ?>
-				<label>Related groups (quick add):</label>
+				<label>Related groups:</label>
 				<div id="suggested-groups-container" class="group-checkboxes suggested" style="margin-top: 10px; margin-bottom: 15px;">
 					<?php
 					$groups_by_relationship = array();
@@ -1232,13 +1322,14 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 									?>
 								</div>
 								<?php foreach ( $groups_by_relationship[ $rel_type ] as $group ) : ?>
-									<label class="group-checkbox-label suggested" data-group-id="<?php echo $group['id']; ?>">
-										<input type="checkbox" name="group_ids[]" value="<?php echo $group['id']; ?>">
+									<div class="suggested-group-row" data-group-id="<?php echo $group['id']; ?>" style="display: flex; align-items: center; gap: 10px; padding: 8px; margin-bottom: 8px; border: 1px solid light-dark(#e0e0e0, #444); border-radius: 6px;">
 										<?php if ( $group['icon'] ) : ?>
 											<span class="group-icon"><?php echo $group['icon']; ?></span>
 										<?php endif; ?>
-										<span class="group-name"><?php echo htmlspecialchars( $group['name'] ); ?></span>
-									</label>
+										<span class="group-name" style="flex: 1;"><?php echo htmlspecialchars( $group['name'] ); ?></span>
+										<button type="button" class="add-suggested-to-current" data-group-id="<?php echo $group['id']; ?>" style="padding: 4px 8px; font-size: 0.85em;">Add as Current</button>
+										<button type="button" class="add-suggested-to-historical" data-group-id="<?php echo $group['id']; ?>" style="padding: 4px 8px; font-size: 0.85em;">Add as Historical</button>
+									</div>
 								<?php endforeach; ?>
 							</div>
 						<?php
@@ -1249,7 +1340,11 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 			<?php endif; ?>
 
 			<label for="add-group-input">Search all groups:</label>
-			<input type="text" id="add-group-input" list="groups-datalist" placeholder="Type to search..." autocomplete="off" style="width: 100%; max-width: 400px;">
+			<div style="display: flex; gap: 10px; align-items: center;">
+				<input type="text" id="add-group-input" list="groups-datalist" placeholder="Type to search..." autocomplete="off" style="flex: 1; max-width: 400px;">
+				<button type="button" id="add-to-current-btn" style="padding: 6px 12px; font-size: 0.9em;" disabled>Add as Current</button>
+				<button type="button" id="add-to-historical-btn" style="padding: 6px 12px; font-size: 0.9em;" disabled>Add as Historical</button>
+			</div>
 			<datalist id="groups-datalist">
 				<?php foreach ( $all_groups as $group ) : ?>
 					<option value="<?php echo htmlspecialchars( ( $group['display_icon'] ? $group['display_icon'] . ' ' : '' ) . $group['hierarchical_name'] ); ?>"></option>
@@ -1407,7 +1502,11 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
                         <?php endif; ?>
                     </h3>
                     <?php if ( $can_add ) : ?>
-                        <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $slug, 'members' => true, 'add' => 'new' ) ); ?>" class="btn">+ Add <?php echo htmlspecialchars( $display_name ); ?></a>
+                        <?php
+                        // For 'members' tab, use parent group; for child groups, use their slug
+                        $add_link_group = ( $slug === 'members' ) ? $current_group : $slug;
+                        ?>
+                        <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'group' => $add_link_group, 'members' => true, 'add' => 'new' ) ); ?>" class="btn">+ Add <?php echo htmlspecialchars( $display_name ); ?></a>
                     <?php endif; ?>
                 </div>
                 <?php
