@@ -62,9 +62,6 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 				// Allow other plugins to add header content
 				do_action( 'personal_crm_header_content', $group_data, $current_group );
 				?>
-				<div style="display: flex; gap: 10px; align-items: center;">
-					<a href="<?php echo $crm->build_url( 'group-history.php', array( 'group' => $current_group ) ); ?>" class="footer-link">📜 History</a>
-				</div>
 				<div class="navigation" style="display: flex; align-items: center; gap: 10px;">
 					<select id="group-selector" onchange="switchGroup()">
 						<?php
@@ -199,70 +196,67 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 						foreach ( $child_groups_objs as $child_group_obj ) :
 							$child_slug = $child_group_obj->slug;
 							$child_members = $child_group_obj->get_members();
+							if ( empty( $child_members ) ) continue;
 					?>
 					<div class="section">
 						<h3><?php echo htmlspecialchars( $child_group_obj->display_icon . ' ' . $child_group_obj->group_name ); ?> (<?php echo count( $child_members ); ?>)</h3>
-						<?php if ( ! empty( $child_members ) ) : ?>
-							<ul class="people-list">
-								<?php foreach ( $child_members as $username => $leader ) : ?>
-									<?php
-									$leader_group_join_date = null;
-									if ( ! empty( $leader->groups ) ) {
-										foreach ( $leader->groups as $group ) {
-											if ( $group['id'] == $child_group_obj->id ) {
-												$leader_group_join_date = $group['group_joined_date'] ?? null;
-												break;
-											}
+						<ul class="people-list">
+							<?php foreach ( $child_members as $username => $leader ) : ?>
+								<?php
+								$leader_group_join_date = null;
+								if ( ! empty( $leader->groups ) ) {
+									foreach ( $leader->groups as $group ) {
+										if ( $group['id'] == $child_group_obj->id ) {
+											$leader_group_join_date = $group['group_joined_date'] ?? null;
+											break;
 										}
 									}
-									$leader_tenure = $leader_group_join_date ? $crm->format_tenure( $leader_group_join_date ) : '';
-									?>
-									<li>
-										<div class="person-row-container">
-											<a href="<?php echo $leader->get_profile_url( array( 'back' => $current_group ) ); ?>" class="person-row">
-												<div class="person-info">
-													<div class="person-name">
-														<?php echo htmlspecialchars( $leader->get_display_name_with_nickname() ); ?>
-														<?php if ( $leader_tenure ) : ?>
-															<small style="font-weight: normal; opacity: 0.7; margin-left: 8px;">(<?php echo htmlspecialchars( $leader_tenure ); ?>)</small>
-														<?php endif; ?>
-														<?php if ( ! empty( $leader->role ) ) : ?>
-															<span class="person-role">(<?php echo htmlspecialchars( $leader->role ); ?>)</span>
-														<?php endif; ?>
-													</div>
-													<div class="person-username">
-														@<?php echo htmlspecialchars( $leader->get_username() ); ?>
-														<?php if ( ! empty( $leader->timezone ) || ! empty( $leader->location ) ) : ?>
-															<span id="time-<?php echo htmlspecialchars( $username ); ?>" class="timezone-display"></span>
-														<?php endif; ?>
-													</div>
+								}
+								$leader_tenure = $leader_group_join_date ? $crm->format_tenure( $leader_group_join_date ) : '';
+								?>
+								<li>
+									<div class="person-row-container">
+										<a href="<?php echo $leader->get_profile_url( array( 'back' => $current_group ) ); ?>" class="person-row">
+											<div class="person-info">
+												<div class="person-name">
+													<?php echo htmlspecialchars( $leader->get_display_name_with_nickname() ); ?>
+													<?php if ( $leader_tenure ) : ?>
+														<small style="font-weight: normal; opacity: 0.7; margin-left: 8px;">(<?php echo htmlspecialchars( $leader_tenure ); ?>)</small>
+													<?php endif; ?>
+													<?php if ( ! empty( $leader->role ) ) : ?>
+														<span class="person-role">(<?php echo htmlspecialchars( $leader->role ); ?>)</span>
+													<?php endif; ?>
 												</div>
-											</a>
-											<?php if ( stripos( $child_group_obj->group_name, 'alumni' ) !== false && ! empty( $leader->new_company ) ) : ?>
-												<div class="alumni-company-display">
-													<span class="alumni-company-text">
-														Now at:
-														<?php if ( ! empty( $leader->new_company_website ) ) : ?>
-															<a href="<?php echo htmlspecialchars( $leader->new_company_website ); ?>" target="_blank" class="company-link"><?php echo htmlspecialchars( $leader->new_company ); ?></a>
-														<?php else : ?>
-															<?php echo htmlspecialchars( $leader->new_company ); ?>
-														<?php endif; ?>
-													</span>
+												<div class="person-username">
+													@<?php echo htmlspecialchars( $leader->get_username() ); ?>
+													<?php if ( ! empty( $leader->timezone ) || ! empty( $leader->location ) ) : ?>
+														<span id="time-<?php echo htmlspecialchars( $username ); ?>" class="timezone-display"></span>
+													<?php endif; ?>
 												</div>
-											<?php endif; ?>
-											<div class="person-links">
-												<?php $crm->render_person_links( $leader->links ); ?>
-												<?php
-												do_action( 'personal_crm_person_links', $leader, $username, $child_group_obj );
-												?>
 											</div>
+										</a>
+										<?php if ( stripos( $child_group_obj->group_name, 'alumni' ) !== false && ! empty( $leader->new_company ) ) : ?>
+											<div class="alumni-company-display">
+												<span class="alumni-company-text">
+													Now at:
+													<?php if ( ! empty( $leader->new_company_website ) ) : ?>
+														<a href="<?php echo htmlspecialchars( $leader->new_company_website ); ?>" target="_blank" class="company-link"><?php echo htmlspecialchars( $leader->new_company ); ?></a>
+													<?php else : ?>
+														<?php echo htmlspecialchars( $leader->new_company ); ?>
+													<?php endif; ?>
+												</span>
+											</div>
+										<?php endif; ?>
+										<div class="person-links">
+											<?php $crm->render_person_links( $leader->links ); ?>
+											<?php
+											do_action( 'personal_crm_person_links', $leader, $username, $child_group_obj );
+											?>
 										</div>
-									</li>
-								<?php endforeach; ?>
-							</ul>
-						<?php else : ?>
-							<p class="empty-state-message">No <?php echo strtolower( $child_group['group_name'] ); ?> yet.</p>
-						<?php endif; ?>
+									</div>
+								</li>
+							<?php endforeach; ?>
+						</ul>
 					</div>
 					<?php endforeach; endif; ?>
 

@@ -650,6 +650,15 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 
 	$crm = PersonalCrm::get_instance();
 
+	// Determine the group slug for social group checks
+	$form_group_slug = $current_group;
+	if ( empty( $form_group_slug ) && ! empty( $default_group_id ) ) {
+		$group_data = $crm->storage->get_group_by_id( $default_group_id );
+		if ( $group_data ) {
+			$form_group_slug = $group_data->slug;
+		}
+	}
+
 	// Get all groups with hierarchy for datalist autocomplete
 	$all_groups = $crm->storage->get_all_groups_with_hierarchy();
 
@@ -880,21 +889,21 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 	<h4 class="section-heading">Company Information</h4>
 	<div class="form-grid">
 		<div class="form-group">
-			<label for="username">Username *<?php if ( $crm->is_social_group( $current_group ) ) echo ' (auto-generated if empty)'; ?></label>
-			<input type="text" id="username" name="username" value="<?php echo get_person_form_value( 'username', $edit_data, $is_editing ); ?>" <?php echo $crm->is_social_group( $current_group ) ? '' : 'required'; ?>>
-			<?php if ( $crm->is_social_group( $current_group ) ) : ?>
+			<label for="username">Username<?php if ( $crm->is_social_group( $form_group_slug ) ) { echo ' (auto-generated if empty)'; } else { echo ' *'; } ?></label>
+			<input type="text" id="username" name="username" value="<?php echo get_person_form_value( 'username', $edit_data, $is_editing ); ?>"<?php if ( ! $crm->is_social_group( $form_group_slug ) ) { echo ' required'; } ?>>
+			<?php if ( $crm->is_social_group( $form_group_slug ) ) : ?>
 				<small style="color: #666;">Leave empty to auto-generate from name (e.g., "John Smith" → "john.smith")</small>
 			<?php endif; ?>
 		</div>
 
-		<?php if ( ! $crm->is_social_group( $current_group ) ) : ?>
+		<?php if ( ! $crm->is_social_group( $form_group_slug ) ) : ?>
 		<div class="form-group">
 			<label for="role">Role</label>
 			<input type="text" id="role" name="role" value="<?php echo get_person_form_value( 'role', $edit_data, $is_editing ); ?>" placeholder="e.g., Developer, Lead, HR">
 		</div>
 		<?php endif; ?>
 
-		<?php if ( ! $crm->is_social_group( $current_group ) ) : ?>
+		<?php if ( ! $crm->is_social_group( $form_group_slug ) ) : ?>
 		<div class="form-group">
 			<label for="company_anniversary">Company Anniversary</label>
 			<input type="date" id="company_anniversary" name="company_anniversary" value="<?php echo get_person_form_value( 'company_anniversary', $edit_data, $is_editing ); ?>">
@@ -912,7 +921,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 					$current_links = $edit_data->links;
 				}
 
-				if ( ! $crm->is_social_group( $current_group ) && ! isset( $current_links['1:1 doc'] ) ) {
+				if ( ! $crm->is_social_group( $form_group_slug ) && ! isset( $current_links['1:1 doc'] ) ) {
 					$current_links['1:1 doc'] = '';
 				}
 
@@ -967,7 +976,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 		</div>
 	</div>
 
-	<?php if ( ! $crm->is_social_group( $current_group ) ) : ?>
+	<?php if ( ! $crm->is_social_group( $form_group_slug ) ) : ?>
 	<!-- GitHub Repositories -->
 	<div class="form-group">
 		<label>GitHub Repositories</label>
@@ -1564,3 +1573,5 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
             <?php endif; ?>
         </div>
         <?php endforeach; ?>
+
+<?php do_action( 'personal_crm_admin_people_list_scripts' ); ?>

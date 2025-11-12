@@ -100,17 +100,25 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 					<div class="back-nav">
 						<a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $current_group ) ); ?>">← Back to <?php echo htmlspecialchars( $group_data->group_name ); ?> Overview</a>
 					</div>
-				<?php elseif ( ! empty( $person_data->groups ) && count( $person_data->groups ) === 1 ) : ?>
+				<?php elseif ( ! empty( $person_data->groups ) ) : ?>
 					<?php
-					// If person belongs to exactly one group and no back group specified, show link to that group
-					$single_group = $person_data->groups[0];
-					$single_group_data = $crm->storage->get_group_by_id( $single_group['id'] );
-					if ( $single_group_data ) :
+					// If person belongs to exactly one current group and no back group specified, show link to that group
+					$current_groups_only = array_filter( $person_data->groups, function( $group ) {
+						return empty( $group['group_left_date'] );
+					} );
+
+					if ( count( $current_groups_only ) === 1 ) {
+						$single_group = reset( $current_groups_only );
+						$single_group_data = $crm->storage->get_group_by_id( $single_group['id'] );
+						if ( $single_group_data ) :
+						?>
+							<div class="back-nav">
+								<a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $single_group_data->slug ) ); ?>">← Back to <?php echo htmlspecialchars( $single_group['group_name'] ); ?> Overview</a>
+							</div>
+						<?php
+						endif;
+					}
 					?>
-						<div class="back-nav">
-							<a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $single_group_data->slug ) ); ?>">← Back to <?php echo htmlspecialchars( $single_group['group_name'] ); ?> Overview</a>
-						</div>
-					<?php endif; ?>
 				<?php endif; ?>
 			</div>
 

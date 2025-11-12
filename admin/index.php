@@ -146,7 +146,8 @@ if ( ! $config ) {
 
 // Handle POST requests before any HTML output (to allow redirects)
 $people_tab_included = false;
-if ( $_SERVER['REQUEST_METHOD'] === 'POST' && $active_tab === 'person_edit' ) {
+$person_post_actions = array( 'add_person', 'edit_person', 'delete_person' );
+if ( $_SERVER['REQUEST_METHOD'] === 'POST' && ( $active_tab === 'person_edit' || in_array( $_POST['action'] ?? '', $person_post_actions, true ) ) ) {
 	// Include people.php early to handle POST, which may redirect
 	require __DIR__ . '/tabs/people.php';
 	$people_tab_included = true;
@@ -595,7 +596,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                         }
                     }
                 }
-                if ( $is_person_tab ) {
+                if ( $is_person_tab && ! $people_tab_included ) {
                     require __DIR__ . '/tabs/people.php';
                 }
                 break;
