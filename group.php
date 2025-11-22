@@ -305,7 +305,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 		<?php elseif ( ! $group_data ) : ?>
 			<div class="header">
 				<h1>No Groups Found</h1>
-				<p>No groups have been created yet. <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'create_team' => 'new' ) ); ?>">Create your first group →</a></p>
+				<p>No groups have been created yet. <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'create_group' => 'new' ) ); ?>">Create your first group →</a></p>
 			</div>
 		<?php else : ?>
 			<div class="header">

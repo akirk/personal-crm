@@ -703,9 +703,13 @@ class Storage extends \WpApp\BaseStorage {
     public function save_group( $group_id, $config ) {
         $group_name = $config['group_name'] ?? $config['team_name'] ?? '';
 
-        // Generate slug from name
-        $base_slug = sanitize_title( $group_name );
-        $base_slug = str_replace( '-', '_', $base_slug );
+        // Use provided slug if available, otherwise generate from name
+        if ( ! empty( $config['slug'] ) ) {
+            $base_slug = $config['slug'];
+        } else {
+            $base_slug = sanitize_title( $group_name );
+            $base_slug = str_replace( '-', '_', $base_slug );
+        }
 
         // Add parent prefix if this is a child group
         $parent_id = $config['parent_id'] ?? null;
@@ -807,6 +811,7 @@ class Storage extends \WpApp\BaseStorage {
 
         $config = array(
             'group_name' => $group_name,
+            'slug' => $group_slug,
             'parent_id' => null,
             'activity_url_prefix' => '',
             'type' => $group_type,

@@ -115,7 +115,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' ) {
 			exit;
 			break;
 
-		case 'create_team':
+		case 'create_group':
 			$new_team_slug = sanitize_text_field( $_POST['new_team_slug'] ?? '' );
 			$new_team_name = sanitize_text_field( $_POST['new_team_name'] ?? '' );
 			$new_team_type = sanitize_text_field( $_POST['new_team_type'] ?? 'team' );
