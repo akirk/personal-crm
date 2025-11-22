@@ -333,8 +333,13 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 										$display_name = $parent->group_name . ' → ' . $group['group_name'];
 									}
 								}
+
+								$title = '';
+								if ( ! empty( $group['group_joined_date'] ) ) {
+									$title = 'Joined ' . date( 'M j, Y', strtotime( $group['group_joined_date'] ) );
+								}
 								?>
-								<a href="<?php echo esc_url( $crm->build_url( 'group.php', array( 'group' => $group['slug'] ) ) ); ?>" class="group-badge">
+								<a href="<?php echo esc_url( $crm->build_url( 'group.php', array( 'group' => $group['slug'] ) ) ); ?>" class="group-badge"<?php if ( $title ) : ?> title="<?php echo htmlspecialchars( $title ); ?>"<?php endif; ?>>
 									<?php echo htmlspecialchars( $display_name ); ?>
 									<?php if ( ! empty( $group['group_joined_date'] ) ) : ?>
 										<?php $tenure = $crm->format_tenure( $group['group_joined_date'] ); ?>
