@@ -42,8 +42,8 @@ class PersonalCrm {
             ]
         );
 
-        register_activation_hook( PERSONAL_CRM_PLUGIN_FILE, [ $this, 'activate' ] );
-        register_deactivation_hook( PERSONAL_CRM_PLUGIN_FILE, [ $this, 'deactivate' ] );
+        // Note: Activation/deactivation hooks are registered at plugin file level
+        // (personal-crm.php) because they fire BEFORE plugins_loaded
 
         if ( class_exists( '\WP_CLI' ) ) {
             require_once __DIR__ . '/wp-cli-commands.php';
@@ -154,32 +154,9 @@ class PersonalCrm {
         }
     }
 
-    public function activate() {
-        // Only run activation in WordPress environment
-        if ( ! defined( 'WPINC' ) ) {
-            return; // Skip activation in standalone mode
-        }
-
-        // Create/update database tables if using WpDB storage
-        $storage_type = get_option( 'personal_crm_storage_type', 'wpdb' );
-        if ( $storage_type === 'wpdb' ) {
-            // WpDB storage will create tables automatically
-            $storage = StorageFactory::create( 'wpdb' );
-        }
-
-        // Flush rewrite rules
-        flush_rewrite_rules();
-
-        // Set default options
-        add_option( 'personal_crm_storage_type', 'wpdb' );
-        add_option( 'personal_crm_default_team', '' );
-        add_option( 'personal_crm_version', PERSONAL_CRM_PLUGIN_VERSION );
-    }
-
-    public function deactivate() {
-        // Flush rewrite rules
-        flush_rewrite_rules();
-    }
+    // Note: activate() and deactivate() methods have been moved to plugin file level
+    // (personal-crm.php) as functions personal_crm_activate() and personal_crm_deactivate()
+    // because activation hooks fire BEFORE plugins_loaded when this class is instantiated
 
     public function admin_menu() {
         add_options_page(
