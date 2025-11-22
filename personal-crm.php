@@ -38,20 +38,26 @@ function personal_crm_activate() {
 		require_once __DIR__ . '/vendor/autoload.php';
 	}
 
-	require_once __DIR__ . '/includes/storage.php';
-
-	// Create/update database tables
-	global $wpdb;
-	$storage = new Storage( $wpdb );
-
-	// Set default options
+	// Set default options (these don't depend on external classes)
 	add_option( 'personal_crm_storage_type', 'wpdb' );
 	add_option( 'personal_crm_default_team', '' );
 	add_option( 'personal_crm_version', PERSONAL_CRM_PLUGIN_VERSION );
 
+	// Only proceed with WpApp and Storage setup if the classes are available
+	if ( ! class_exists( '\WpApp\WpApp' ) ) {
+		// WpApp not available - rewrite rules will be set up on first page load
+		// when the autoloader is properly initialized
+		return;
+	}
+
+	// Create/update database tables if Storage class is available
+	if ( class_exists( '\WpApp\BaseStorage' ) ) {
+		require_once __DIR__ . '/includes/storage.php';
+		global $wpdb;
+		$storage = new Storage( $wpdb );
+	}
+
 	// Initialize WpApp to register rewrite rules, then flush them
-	// The WpApp::init() method hooks into 'init' to register rewrite rules
-	// We need to manually trigger the rewrite rule registration here
 	$app = new \WpApp\WpApp(
 		__DIR__ . '/',
 		'crm',
