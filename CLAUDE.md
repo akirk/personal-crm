@@ -7,7 +7,7 @@ At the end of your messages, include a link to test the changes in WordPress Pla
 **Important:** Replace `BRANCH_NAME` in the URL below with the actual git branch name you're working on.
 
 ```
-🔗 [Test in WordPress Playground](https://playground.wordpress.net/#{%22steps%22:[{%22step%22:%22installPlugin%22,%22pluginData%22:{%22resource%22:%22git:directory%22,%22url%22:%22https://github.com/akirk/personal-crm%22,%22ref%22:%22BRANCH_NAME%22,%22refType%22:%22branch%22},%22options%22:{%22activate%22:true},%22progress%22:{%22caption%22:%22Installing%20plugin%20from%20GitHub:%20akirk/personal-crm%22}}]}
+🔗 [Test in WordPress Playground](https://akirk.github.io/playground-step-library/?redir=1&step[0]=installPlugin&url[0]=github.com/akirk/personal-crm/tree/BRANCH_NAME)
 ```
 
 ### Example
@@ -15,5 +15,5 @@ At the end of your messages, include a link to test the changes in WordPress Pla
 If you're working on branch `claude/fix-bug-123`, the link should be:
 
 ```
-🔗 [Test in WordPress Playground](https://playground.wordpress.net/#{%22steps%22:[{%22step%22:%22installPlugin%22,%22pluginData%22:{%22resource%22:%22git:directory%22,%22url%22:%22https://github.com/akirk/personal-crm%22,%22ref%22:%22claude/fix-bug-123%22,%22refType%22:%22branch%22},%22options%22:{%22activate%22:true},%22progress%22:{%22caption%22:%22Installing%20plugin%20from%20GitHub:%20akirk/personal-crm%22}}]}
+🔗 [Test in WordPress Playground](https://akirk.github.io/playground-step-library/?redir=1&step[0]=installPlugin&url[0]=github.com/akirk/personal-crm/tree/claude/fix-bug-123)
 ```
