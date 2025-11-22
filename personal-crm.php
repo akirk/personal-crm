@@ -55,6 +55,7 @@ function personal_crm_activate() {
 		require_once __DIR__ . '/includes/storage.php';
 		global $wpdb;
 		$storage = new Storage( $wpdb );
+		$storage->create_tables();
 	}
 
 	// Initialize WpApp to register rewrite rules, then flush them
@@ -132,6 +133,8 @@ if ( defined( 'WPINC' ) ) {
     add_action( 'plugins_loaded', function() {
         global $wpdb;
         $storage = new Storage( $wpdb );
+        // Ensure tables exist (in case activation hook didn't run)
+        $storage->create_tables();
         PersonalCrm::set_storage( $storage );
         PersonalCrm::get_instance();
     } );

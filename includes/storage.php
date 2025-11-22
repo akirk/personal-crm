@@ -789,11 +789,14 @@ class Storage extends \WpApp\BaseStorage {
         } else {
             // Insert new group
             $group_data['created_at'] = current_time( 'mysql' );
-            $this->wpdb->insert(
+            $result = $this->wpdb->insert(
                 $this->wpdb->prefix . 'personal_crm_groups',
                 $group_data,
                 array( '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%d', '%s', '%s' )
             );
+            if ( $result === false ) {
+                return false;
+            }
             $group_id = $this->wpdb->insert_id;
         }
 
