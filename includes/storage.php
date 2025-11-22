@@ -21,6 +21,24 @@ if ( class_exists( '\PersonalCRM\Storage' ) ) {
 class Storage extends \WpApp\BaseStorage {
 
     /**
+     * Create or update database tables
+     * Override to build proper CREATE TABLE statements from schema
+     */
+    public function create_tables() {
+        $charset_collate = $this->wpdb->get_charset_collate();
+        $schema = $this->get_schema();
+        $queries = array();
+
+        foreach ( $schema as $table_name => $columns ) {
+            $queries[] = "CREATE TABLE {$this->wpdb->prefix}{$table_name} (
+                {$columns}
+            ) {$charset_collate};";
+        }
+
+        return $this->dbdelta( $queries );
+    }
+
+    /**
      * Get database schema
      */
     public function get_schema() {
