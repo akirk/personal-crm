@@ -29,7 +29,7 @@ class DateTime extends \DateTime {
 		return self::$simulated_date;
 	}
 
-	public static function createFromFormat( $format, $datetime, $timezone = null ) {
+	public static function createFromFormat( string $format, string $datetime, ?\DateTimeZone $timezone = null ): DateTime|false {
 		$obj = parent::createFromFormat( $format, $datetime, $timezone );
 		if ( $obj === false ) {
 			return false;
@@ -63,7 +63,7 @@ class DateTimeImmutable extends \DateTimeImmutable {
 		return self::$simulated_date;
 	}
 
-	public static function createFromFormat( $format, $datetime, $timezone = null ) {
+	public static function createFromFormat( string $format, string $datetime, ?\DateTimeZone $timezone = null ): DateTimeImmutable|false {
 		$obj = parent::createFromFormat( $format, $datetime, $timezone );
 		if ( $obj === false ) {
 			return false;

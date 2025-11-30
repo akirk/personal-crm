@@ -7,7 +7,7 @@ if ( ! defined( 'WP_CLI' ) || ! WP_CLI ) {
     return;
 }
 
-class A8C_HR_Migrate_Command {
+class Personal_CRM_Migrate_Command {
 
     /**
      * Migrate data between storage backends
