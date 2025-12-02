@@ -69,9 +69,14 @@ class TimeTravel {
 		$is_time_traveling = self::is_time_traveling();
 
 		if ( ! $is_time_traveling ) {
-			$previous_month_15th = ( new DateTimeImmutable() )->modify( 'first day of last month' )->modify( '+14 days' )->format( 'Y-m-d' );
+			$today = new DateTimeImmutable();
+			$previous_month_first = $today->modify( 'first day of last month' )->format( 'Y-m-d' );
+			$current_month_15th = $today->modify( 'first day of this month' )->modify( '+14 days' )->format( 'Y-m-d' );
 			?>
-			<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'as_of' => $previous_month_15th ) ) ); ?>" class="footer-link">📅 <?php echo date( 'M j', strtotime( $previous_month_15th ) ); ?></a>
+			<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'as_of' => $previous_month_first ) ) ); ?>" class="footer-link">📅 <?php echo date( 'M j', strtotime( $previous_month_first ) ); ?></a>
+			<?php if ( strtotime( $current_month_15th ) > time() ) : ?>
+				<a href="?<?php echo http_build_query( array_merge( $_GET, array( 'as_of' => $current_month_15th ) ) ); ?>" class="footer-link">📅 <?php echo date( 'M j', strtotime( $current_month_15th ) ); ?></a>
+			<?php endif; ?>
 			<?php
 		} else {
 			$current_date = self::get_current_date();
