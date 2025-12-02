@@ -47,6 +47,13 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 			<div class="header">
 				<div>
 					<h1><a href="<?php echo $crm->build_url( 'group.php' ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $crm->get_group_display_title( $current_group, 'Overview' ) ); ?></a></h1>
+					<?php if ( ! empty( $group_data->parent_id ) ) :
+						$parent_group = $crm->storage->get_group_by_id( $group_data->parent_id );
+						if ( $parent_group ) : ?>
+						<div class="back-nav">
+							<a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $parent_group->slug ) ); ?>">← Back to <?php echo htmlspecialchars( $parent_group->group_name ); ?> Overview</a>
+						</div>
+					<?php endif; endif; ?>
 				</div>
 				<?php if ( ! empty( $group_data->links ) ) : ?>
 					<div class="person-links" style="flex-grow: 1;">
@@ -199,7 +206,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 							if ( empty( $child_members ) ) continue;
 					?>
 					<div class="section">
-						<h3><?php echo htmlspecialchars( $child_group_obj->display_icon . ' ' . $child_group_obj->group_name ); ?> (<?php echo count( $child_members ); ?>)</h3>
+						<h3><a href="<?php echo $crm->build_url( 'group.php', array( 'group' => $child_slug ) ); ?>" style="color: inherit; text-decoration: none;"><?php echo htmlspecialchars( $child_group_obj->display_icon . ' ' . $child_group_obj->group_name ); ?> (<?php echo count( $child_members ); ?>)</a></h3>
 						<ul class="people-list">
 							<?php foreach ( $child_members as $username => $leader ) : ?>
 								<?php
