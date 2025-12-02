@@ -312,7 +312,7 @@ $available_teams = $crm->storage->get_available_groups();
                     <?php if ( ! empty( $default_teams ) ) : ?>
                     <optgroup label="Default">
                         <?php foreach ( $default_teams as $item ) : ?>
-                            <option value="<?php echo htmlspecialchars( $crm->build_ul( $item['slug'] ) ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
+                            <option value="<?php echo htmlspecialchars( $crm->build_url( $item['slug'] ) ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
                         <?php endforeach; ?>
                     </optgroup>
                     <?php endif; ?>
@@ -403,7 +403,7 @@ $available_teams = $crm->storage->get_available_groups();
                                                 <?php 
                                                 // For events with a person, link to the person
                                                 if ( $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary', 'sabbatical', 'other' ) ) ) {
-                                                	echo '<a href="' . $crm->build_url( 'index.php', array( 'person' => $event->person->username ) ) . '" class="event-person-link">' . htmlspecialchars( $event->get_title() ) . '</a>';
+                                                	echo '<a href="' . $crm->build_url( 'person.php', array( 'person' => $event->person->username ) ) . '" class="event-person-link">' . htmlspecialchars( $event->get_title() ) . '</a>';
                                                 } else {
                                             		echo htmlspecialchars( $event->get_title() );
                                                 }
@@ -542,7 +542,7 @@ $available_teams = $crm->storage->get_available_groups();
                                         $tooltip = $original_title . ( ! empty( $event->location ) ? ' - ' . $event->location : '' );
                                     ?>
                                         <?php if ( $event->has_person() && in_array( $event->type, array( 'birthday', 'anniversary', 'sabbatical', 'other' ) ) ) : ?>
-                                            <a href="<?php echo $crm->build_url( 'index.php', array( 'person' => $event->person->username ) ); ?>"
+                                            <a href="<?php echo $crm->build_url( 'person.php', array( 'person' => $event->person->username ) ); ?>"
                                                class="calendar-event <?php echo $event->type; ?>"
                                                title="<?php echo htmlspecialchars( $tooltip ); ?>"
                                                style="text-decoration: none; display: block;">
