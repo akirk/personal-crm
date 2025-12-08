@@ -55,6 +55,7 @@ function personal_crm_activate() {
 		require_once __DIR__ . '/includes/storage.php';
 		global $wpdb;
 		$storage = new Storage( $wpdb );
+		$storage->create_tables();
 	}
 
 	// Initialize WpApp to register rewrite rules, then flush them
