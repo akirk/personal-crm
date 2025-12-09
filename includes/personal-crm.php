@@ -170,6 +170,7 @@ class PersonalCrm {
 
     public function admin_settings() {
         register_setting( 'personal_crm_settings', 'personal_crm_default_team' );
+        register_setting( 'personal_crm_settings', 'personal_crm_ollama_model' );
 
         add_settings_section(
             'personal_crm_general',
@@ -184,6 +185,21 @@ class PersonalCrm {
             [ $this, 'default_team_callback' ],
             'personal_crm_settings',
             'personal_crm_general'
+        );
+
+        add_settings_section(
+            'personal_crm_ollama',
+            'Ollama AI Settings',
+            [ $this, 'ollama_section_callback' ],
+            'personal_crm_settings'
+        );
+
+        add_settings_field(
+            'ollama_model',
+            'Ollama Model',
+            [ $this, 'ollama_model_callback' ],
+            'personal_crm_settings',
+            'personal_crm_ollama'
         );
     }
 
@@ -224,6 +240,142 @@ class PersonalCrm {
         </select>
         <p class="description">Select the default team to use when none is specified.</p>
         <?php
+    }
+
+    public function ollama_section_callback() {
+        ?>
+        <style>
+            #ollama-status {
+                padding: 12px;
+                border-radius: 4px;
+                margin-bottom: 15px;
+                background: #f0f0f0;
+            }
+            #ollama-status.connected {
+                background: #d4edda;
+                border-left: 4px solid #28a745;
+            }
+            #ollama-status.error {
+                background: #f8d7da;
+                border-left: 4px solid #dc3545;
+            }
+            #ollama-instructions {
+                display: none;
+                padding: 15px;
+                background: #fff8e5;
+                border-left: 4px solid #ffb900;
+                margin-bottom: 15px;
+            }
+            #ollama-instructions.visible {
+                display: block;
+            }
+            #ollama-instructions ol {
+                margin: 10px 0 0 20px;
+            }
+            #ollama-instructions code {
+                background: #f5f5f5;
+                padding: 2px 6px;
+            }
+            #ollama-instructions .hint {
+                font-size: 12px;
+                color: #666;
+            }
+            #ollama-models-list {
+                margin-top: 10px;
+            }
+            .ollama-model-tag {
+                display: inline-block;
+                background: #f0f0f0;
+                padding: 4px 8px;
+                margin: 2px;
+                border-radius: 3px;
+                cursor: pointer;
+            }
+            .ollama-model-tag:hover {
+                background: #0073aa;
+                color: white;
+            }
+        </style>
+        <p>Configure the Ollama AI integration for AI-powered features.</p>
+        <div id="ollama-status">
+            <span id="ollama-status-text">Checking Ollama connection...</span>
+        </div>
+        <div id="ollama-instructions">
+            <strong>Ollama Setup Instructions:</strong>
+            <ol>
+                <li>Install Ollama from <a href="https://ollama.ai" target="_blank">ollama.ai</a></li>
+                <li>Start Ollama (it runs on port 11434 by default)</li>
+                <li>Allow browser access by setting the environment variable:<br>
+                    <code>OLLAMA_ORIGINS=* ollama serve</code><br>
+                    <span class="hint">Or add <code>OLLAMA_ORIGINS=*</code> to your environment before starting Ollama.</span>
+                </li>
+                <li>Pull a model: <code>ollama pull llama3.2</code></li>
+            </ol>
+        </div>
+        <?php
+    }
+
+    public function ollama_model_callback() {
+        $value = get_option( 'personal_crm_ollama_model', 'llama3.2' );
+        ?>
+        <input type="text" name="personal_crm_ollama_model" id="personal_crm_ollama_model" value="<?php echo esc_attr( $value ); ?>" class="regular-text">
+        <div id="ollama-models-list"></div>
+        <script>
+        (async function checkOllamaAndLoadModels() {
+            const statusDiv = document.getElementById('ollama-status');
+            const statusText = document.getElementById('ollama-status-text');
+            const instructions = document.getElementById('ollama-instructions');
+            const modelsDiv = document.getElementById('ollama-models-list');
+            const modelInput = document.getElementById('personal_crm_ollama_model');
+
+            try {
+                const response = await fetch('http://localhost:11434/api/tags');
+                if (response.ok) {
+                    const data = await response.json();
+                    const modelCount = data.models ? data.models.length : 0;
+                    statusDiv.className = 'connected';
+                    statusText.textContent = '✓ Ollama is running (' + modelCount + ' model' + (modelCount !== 1 ? 's' : '') + ' available)';
+
+                    if (data.models && data.models.length > 0) {
+                        const label = document.createElement('strong');
+                        label.textContent = 'Available models (click to select): ';
+                        modelsDiv.appendChild(label);
+                        data.models.forEach(model => {
+                            const span = document.createElement('span');
+                            span.className = 'ollama-model-tag';
+                            span.textContent = model.name;
+                            span.addEventListener('click', () => {
+                                modelInput.value = model.name;
+                            });
+                            modelsDiv.appendChild(span);
+                        });
+                    } else {
+                        const msg = document.createElement('em');
+                        msg.textContent = 'No models installed. Run "ollama pull llama3.2" to install a model.';
+                        modelsDiv.appendChild(msg);
+                    }
+                } else {
+                    throw new Error('HTTP ' + response.status);
+                }
+            } catch (error) {
+                statusDiv.className = 'error';
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    statusText.textContent = '✗ Cannot connect to Ollama - it may not be running or browser access is blocked (CORS)';
+                } else {
+                    statusText.textContent = '✗ Cannot connect to Ollama: ' + error.message;
+                }
+                instructions.className = 'visible';
+            }
+        })();
+        </script>
+        <?php
+    }
+
+    /**
+     * Get the configured Ollama model
+     */
+    public static function get_ollama_model() {
+        return get_option( 'personal_crm_ollama_model', 'llama3.2' );
     }
 
     public static function get_globals() {
