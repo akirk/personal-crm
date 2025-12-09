@@ -649,9 +649,9 @@ class PersonalCrm {
         } else {
             if ( $next_event_after ) {
                 $days_until_next = $current_date->diff( $next_event_after->date )->days;
-                echo '<p style="color: #666; font-style: italic; margin: 0;">No upcoming events in the next ' . $days_ahead . ' days<br><span style="font-size: 12px; color: #999;">Next event in ' . $days_until_next . ' days</span></p>';
+                echo '<p class="no-upcoming-events">No upcoming events in the next ' . $days_ahead . ' days<br><span>Next event in ' . $days_until_next . ' days</span></p>';
             } else {
-                echo '<p style="color: #666; font-style: italic; margin: 0;">No upcoming events</p>';
+                echo '<p class="no-upcoming-events">No upcoming events</p>';
             }
         }
     }
