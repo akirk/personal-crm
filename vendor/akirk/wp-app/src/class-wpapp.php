@@ -99,6 +99,9 @@ class WpApp {
             return;
         }
 
+        // Disable emoji to img conversion (renders huge SVGs otherwise)
+        remove_action( 'wp_head', 'print_emoji_detection_script', 7 );
+
         // Set up defaults automatically
         $this->setup_defaults();
 

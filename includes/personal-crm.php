@@ -73,6 +73,7 @@ class PersonalCrm {
         wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.css' );
         wp_app_enqueue_script( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.js', [ 'jquery' ], '1.0', true );
         wp_app_enqueue_script( 'personal-crm-script', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/script.js', [ 'jquery' ], '1.0', true );
+        wp_app_enqueue_script( 'personal-crm-ollama', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/ollama.js', [], '1.0', true );
 
         // Fire action to allow other plugins to register routes and extend functionality
         do_action( 'personal_crm_loaded', $this );

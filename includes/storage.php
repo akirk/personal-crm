@@ -1357,6 +1357,27 @@ class Storage extends \WpApp\BaseStorage {
     }
 
     /**
+     * Get all people (no group context)
+     */
+    public function get_all_people() {
+        $results = $this->wpdb->get_results(
+            "SELECT * FROM {$this->wpdb->prefix}personal_crm_people ORDER BY name",
+            ARRAY_A
+        );
+
+        $people = array();
+        foreach ( $results as $row ) {
+            $username = $row['username'];
+            $person = $this->get_person( $username );
+            if ( $person ) {
+                $people[ $username ] = $person;
+            }
+        }
+
+        return $people;
+    }
+
+    /**
      * Save or update a group link
      */
     public function save_group_link( $group_id, $link_name, $link_url ) {
