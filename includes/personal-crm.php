@@ -73,7 +73,7 @@ class PersonalCrm {
         wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.css' );
         wp_app_enqueue_script( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.js', [ 'jquery' ], '1.0', true );
         wp_app_enqueue_script( 'personal-crm-script', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/script.js', [ 'jquery' ], '1.0', true );
-        wp_app_enqueue_script( 'personal-crm-ollama', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/ollama.js', [], '1.0', true );
+        wp_app_enqueue_script( 'personal-crm-local-llm', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/local-llm.js', [], '1.0', true );
 
         // Fire action to allow other plugins to register routes and extend functionality
         do_action( 'personal_crm_loaded', $this );
@@ -171,7 +171,9 @@ class PersonalCrm {
 
     public function admin_settings() {
         register_setting( 'personal_crm_settings', 'personal_crm_default_team' );
-        register_setting( 'personal_crm_settings', 'personal_crm_ollama_model' );
+        register_setting( 'personal_crm_settings', 'personal_crm_local_llm_provider' );
+        register_setting( 'personal_crm_settings', 'personal_crm_local_llm_host' );
+        register_setting( 'personal_crm_settings', 'personal_crm_local_llm_model' );
 
         add_settings_section(
             'personal_crm_general',
@@ -189,18 +191,34 @@ class PersonalCrm {
         );
 
         add_settings_section(
-            'personal_crm_ollama',
-            'Ollama AI Settings',
-            [ $this, 'ollama_section_callback' ],
+            'personal_crm_local_llm',
+            'Local LLM Settings',
+            [ $this, 'local_llm_section_callback' ],
             'personal_crm_settings'
         );
 
         add_settings_field(
-            'ollama_model',
-            'Ollama Model',
-            [ $this, 'ollama_model_callback' ],
+            'local_llm_provider',
+            'Provider',
+            [ $this, 'local_llm_provider_callback' ],
             'personal_crm_settings',
-            'personal_crm_ollama'
+            'personal_crm_local_llm'
+        );
+
+        add_settings_field(
+            'local_llm_host',
+            'Host',
+            [ $this, 'local_llm_host_callback' ],
+            'personal_crm_settings',
+            'personal_crm_local_llm'
+        );
+
+        add_settings_field(
+            'local_llm_model',
+            'Model',
+            [ $this, 'local_llm_model_callback' ],
+            'personal_crm_settings',
+            'personal_crm_local_llm'
         );
     }
 
@@ -243,48 +261,48 @@ class PersonalCrm {
         <?php
     }
 
-    public function ollama_section_callback() {
+    public function local_llm_section_callback() {
         ?>
         <style>
-            #ollama-status {
+            #local-llm-status {
                 padding: 12px;
                 border-radius: 4px;
                 margin-bottom: 15px;
                 background: #f0f0f0;
             }
-            #ollama-status.connected {
+            #local-llm-status.connected {
                 background: #d4edda;
                 border-left: 4px solid #28a745;
             }
-            #ollama-status.error {
+            #local-llm-status.error {
                 background: #f8d7da;
                 border-left: 4px solid #dc3545;
             }
-            #ollama-instructions {
+            #local-llm-instructions {
                 display: none;
                 padding: 15px;
                 background: #fff8e5;
                 border-left: 4px solid #ffb900;
                 margin-bottom: 15px;
             }
-            #ollama-instructions.visible {
+            #local-llm-instructions.visible {
                 display: block;
             }
-            #ollama-instructions ol {
+            #local-llm-instructions ol {
                 margin: 10px 0 0 20px;
             }
-            #ollama-instructions code {
+            #local-llm-instructions code {
                 background: #f5f5f5;
                 padding: 2px 6px;
             }
-            #ollama-instructions .hint {
+            #local-llm-instructions .hint {
                 font-size: 12px;
                 color: #666;
             }
-            #ollama-models-list {
+            #local-llm-models-list {
                 margin-top: 10px;
             }
-            .ollama-model-tag {
+            .local-llm-model-tag {
                 display: inline-block;
                 background: #f0f0f0;
                 padding: 4px 8px;
@@ -292,91 +310,222 @@ class PersonalCrm {
                 border-radius: 3px;
                 cursor: pointer;
             }
-            .ollama-model-tag:hover {
+            .local-llm-model-tag:hover {
                 background: #0073aa;
                 color: white;
             }
         </style>
-        <p>Configure the Ollama AI integration for AI-powered features.</p>
-        <div id="ollama-status">
-            <span id="ollama-status-text">Checking Ollama connection...</span>
+        <p>Configure a local LLM for AI-powered features. Supports Ollama and LM Studio.</p>
+        <div id="local-llm-status">
+            <span id="local-llm-status-text">Select a provider and check connection...</span>
+            <button type="button" id="local-llm-refresh" class="button button-small" style="margin-left: 10px;" title="Refresh connection">↻</button>
         </div>
-        <div id="ollama-instructions">
-            <strong>Ollama Setup Instructions:</strong>
-            <ol>
-                <li>Install Ollama from <a href="https://ollama.ai" target="_blank">ollama.ai</a></li>
-                <li>Start Ollama (it runs on port 11434 by default)</li>
-                <li>Allow browser access by setting the environment variable:<br>
-                    <code>OLLAMA_ORIGINS=* ollama serve</code><br>
-                    <span class="hint">Or add <code>OLLAMA_ORIGINS=*</code> to your environment before starting Ollama.</span>
-                </li>
-                <li>Pull a model: <code>ollama pull llama3.2</code></li>
-            </ol>
-        </div>
+        <div id="local-llm-instructions"></div>
         <?php
     }
 
-    public function ollama_model_callback() {
-        $value = get_option( 'personal_crm_ollama_model', 'llama3.2' );
+    public function local_llm_provider_callback() {
+        $value = get_option( 'personal_crm_local_llm_provider', 'ollama' );
         ?>
-        <input type="text" name="personal_crm_ollama_model" id="personal_crm_ollama_model" value="<?php echo esc_attr( $value ); ?>" class="regular-text">
-        <div id="ollama-models-list"></div>
+        <select name="personal_crm_local_llm_provider" id="personal_crm_local_llm_provider">
+            <option value="ollama" <?php selected( $value, 'ollama' ); ?>>Ollama</option>
+            <option value="lm_studio" <?php selected( $value, 'lm_studio' ); ?>>LM Studio</option>
+        </select>
+        <p class="description">
+            <a href="https://ollama.ai" target="_blank">Ollama</a> |
+            <a href="https://lmstudio.ai" target="_blank">LM Studio</a>
+        </p>
+        <?php
+    }
+
+    public function local_llm_host_callback() {
+        $value = get_option( 'personal_crm_local_llm_host', '' );
+        $provider = get_option( 'personal_crm_local_llm_provider', 'ollama' );
+        $defaults = [
+            'ollama'    => 'localhost:11434',
+            'lm_studio' => 'localhost:1234',
+        ];
+        $placeholder = $defaults[ $provider ] ?? 'localhost:11434';
+        ?>
+        <input type="text" name="personal_crm_local_llm_host" id="personal_crm_local_llm_host" value="<?php echo esc_attr( $value ); ?>" class="regular-text" placeholder="<?php echo esc_attr( $placeholder ); ?>">
+        <p class="description">Leave empty for default (<span id="local-llm-default-host"><?php echo esc_html( $placeholder ); ?></span>)</p>
+        <?php
+    }
+
+    public function local_llm_model_callback() {
+        $provider = get_option( 'personal_crm_local_llm_provider', 'ollama' );
+        $value = get_option( 'personal_crm_local_llm_model', 'llama3.2' );
+        ?>
+        <input type="text" name="personal_crm_local_llm_model" id="personal_crm_local_llm_model" value="<?php echo esc_attr( $value ); ?>" class="regular-text">
+        <div id="local-llm-models-list"></div>
         <script>
-        (async function checkOllamaAndLoadModels() {
-            const statusDiv = document.getElementById('ollama-status');
-            const statusText = document.getElementById('ollama-status-text');
-            const instructions = document.getElementById('ollama-instructions');
-            const modelsDiv = document.getElementById('ollama-models-list');
-            const modelInput = document.getElementById('personal_crm_ollama_model');
-
-            try {
-                const response = await fetch('http://localhost:11434/api/tags');
-                if (response.ok) {
-                    const data = await response.json();
-                    const modelCount = data.models ? data.models.length : 0;
-                    statusDiv.className = 'connected';
-                    statusText.textContent = '✓ Ollama is running (' + modelCount + ' model' + (modelCount !== 1 ? 's' : '') + ' available)';
-
-                    if (data.models && data.models.length > 0) {
-                        const label = document.createElement('strong');
-                        label.textContent = 'Available models (click to select): ';
-                        modelsDiv.appendChild(label);
-                        data.models.forEach(model => {
-                            const span = document.createElement('span');
-                            span.className = 'ollama-model-tag';
-                            span.textContent = model.name;
-                            span.addEventListener('click', () => {
-                                modelInput.value = model.name;
-                            });
-                            modelsDiv.appendChild(span);
-                        });
-                    } else {
-                        const msg = document.createElement('em');
-                        msg.textContent = 'No models installed. Run "ollama pull llama3.2" to install a model.';
-                        modelsDiv.appendChild(msg);
-                    }
-                } else {
-                    throw new Error('HTTP ' + response.status);
+        (function() {
+            const providers = {
+                ollama: {
+                    name: 'Ollama',
+                    baseUrl: 'http://localhost:11434',
+                    modelsPath: '/api/tags',
+                    modelsKey: 'models',
+                    getModelName: function(m) { return m.name; },
+                    instructions: [
+                        { text: 'Install Ollama from ', link: { url: 'https://ollama.ai', text: 'ollama.ai' } },
+                        { text: 'Start Ollama (runs on port 11434 by default)' },
+                        { text: 'Allow browser access: ', code: 'OLLAMA_ORIGINS=* ollama serve' },
+                        { text: 'Pull a model: ', code: 'ollama pull llama3.2' }
+                    ]
+                },
+                lm_studio: {
+                    name: 'LM Studio',
+                    baseUrl: 'http://localhost:1234',
+                    modelsPath: '/v1/models',
+                    modelsKey: 'data',
+                    getModelName: function(m) { return m.id; },
+                    instructions: [
+                        { text: 'Install LM Studio from ', link: { url: 'https://lmstudio.ai', text: 'lmstudio.ai' } },
+                        { text: 'Open LM Studio and download a model' },
+                        { text: 'Go to the "Local Server" tab (left sidebar)' },
+                        { text: 'In the server settings, enable "Enable CORS" toggle' },
+                        { text: 'Click "Start Server" (restart if already running)' }
+                    ]
                 }
-            } catch (error) {
-                statusDiv.className = 'error';
-                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                    statusText.textContent = '✗ Cannot connect to Ollama - it may not be running or browser access is blocked (CORS)';
-                } else {
-                    statusText.textContent = '✗ Cannot connect to Ollama: ' + error.message;
+            };
+
+            const providerSelect = document.getElementById('personal_crm_local_llm_provider');
+            const hostInput = document.getElementById('personal_crm_local_llm_host');
+            const defaultHostSpan = document.getElementById('local-llm-default-host');
+            const statusDiv = document.getElementById('local-llm-status');
+            const statusText = document.getElementById('local-llm-status-text');
+            const refreshBtn = document.getElementById('local-llm-refresh');
+            const instructionsDiv = document.getElementById('local-llm-instructions');
+            const modelsDiv = document.getElementById('local-llm-models-list');
+            const modelInput = document.getElementById('personal_crm_local_llm_model');
+
+            function getBaseUrl(provider) {
+                const config = providers[provider];
+                const customHost = hostInput.value.trim();
+                if (customHost) {
+                    return 'http://' + customHost.replace(/^https?:\/\//, '');
                 }
-                instructions.className = 'visible';
+                return config.baseUrl;
             }
+
+            function updateHostPlaceholder() {
+                const provider = providerSelect.value;
+                const config = providers[provider];
+                const defaultHost = config.baseUrl.replace('http://', '');
+                hostInput.placeholder = defaultHost;
+                defaultHostSpan.textContent = defaultHost;
+            }
+
+            function showInstructions(provider) {
+                const config = providers[provider];
+                instructionsDiv.replaceChildren();
+
+                const title = document.createElement('strong');
+                title.textContent = config.name + ' Setup Instructions:';
+                instructionsDiv.appendChild(title);
+
+                const ol = document.createElement('ol');
+                config.instructions.forEach(function(item) {
+                    const li = document.createElement('li');
+                    li.appendChild(document.createTextNode(item.text));
+                    if (item.link) {
+                        const a = document.createElement('a');
+                        a.href = item.link.url;
+                        a.target = '_blank';
+                        a.textContent = item.link.text;
+                        li.appendChild(a);
+                    }
+                    if (item.code) {
+                        const code = document.createElement('code');
+                        code.textContent = item.code;
+                        li.appendChild(code);
+                    }
+                    ol.appendChild(li);
+                });
+                instructionsDiv.appendChild(ol);
+                instructionsDiv.className = 'visible';
+            }
+
+            async function checkConnection() {
+                const provider = providerSelect.value;
+                const config = providers[provider];
+                const baseUrl = getBaseUrl(provider);
+
+                statusDiv.className = '';
+                statusText.textContent = 'Checking ' + config.name + ' connection...';
+                instructionsDiv.className = '';
+                modelsDiv.replaceChildren();
+
+                try {
+                    const response = await fetch(baseUrl + config.modelsPath, {
+                        signal: AbortSignal.timeout(5000)
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const rawModels = data[config.modelsKey] || [];
+                        const models = rawModels.map(m => ({ name: config.getModelName(m) }));
+                        const modelCount = models.length;
+                        statusDiv.className = 'connected';
+                        statusText.textContent = '✓ ' + config.name + ' is running (' + modelCount + ' model' + (modelCount !== 1 ? 's' : '') + ' available)';
+
+                        if (models.length > 0) {
+                            const label = document.createElement('strong');
+                            label.textContent = 'Available models (click to select): ';
+                            modelsDiv.appendChild(label);
+                            models.forEach(model => {
+                                const span = document.createElement('span');
+                                span.className = 'local-llm-model-tag';
+                                span.textContent = model.name;
+                                span.addEventListener('click', () => {
+                                    modelInput.value = model.name;
+                                });
+                                modelsDiv.appendChild(span);
+                            });
+                        } else {
+                            const msg = document.createElement('em');
+                            msg.textContent = 'No models installed.';
+                            modelsDiv.appendChild(msg);
+                        }
+                    } else {
+                        throw new Error('HTTP ' + response.status);
+                    }
+                } catch (error) {
+                    statusDiv.className = 'error';
+                    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.name === 'TypeError') {
+                        statusText.textContent = '✗ Cannot connect to ' + config.name + ' - it may not be running or browser access is blocked (CORS)';
+                    } else {
+                        statusText.textContent = '✗ Cannot connect to ' + config.name + ': ' + error.message;
+                    }
+                    showInstructions(provider);
+                }
+            }
+
+            providerSelect.addEventListener('change', function() {
+                updateHostPlaceholder();
+                checkConnection();
+            });
+            refreshBtn.addEventListener('click', checkConnection);
+            updateHostPlaceholder();
+            checkConnection();
         })();
         </script>
         <?php
     }
 
     /**
-     * Get the configured Ollama model
+     * Get the configured Local LLM model
      */
-    public static function get_ollama_model() {
-        return get_option( 'personal_crm_ollama_model', 'llama3.2' );
+    public static function get_local_llm_model() {
+        return get_option( 'personal_crm_local_llm_model', 'llama3.2' );
+    }
+
+    /**
+     * Get the configured Local LLM provider
+     */
+    public static function get_local_llm_provider() {
+        return get_option( 'personal_crm_local_llm_provider', 'ollama' );
     }
 
     public static function get_globals() {
