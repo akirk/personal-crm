@@ -31,7 +31,7 @@ if ( $type_filter ) {
 
 // If there's only one team or no teams, redirect appropriately
 if ( empty( $available_teams ) ) {
-	header( 'Location: ' . $crm->build_url( 'admin/index.php', array( 'create_team' => 'new' ) ) );
+	header( 'Location: ' . $crm->build_url( 'admin/index.php', array( 'create_group' => 'new' ) ) );
 	exit;
 } elseif ( count( $available_teams ) === 1 ) {
 	header( 'Location: ' . $crm->build_url( 'group.php' ) );
@@ -62,6 +62,11 @@ if ( empty( $available_teams ) ) {
     <?php $crm->render_cmd_k_panel(); ?>
 
     <div class="group-selection-container">
+        <?php if ( ! empty( $_GET['not_found'] ) ) : ?>
+            <div class="notice notice-warning">
+                <p>Group "<?php echo htmlspecialchars( $_GET['not_found'] ); ?>" was not found. Please select a group below.</p>
+            </div>
+        <?php endif; ?>
         <div class="group-selection-header">
             <h1>Select<?php if ( $type_filter ) echo ' (' . htmlspecialchars( ucfirst( $type_filter ) ) . 's)'; ?></h1>
             <p>Choose which one you'd like to view:</p>
@@ -138,11 +143,8 @@ if ( empty( $available_teams ) ) {
         </div>
         
         <div id="no-results" class="no-results-message" style="display: none;">
-            <p>No teams found matching your search.</p>
-        </div>
-
-        <div class="admin-link-section">
-            <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'create_team' => 'new' ) ); ?>">⚙️ Create New</a>
+            <p>No groups found matching your search.</p>
+            <a href="#" id="create-group-btn" class="btn">Create group "<span id="create-group-name"></span>"</a>
         </div>
     </div>
     
@@ -157,12 +159,24 @@ if ( empty( $available_teams ) ) {
         const teamCards = document.querySelectorAll('.team-card');
         const teamGrid = document.getElementById('team-grid');
         const noResults = document.getElementById('no-results');
-	searchInput.focus();
-        
+        const createGroupBtn = document.getElementById('create-group-btn');
+        const createGroupName = document.getElementById('create-group-name');
+        const createBaseUrl = '<?php echo $crm->build_url( 'admin/index.php', array( 'create_group' => 'new' ) ); ?>';
+
+        // Pre-populate search with not_found parameter if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const notFound = urlParams.get('not_found');
+        if (notFound) {
+            searchInput.value = notFound;
+        }
+
+        searchInput.focus();
+
         function performSearch() {
             const searchTerm = searchInput.value.toLowerCase().trim();
+            const originalSearchTerm = searchInput.value.trim();
             let visibleCount = 0;
-            
+
             if (searchTerm === '') {
                 // Show all cards when search is empty
                 teamCards.forEach(card => {
@@ -177,6 +191,8 @@ if ( empty( $available_teams ) ) {
                 visibleCount = teamCards.length;
             } else {
                 clearButton.style.display = 'flex';
+                createGroupName.textContent = originalSearchTerm;
+                createGroupBtn.href = createBaseUrl + '&name=' + encodeURIComponent(originalSearchTerm);
                 
                 teamCards.forEach(card => {
                     const teamName = card.getAttribute('data-team-name').toLowerCase();
@@ -211,7 +227,7 @@ if ( empty( $available_teams ) ) {
                             matchNameElement.onclick = function(e) {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                window.location.href = `<?php echo $crm->build_url( 'person.php' ); ?>?team=${encodeURIComponent(teamSlug)}&person=${encodeURIComponent(matchedUsername)}`;
+                                window.location.href = `<?php echo rtrim( $crm->build_url( 'person.php' ), '/' ); ?>/${encodeURIComponent(matchedUsername)}`;
                                 return false;
                             };
                         } else if (matchedPersonElement) {
@@ -247,6 +263,11 @@ if ( empty( $available_teams ) ) {
                 searchInput.focus();
             }
         });
+
+        // Trigger search on page load if search field has a value (e.g., from not_found)
+        if (searchInput.value) {
+            performSearch();
+        }
     });
     </script>
 </body>

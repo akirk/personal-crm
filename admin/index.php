@@ -18,10 +18,10 @@ $current_group = $crm->get_current_group_from_params();
 $route_person = function_exists( 'get_query_var' ) ? get_query_var( 'person' ) : '';
 $is_editing_person = ! empty( $route_person );
 
-// Redirect to selector if no group is specified (unless editing person, creating team, or handling POST)
-$is_creating_team = isset( $_GET['create_team'] ) && $_GET['create_team'] === 'new';
+// Redirect to selector if no group is specified (unless editing person, creating group, or handling POST)
+$is_creating_group = isset( $_GET['create_group'] ) && $_GET['create_group'] === 'new';
 $is_post_request = $_SERVER['REQUEST_METHOD'] === 'POST';
-if ( ! $current_group && ! $is_editing_person && ! $is_creating_team && ! $is_post_request ) {
+if ( ! $current_group && ! $is_editing_person && ! $is_creating_group && ! $is_post_request ) {
 	header( 'Location: ' . $crm->build_url( 'index.php' ) );
 	exit;
 }
@@ -68,7 +68,7 @@ if ( strpos( $request_uri, '/person/' ) !== false || $is_editing_person ) {
 }
 $is_adding_new = isset( $_GET['add'] ) && $_GET['add'] === 'new';
 // Check if group exists in database and redirect to selector if not (unless already creating a team or editing a person)
-if ( $current_group && ! $crm->storage->group_exists( $current_group ) && ! $is_creating_team && ! $is_editing_person ) {
+if ( $current_group && ! $crm->storage->group_exists( $current_group ) && ! $is_creating_group && ! $is_editing_person ) {
 	header( 'Location: ' . $crm->build_url( 'index.php' ) );
 	exit;
 }
@@ -132,7 +132,7 @@ require_once __DIR__ . '/actions.php';
 // Load config for display (after any POST operations)
 $config = $crm->storage->get_group( $current_group );
 if ( ! $config ) {
-	// Fallback default config (group should normally be created via create_team)
+	// Fallback default config (group should normally be created via create_group)
 	$config = array(
 		'activity_url_prefix' => '',
 		'group_name' => '',
@@ -255,7 +255,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                         ?>
                     </select>
                 <?php endif; ?>
-                    <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'create_team' => 'new' ) ); ?>" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Group</a>
+                    <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'create_group' => 'new' ) ); ?>" class="nav-link" style="font-size: 12px; padding: 6px 12px; margin-left: 5px;">+ New Group</a>
                 </div>
 
             </div>
@@ -271,7 +271,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
 
         <?php
         // Show parent navigation link if this is a child group
-        if ( $current_group && ! $is_creating_team ) {
+        if ( $current_group && ! $is_creating_group ) {
             $current_group_config = $crm->storage->get_group( $current_group );
             if ( $current_group_config && ! empty( $current_group_config->parent_id ) ) {
                 $parent_group = $crm->storage->get_group_by_id( $current_group_config->parent_id );
@@ -286,7 +286,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
         }
         ?>
 
-        <?php if ( $is_creating_team ) : ?>
+        <?php if ( $is_creating_group ) : ?>
             <!-- Create New Page -->
             <div style="margin-bottom: 20px;">
                 <a href="index.php" class="back-link-admin">← Back to Admin Dashboard</a>
@@ -294,17 +294,17 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
 
             <h2>Create New</h2>
             <form method="post">
-                <input type="hidden" name="action" value="create_team">
+                <input type="hidden" name="action" value="create_group">
                 <?php if ( $current_group ) : ?>
                     <input type="hidden" name="group" value="<?php echo htmlspecialchars( $current_group ); ?>">
                 <?php endif; ?>
                 <div class="form-group">
                     <label for="new_team_name">Name *</label>
-                    <input type="text" id="new_team_name" name="new_team_name" required placeholder="e.g., Marketing" autofocus>
+                    <input type="text" id="new_team_name" name="new_team_name" required placeholder="e.g., Marketing" autofocus value="<?php echo htmlspecialchars( $_GET['name'] ?? '' ); ?>">
                 </div>
                 <div class="form-group">
                     <label for="new_team_slug">Slug *</label>
-                    <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing" pattern="[a-z0-9_-]+" value="<?php echo $current_group ? htmlspecialchars( $current_group ) : ''; ?>">
+                    <input type="text" id="new_team_slug" name="new_team_slug" required placeholder="e.g., marketing" pattern="[a-z0-9_-]+">
                     <small class="text-small-muted">Only lowercase letters, numbers, hyphens, and underscores allowed. This will be used as the filename.</small>
                 </div>
                 <div class="form-group">
@@ -855,22 +855,29 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
             });
         }
 
-       // Auto-generate slug from team name
+       // Auto-generate slug from group name
         document.addEventListener('DOMContentLoaded', function() {
-            const teamNameInput = document.getElementById('new_team_name');
-            const teamSlugInput = document.getElementById('new_team_slug');
-            
-            if (teamNameInput && teamSlugInput) {
-                teamNameInput.addEventListener('input', function() {
-                    // Auto-generate slug if slug field is empty or matches previous auto-generated value
-                    let slug = this.value
-                        .toLowerCase()
-                        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
-                        .replace(/\s+/g, '-') // Replace spaces with hyphens
-                        .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-                        .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-                    teamSlugInput.value = slug;
+            const groupNameInput = document.getElementById('new_team_name');
+            const groupSlugInput = document.getElementById('new_team_slug');
+
+            function generateSlug(name) {
+                return name
+                    .toLowerCase()
+                    .replace(/[^a-z0-9\s-]/g, '')
+                    .replace(/\s+/g, '-')
+                    .replace(/-+/g, '-')
+                    .replace(/^-|-$/g, '');
+            }
+
+            if (groupNameInput && groupSlugInput) {
+                groupNameInput.addEventListener('input', function() {
+                    groupSlugInput.value = generateSlug(this.value);
                 });
+
+                // Auto-generate slug on page load if name is pre-populated
+                if (groupNameInput.value && !groupSlugInput.value) {
+                    groupSlugInput.value = generateSlug(groupNameInput.value);
+                }
             }
         });
 

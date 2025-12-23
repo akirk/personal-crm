@@ -113,6 +113,7 @@ class Person {
 	public function get_upcoming_events() {
 		$events = array();
 		$current_date = new DateTime();
+		$current_date->setTime( 0, 0, 0 ); // Reset to start of day to include today's events
 		$current_year = (int) $current_date->format( 'Y' );
 		$cutoff_date = clone $current_date;
 		$cutoff_date->add( new \DateInterval( 'P1Y' ) )->sub( new \DateInterval( 'P1D' ) ); // 1 year minus 1 day from now
@@ -484,6 +485,7 @@ class Person {
 	public function get_upcoming_events_with_personal_dates() {
 		$events = array();
 		$current_date = new DateTime();
+		$current_date->setTime( 0, 0, 0 ); // Reset to start of day to include today's events
 		$current_year = (int) $current_date->format( 'Y' );
 		$cutoff_date = clone $current_date;
 		$cutoff_date->add( new \DateInterval( 'P1Y' ) ); // 1 year from now

@@ -90,11 +90,31 @@ function generate_username_from_name( $name ) {
 		return null;
 	}
 
-	// Convert to lowercase, remove special characters, replace spaces with hyphens
 	$username = strtolower( $name );
-	$username = iconv( 'UTF-8', 'ASCII//TRANSLIT', $username ); // Remove accents
-	$username = preg_replace( '/[^a-z0-9\s]/', '', $username );
-	$username = preg_replace( '/\s+/', '-', trim( $username ) );
+
+	// Use intl Transliterator if available for proper UTF-8 transliteration
+	if ( class_exists( 'Transliterator' ) ) {
+		$transliterator = \Transliterator::create( 'Any-Latin; Latin-ASCII' );
+		if ( $transliterator ) {
+			$username = $transliterator->transliterate( $username );
+		}
+	} else {
+		// Fallback: common transliterations
+		$replacements = array(
+			'ä' => 'ae', 'ö' => 'oe', 'ü' => 'ue', 'ß' => 'ss',
+			'á' => 'a', 'à' => 'a', 'â' => 'a', 'ã' => 'a', 'å' => 'a',
+			'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+			'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
+			'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'õ' => 'o', 'ø' => 'o',
+			'ú' => 'u', 'ù' => 'u', 'û' => 'u',
+			'ñ' => 'n', 'ç' => 'c', 'ý' => 'y', 'ÿ' => 'y',
+		);
+		$username = strtr( $username, $replacements );
+	}
+
+	$username = preg_replace( '/[^a-z0-9\s-]/', '', $username ); // Only allow letters, numbers, spaces, hyphens
+	$username = preg_replace( '/\s+/', '-', trim( $username ) ); // Replace spaces with hyphens
+	$username = preg_replace( '/-+/', '-', $username ); // Collapse multiple hyphens
 
 	return $username;
 }
@@ -460,8 +480,8 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 				}
 				if ( $is_social ) {
 					$name = $person_data['name'] ?? '';
-					$username = strtolower( str_replace( ' ', '.', $name ) );
-					$username = preg_replace( '/[^a-z0-9._-]/', '', $username );
+					$username = strtolower( str_replace( ' ', '-', $name ) );
+					$username = preg_replace( '/[^a-z0-9-]/', '', $username );
 				}
 			}
 
@@ -892,7 +912,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 			<label for="username">Username<?php if ( $crm->is_social_group( $form_group_slug ) ) { echo ' (auto-generated if empty)'; } else { echo ' *'; } ?></label>
 			<input type="text" id="username" name="username" value="<?php echo get_person_form_value( 'username', $edit_data, $is_editing ); ?>"<?php if ( ! $crm->is_social_group( $form_group_slug ) ) { echo ' required'; } ?>>
 			<?php if ( $crm->is_social_group( $form_group_slug ) ) : ?>
-				<small style="color: #666;">Leave empty to auto-generate from name (e.g., "John Smith" → "john.smith")</small>
+				<small style="color: #666;">Leave empty to auto-generate from name (e.g., "John Smith" → "john-smith")</small>
 			<?php endif; ?>
 		</div>
 

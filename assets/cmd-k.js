@@ -72,14 +72,16 @@ window.CmdK = {
                 return searchText.includes(searchLower);
             }).map(person => ({
                 username: person.username,
-                name: this.privacyMode ? this.maskName(person.name) : person.name,
-                nickname: this.privacyMode ? '' : person.nickname,
+                name: person.name,
+                nickname: person.nickname,
                 type: person.type,
                 team: person.team_name,
                 team_slug: person.team_slug,
+                role: person.role || '',
+                location: person.location || '',
                 itemType: 'person',
                 url: person.url,
-                detailsLoading: true // Mark as loading
+                detailsLoading: false
             }));
 
             this.filteredItems = [...matchingTeams, ...matchingPeople];
@@ -201,8 +203,8 @@ window.CmdK = {
 
         return {
             username: username,
-            name: this.privacyMode ? this.maskName(personData.name || '') : (personData.name || ''),
-            nickname: this.privacyMode ? '' : (personData.nickname || ''),
+            name: personData.name || '',
+            nickname: personData.nickname || '',
             role: personData.role || '',
             type: type,
             team: teamName,
@@ -317,6 +319,22 @@ window.CmdK = {
         if (panel) {
             panel.addEventListener('click', (e) => {
                 e.stopPropagation();
+            });
+        }
+
+        // Handle clicks on result items
+        const resultsContainer = document.getElementById('cmd-k-results');
+        if (resultsContainer) {
+            resultsContainer.addEventListener('click', (e) => {
+                const item = e.target.closest('.cmd-k-item');
+                if (item) {
+                    const index = parseInt(item.dataset.index, 10);
+                    if (!isNaN(index)) {
+                        this.selectedIndex = index;
+                        this.selectedLinkIndex = -1;
+                        this.selectCurrent();
+                    }
+                }
             });
         }
     },

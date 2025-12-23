@@ -394,20 +394,49 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 					</div>
 				<?php endif; ?>
 
-				<?php if ( ! empty( $person_data->birthday ) || ! empty( $person_data->company_anniversary ) || ! empty( $kids_with_ages ) || ! empty( $person_data->notes ) || ! empty( $person_data->location ) || ! empty( $person_data->partner ) || ! empty( $person_data->partner_birthday ) ) : ?>
-					<?php
-					// Check if person has any external accounts or GitHub repos
-					$has_github = ! empty( $person_data->github );
-					$has_wordpress = ! empty( $person_data->wordpress );
-					$has_linkedin = ! empty( $person_data->linkedin );
-					$has_website = ! empty( $person_data->website );
-					$has_linear = ! empty( $person_data->links['Linear'] ?? '' );
-					$has_repos = ! empty( $person_data->github_repos );
-					$has_any_accounts = $has_github || $has_wordpress || $has_linkedin || $has_website || $has_linear;
-					
-					// Check if person has notes (needed for Quick Links)
-					$has_notes = ! empty( $person_data->notes ) && is_array( $person_data->notes ) && count( $person_data->notes ) > 0;
-					?>
+				<?php
+				// Check if person has any external accounts or GitHub repos
+				$has_github = ! empty( $person_data->github );
+				$has_wordpress = ! empty( $person_data->wordpress );
+				$has_linkedin = ! empty( $person_data->linkedin );
+				$has_website = ! empty( $person_data->website );
+				$has_linear = ! empty( $person_data->links['Linear'] ?? '' );
+				$has_repos = ! empty( $person_data->github_repos );
+				$has_any_accounts = $has_github || $has_wordpress || $has_linkedin || $has_website || $has_linear;
+
+				// Check if person has notes
+				$has_notes = ! empty( $person_data->notes ) && is_array( $person_data->notes ) && count( $person_data->notes ) > 0;
+
+				// Build quick links array
+				$quick_links = array();
+
+				// Add person's custom links (excluding external account links)
+				if ( ! empty( $person_data->links ) ) {
+					foreach ( $person_data->links as $link_text => $link_url ) {
+						if ( ! empty( $link_url ) && ! in_array( $link_text, array( 'Linear', 'WordPress.org', 'LinkedIn' ) ) ) {
+							$quick_links[ 'link-' . sanitize_title( $link_text ) ] = array(
+								'url'    => str_replace( '$username', $person, $link_url ),
+								'label'  => $link_text,
+								'icon'   => $crm->get_link_icon( $link_text, $link_url, 18 ),
+								'target' => '_blank',
+							);
+						}
+					}
+				}
+
+				// Add note link
+				$quick_links['add-note'] = array(
+					'url'     => '#',
+					'label'   => 'Add note',
+					'icon'    => '📝',
+					'onclick' => 'toggleAddNoteForm(); return false;',
+				);
+
+				// Allow plugins to modify quick links
+				$quick_links = apply_filters( 'personal_crm_person_quick_links', $quick_links, $person_data, $is_team_member, $group_data );
+				?>
+
+				<?php if ( ! empty( $quick_links ) || ! empty( $person_data->birthday ) || ! empty( $person_data->company_anniversary ) || ! empty( $kids_with_ages ) || ! empty( $person_data->notes ) || ! empty( $person_data->location ) || ! empty( $person_data->partner ) || ! empty( $person_data->partner_birthday ) ) : ?>
 
 					<?php if ( $has_repos ) : ?>
 						<div class="section">
@@ -432,46 +461,27 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 						</div>
 					<?php endif; ?>
 
-					<?php
-					// Filter out external account links from regular links
-					$filtered_links = array();
-					if ( ! empty( $person_data->links ) ) {
-						foreach ( $person_data->links as $link_text => $link_url ) {
-							if ( ! in_array( $link_text, array( 'Linear', 'WordPress.org', 'LinkedIn' ) ) ) {
-								$filtered_links[$link_text] = $link_url;
-							}
-						}
-					}
-					$has_other_links = ! empty( $filtered_links );
-					$has_activity_links = $is_team_member && ! empty( $person_data->username ) && ! empty( $group_data->activity_url_prefix ) && ! $crm->is_social_group( $current_group );
-					$has_add_note_link = ! $has_notes;
-					?>
-
-					<?php if ( $has_other_links || $has_activity_links || $has_add_note_link ) : ?>
+					<?php if ( ! empty( $quick_links ) ) : ?>
 						<div class="section">
 							<h2>Quick Links</h2>
 
 						<div class="quick-links-container">
-							<?php if ( $has_other_links ) : ?>
-									<?php foreach ( $filtered_links as $link_text => $link_url ) : ?>
-										<?php if ( ! empty( $link_url ) ) : ?>
-											<a href="<?php echo esc_url( str_replace( '$username', $person, $link_url ) ); ?>" target="_blank" class="quick-link">
-												<?php echo $crm->get_link_icon( $link_text, $link_url, 18); ?>
-												<?php echo esc_html( $link_text ); ?>
-											</a>
+							<?php foreach ( $quick_links as $link_id => $link ) : ?>
+								<a href="<?php echo esc_url( $link['url'] ); ?>"
+								   class="quick-link <?php echo esc_attr( $link['class'] ?? '' ); ?>"
+								   <?php if ( ! empty( $link['target'] ) ) : ?>target="<?php echo esc_attr( $link['target'] ); ?>"<?php endif; ?>
+								   <?php if ( ! empty( $link['onclick'] ) ) : ?>onclick="<?php echo esc_attr( $link['onclick'] ); ?>"<?php endif; ?>
+								   <?php if ( ! empty( $link['title'] ) ) : ?>title="<?php echo esc_attr( $link['title'] ); ?>"<?php endif; ?>>
+									<?php if ( ! empty( $link['icon'] ) ) : ?>
+										<?php if ( strpos( $link['icon'], '<' ) === 0 ) : ?>
+											<?php echo $link['icon']; ?>
+										<?php else : ?>
+											<span style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; margin-right: 8px; font-size: 14px;"><?php echo $link['icon']; ?></span>
 										<?php endif; ?>
-									<?php endforeach; ?>
-							<?php endif; ?>
-
-							<a href="#" onclick="toggleAddNoteForm(); return false;" class="quick-link">
-								<span style="width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; margin-right: 8px; font-size: 14px;">📝</span>
-								Add note
-							</a>
-
-							<?php
-							// Allow plugins to add quick links
-							do_action( 'personal_crm_person_quick_links', $person_data, $is_team_member, $group_data );
-							?>
+									<?php endif; ?>
+									<?php echo esc_html( $link['label'] ); ?>
+								</a>
+							<?php endforeach; ?>
 						</div>
 						</div>
 					<?php endif; ?>

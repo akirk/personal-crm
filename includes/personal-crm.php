@@ -383,11 +383,11 @@ class PersonalCrm {
         $crm = self::get_instance();
         $current_group = $crm->get_current_group_from_params();
 
-        // Check if we're on select.php to prevent redirect loops
-        $current_script = basename( $_SERVER['PHP_SELF'] );
-        $is_select_page = ( $current_script === 'index.php' );
+        // Check if we're on a front-end group page (not admin) to redirect for non-existent groups
+        $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+        $is_group_page = ( preg_match( '#/crm/group/[^/]+#', $request_uri ) && strpos( $request_uri, '/admin/' ) === false );
 
-        if ( ! $current_group && ! $is_select_page ) {
+        if ( ! $current_group && ! $is_group_page ) {
             $current_group = $crm->use_default_group();
             $available_groups = $crm->storage->get_available_groups();
             if ( count( $available_groups ) > 1 && ! $current_group ) {
@@ -399,15 +399,10 @@ class PersonalCrm {
         // Load group object - members and events will be lazy loaded
         $group_data = $crm->storage->get_group( $current_group );
 
-        // Handle case where group doesn't exist
-        if ( ! $group_data && ! $is_select_page ) {
-            $available_groups = $crm->storage->get_available_groups();
-            if ( ! empty( $available_groups ) ) {
-                header( 'Location: ' . $crm->build_url( 'index.php' ) );
-                exit;
-            }
-            // No groups exist at all - will show create team page
-            $group_data = null;
+        // Handle case where group doesn't exist - redirect to select page
+        if ( ! $group_data && $is_group_page ) {
+            header( 'Location: ' . $crm->build_url( 'index.php', array( 'not_found' => $current_group ) ) );
+            exit;
         } elseif ( $group_data ) {
             // Set as current group for static access
             Group::set_current( $group_data );
@@ -633,6 +628,7 @@ class PersonalCrm {
      */
     public function render_upcoming_events_sidebar( $group_data, $days_ahead = 90, $filter_person = null, $include_team_events = true ) {
         $current_date = new DateTime();
+        $current_date->setTime( 0, 0, 0 ); // Reset to start of day to include today's events
         $cutoff_date = clone $current_date;
         $cutoff_date->add( new \DateInterval( 'P' . $days_ahead . 'D' ) );
 
@@ -1025,6 +1021,8 @@ class PersonalCrm {
                     'team_slug' => $group_slug,
                     'team_name' => $group_name,
                     'type' => 'Member',
+                    'role' => $person->role ?? '',
+                    'location' => $person->location ?? '',
                     'url' => $this->build_url( 'person.php', array( 'person' => $username ) )
                 );
             }
@@ -1040,6 +1038,8 @@ class PersonalCrm {
                         'team_slug' => $group_slug,
                         'team_name' => $group_name,
                         'type' => $child_group->group_name,
+                        'role' => $person->role ?? '',
+                        'location' => $person->location ?? '',
                         'url' => $this->build_url( 'person.php', array( 'person' => $username ) )
                     );
                 }
@@ -1128,6 +1128,7 @@ class PersonalCrm {
      */
     public function get_upcoming_events_for_display( $group_data ) {
         $current_date = new DateTime();
+        $current_date->setTime( 0, 0, 0 ); // Reset to start of day to include today's events
         $cutoff_date = clone $current_date;
         $cutoff_date->add( new \DateInterval( 'P3M' ) );
         $all_events = array();
@@ -1174,6 +1175,7 @@ class PersonalCrm {
     public function get_all_upcoming_events( $group_data ) {
         $all_events = array();
         $current_date = new DateTime();
+        $current_date->setTime( 0, 0, 0 ); // Reset to start of day to include today's events
         $cutoff_date = clone $current_date;
         $cutoff_date->add( new \DateInterval( 'P3M' ) );
 

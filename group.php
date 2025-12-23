@@ -184,7 +184,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 											<div class="person-links">
 												<?php $crm->render_person_links( $member->links ); ?>
 												<?php
-												do_action( 'personal_crm_person_links', $member, $username, $group_data );
+												do_action( 'personal_crm_person_links', $member, $username, $group_data, null );
 												?>
 											</div>
 										</div>
@@ -257,7 +257,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 										<div class="person-links">
 											<?php $crm->render_person_links( $leader->links ); ?>
 											<?php
-											do_action( 'personal_crm_person_links', $leader, $username, $child_group_obj );
+											do_action( 'personal_crm_person_links', $leader, $username, $child_group_obj, null );
 											?>
 										</div>
 									</div>
@@ -309,11 +309,6 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 			</div>
 
 
-		<?php elseif ( ! $group_data ) : ?>
-			<div class="header">
-				<h1>No Groups Found</h1>
-				<p>No groups have been created yet. <a href="<?php echo $crm->build_url( 'admin/index.php', array( 'create_team' => 'new' ) ); ?>">Create your first group →</a></p>
-			</div>
 		<?php else : ?>
 			<div class="header">
 				<h1>Page Not Found</h1>
