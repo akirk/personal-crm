@@ -122,6 +122,58 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 				<?php endif; ?>
 			</div>
 
+			<div class="navigation" style="display: flex; align-items: center; gap: 10px;">
+				<select id="group-selector" onchange="switchGroup()">
+					<option value="<?php echo esc_attr( $crm->build_url( 'index.php' ) ); ?>">View All Groups…</option>
+					<?php
+					$available_groups = $crm->storage->get_available_groups();
+					$teams = array();
+					$groups = array();
+
+					foreach ( $available_groups as $group_slug ) {
+						$group_obj = $crm->storage->get_group( $group_slug );
+						if ( $group_obj && $group_obj->parent_id ) {
+							continue;
+						}
+
+						$group_name = $crm->storage->get_group_name( $group_slug );
+						$group_type = $crm->storage->get_group_type( $group_slug );
+
+						$item = array(
+							'slug' => $group_slug,
+							'name' => $group_name,
+							'type' => $group_type
+						);
+
+						if ( $group_type === 'group' ) {
+							$groups[] = $item;
+						} else {
+							$teams[] = $item;
+						}
+					}
+
+					usort( $teams, fn($a, $b) => strcasecmp( $a['name'], $b['name'] ) );
+					usort( $groups, fn($a, $b) => strcasecmp( $a['name'], $b['name'] ) );
+					?>
+
+					<?php if ( ! empty( $teams ) ) : ?>
+					<optgroup label="Work">
+						<?php foreach ( $teams as $item ) : ?>
+							<option value="<?php echo esc_attr( $crm->build_url( 'group.php', array( 'group' => $item['slug'] ) ) ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo esc_html( $item['name'] ); ?></option>
+						<?php endforeach; ?>
+					</optgroup>
+					<?php endif; ?>
+
+					<?php if ( ! empty( $groups ) ) : ?>
+					<optgroup label="Personal">
+						<?php foreach ( $groups as $item ) : ?>
+							<option value="<?php echo esc_attr( $crm->build_url( 'group.php', array( 'group' => $item['slug'] ) ) ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo esc_html( $item['name'] ); ?></option>
+						<?php endforeach; ?>
+					</optgroup>
+					<?php endif; ?>
+				</select>
+			</div>
+
 			<?php do_action( 'personal_crm_person_header_tabs', $person_data, $is_team_member, $current_group, $group_data ); ?>
 		</div>
 
@@ -486,8 +538,10 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 						</div>
 					<?php endif; ?>
 
-					
-						<?php 
+					<?php do_action( 'personal_crm_person_left_sidebar', $person_data, $is_team_member, $group_data ); ?>
+
+
+						<?php
 						$view_mode = $_GET['notes_view'] ?? 'compiled'; 
 						?>
 						<?php if ( $has_notes ) : ?>

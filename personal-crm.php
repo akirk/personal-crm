@@ -40,7 +40,6 @@ function personal_crm_activate() {
 
 	// Set default options (these don't depend on external classes)
 	add_option( 'personal_crm_storage_type', 'wpdb' );
-	add_option( 'personal_crm_default_team', '' );
 	add_option( 'personal_crm_version', PERSONAL_CRM_PLUGIN_VERSION );
 
 	// Only proceed with WpApp and Storage setup if the classes are available

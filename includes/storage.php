@@ -1217,12 +1217,32 @@ class Storage extends \WpApp\BaseStorage {
      */
     public function get_default_group() {
         $slug = $this->wpdb->get_var( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_groups WHERE is_default = 1 LIMIT 1" );
-
-        if ( ! $slug ) {
-            $slug = $this->wpdb->get_var( "SELECT slug FROM {$this->wpdb->prefix}personal_crm_groups ORDER BY slug LIMIT 1" );
-        }
-
         return $slug ?: '';
+    }
+
+    /**
+     * Set the default group
+     */
+    public function set_default_group( $slug ) {
+        // Clear all default flags
+        $this->wpdb->update(
+            $this->wpdb->prefix . 'personal_crm_groups',
+            array( 'is_default' => 0 ),
+            array( 'is_default' => 1 ),
+            array( '%d' ),
+            array( '%d' )
+        );
+
+        // Set the new default if a slug is provided
+        if ( ! empty( $slug ) ) {
+            $this->wpdb->update(
+                $this->wpdb->prefix . 'personal_crm_groups',
+                array( 'is_default' => 1 ),
+                array( 'slug' => $slug ),
+                array( '%d' ),
+                array( '%s' )
+            );
+        }
     }
 
     /**

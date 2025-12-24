@@ -170,7 +170,10 @@ class PersonalCrm {
     }
 
     public function admin_settings() {
-        register_setting( 'personal_crm_settings', 'personal_crm_default_team' );
+        // Register default team setting with a sanitize callback that saves to database
+        register_setting( 'personal_crm_settings', 'personal_crm_default_team', array(
+            'sanitize_callback' => array( $this, 'sanitize_default_team' ),
+        ) );
         register_setting( 'personal_crm_settings', 'personal_crm_local_llm_provider' );
         register_setting( 'personal_crm_settings', 'personal_crm_local_llm_host' );
         register_setting( 'personal_crm_settings', 'personal_crm_local_llm_model' );
@@ -241,8 +244,15 @@ class PersonalCrm {
         echo '<p>Configure the basic settings for the Personal CRM.</p>';
     }
 
+    public function sanitize_default_team( $value ) {
+        $value = sanitize_text_field( $value );
+        $this->storage->set_default_group( $value );
+        // Return empty string since we don't store this in wp_options
+        return '';
+    }
+
     public function default_team_callback() {
-        $value = get_option( 'personal_crm_default_team', '' );
+        $value = $this->storage->get_default_group();
         $available_groups = $this->storage->get_available_groups();
         ?>
         <select name="personal_crm_default_team" id="personal_crm_default_team">
@@ -257,7 +267,7 @@ class PersonalCrm {
                 </option>
             <?php endforeach; ?>
         </select>
-        <p class="description">Select the default team to use when none is specified.</p>
+        <p class="description">Select the default team to redirect to from /crm/.</p>
         <?php
     }
 

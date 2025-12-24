@@ -71,9 +71,10 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 				?>
 				<div class="navigation" style="display: flex; align-items: center; gap: 10px;">
 					<select id="group-selector" onchange="switchGroup()">
+						<option value="<?php echo esc_attr( $crm->build_url( 'index.php' ) ); ?>">View All Groups…</option>
+
 						<?php
-						// Separate teams by type and default status (only top-level groups)
-						$default_teams = array();
+						// Separate teams by type (only top-level groups)
 						$teams = array();
 						$groups = array();
 
@@ -87,7 +88,6 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 
 							$group_name = $crm->storage->get_group_name( $group_slug );
 							$group_type = $crm->storage->get_group_type( $group_slug );
-							$is_default = $crm->get_default_group() === $group_slug;
 
 							$item = array(
 								'slug' => $group_slug,
@@ -95,9 +95,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 								'type' => $group_type
 							);
 
-							if ( $is_default ) {
-								$default_teams[] = $item;
-							} elseif ( $group_type === 'group' ) {
+							if ( $group_type === 'group' ) {
 								$groups[] = $item;
 							} else {
 								$teams[] = $item;
@@ -105,21 +103,12 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 						}
 
 						// Sort each group by name
-						usort( $default_teams, fn($a, $b) => strcasecmp( $a['name'], $b['name'] ) );
 						usort( $teams, fn($a, $b) => strcasecmp( $a['name'], $b['name'] ) );
 						usort( $groups, fn($a, $b) => strcasecmp( $a['name'], $b['name'] ) );
 						?>
 
-						<?php if ( ! empty( $default_teams ) ) : ?>
-						<optgroup label="Default">
-							<?php foreach ( $default_teams as $item ) : ?>
-								<option value="<?php echo htmlspecialchars( $crm->build_url( 'group.php', array( 'group' => $item['slug'] ) ) ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
-							<?php endforeach; ?>
-						</optgroup>
-						<?php endif; ?>
-
 						<?php if ( ! empty( $teams ) ) : ?>
-						<optgroup label="Groups">
+						<optgroup label="Work">
 							<?php foreach ( $teams as $item ) : ?>
 								<option value="<?php echo htmlspecialchars( $crm->build_url( 'group.php', array( 'group' => $item['slug'] ) ) ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
 							<?php endforeach; ?>
@@ -127,7 +116,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 						<?php endif; ?>
 
 						<?php if ( ! empty( $groups ) ) : ?>
-						<optgroup label="Groups">
+						<optgroup label="Personal">
 							<?php foreach ( $groups as $item ) : ?>
 								<option value="<?php echo htmlspecialchars( $crm->build_url( 'group.php', array( 'group' => $item['slug'] ) ) ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
 							<?php endforeach; ?>

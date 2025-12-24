@@ -278,15 +278,13 @@ $available_teams = $crm->storage->get_available_groups();
                     <option value="all-teams" <?php echo $selected_all; ?>>All Groups</option>
 
                     <?php
-                    // Separate teams by type and default status (same structure as index.php)
-                    $default_teams = array();
+                    // Separate teams by type
                     $teams = array();
                     $groups = array();
 
                     foreach ( $available_teams as $team_slug ) {
                         $team_name = $crm->storage->get_group_name( $team_slug );
                         $team_type = $crm->storage->get_group_type( $team_slug );
-                        $is_default = $crm->get_default_group() === $team_slug;
 
                         $item = array(
                             'slug' => $team_slug,
@@ -294,9 +292,7 @@ $available_teams = $crm->storage->get_available_groups();
                             'type' => $team_type
                         );
 
-                        if ( $is_default ) {
-                            $default_teams[] = $item;
-                        } elseif ( $team_type === 'group' ) {
+                        if ( $team_type === 'group' ) {
                             $groups[] = $item;
                         } else {
                             $teams[] = $item;
@@ -304,21 +300,12 @@ $available_teams = $crm->storage->get_available_groups();
                     }
 
                     // Sort each group by name
-                    usort( $default_teams, fn($a, $b) => strcasecmp( $a['name'], $b['name'] ) );
                     usort( $teams, fn($a, $b) => strcasecmp( $a['name'], $b['name'] ) );
                     usort( $groups, fn($a, $b) => strcasecmp( $a['name'], $b['name'] ) );
                     ?>
 
-                    <?php if ( ! empty( $default_teams ) ) : ?>
-                    <optgroup label="Default">
-                        <?php foreach ( $default_teams as $item ) : ?>
-                            <option value="<?php echo htmlspecialchars( $crm->build_url( $item['slug'] ) ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
-                        <?php endforeach; ?>
-                    </optgroup>
-                    <?php endif; ?>
-
                     <?php if ( ! empty( $teams ) ) : ?>
-                    <optgroup label="Groups">
+                    <optgroup label="Work">
                         <?php foreach ( $teams as $item ) : ?>
                             <option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
                         <?php endforeach; ?>
@@ -326,7 +313,7 @@ $available_teams = $crm->storage->get_available_groups();
                     <?php endif; ?>
 
                     <?php if ( ! empty( $groups ) ) : ?>
-                    <optgroup label="Groups">
+                    <optgroup label="Personal">
                         <?php foreach ( $groups as $item ) : ?>
                             <option value="<?php echo htmlspecialchars( $item['slug'] ); ?>" data-type="<?php echo htmlspecialchars( $item['type'] ); ?>" <?php echo ! $all_teams_mode && $item['slug'] === $current_group ? 'selected' : ''; ?>><?php echo htmlspecialchars( $item['name'] ); ?></option>
                         <?php endforeach; ?>
