@@ -62,8 +62,11 @@ $people = array();
 $query_type = sanitize_text_field( $_GET['query'] ?? '' );
 $query_description = '';
 
-if ( ! empty( $_GET['usernames'] ) ) {
-	$usernames = array_map( 'trim', explode( ',', sanitize_text_field( $_GET['usernames'] ) ) );
+if ( ! empty( $_GET['person'] ) ) {
+	// Supports PHP array syntax: ?person[]=user1&person[]=user2
+	$usernames = is_array( $_GET['person'] )
+		? array_map( 'sanitize_text_field', $_GET['person'] )
+		: array( sanitize_text_field( $_GET['person'] ) );
 	$people = $crm->storage->get_people_by_usernames( $usernames );
 	$query_description = count( $people ) . ' people from URL';
 } elseif ( $query_type === 'no-group' ) {
@@ -389,7 +392,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 			<div class="empty-state">
 				<h2>No People Loaded</h2>
 				<p>Use the query bar above to load people for group assignment.</p>
-				<p>You can also pass usernames via URL: <code>?usernames=user1,user2,user3</code></p>
+				<p>You can also pass usernames via URL: <code>?person[]=user1&person[]=user2</code></p>
 			</div>
 		<?php else : ?>
 			<div class="assign-groups-layout">
