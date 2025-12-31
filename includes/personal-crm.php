@@ -128,6 +128,9 @@ class PersonalCrm {
 
         // Select interface (index.php)
         $this->app->route( 'select', 'index.php' );
+
+        // Group assignment utility (assign-groups.php)
+        $this->app->route( 'assign-groups', 'assign-groups.php' );
     }
 
     private function setup_menu() {

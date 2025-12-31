@@ -1398,6 +1398,67 @@ class Storage extends \WpApp\BaseStorage {
     }
 
     /**
+     * Get all people who are not assigned to any group
+     */
+    public function get_people_without_groups() {
+        $results = $this->wpdb->get_results(
+            "SELECT p.*
+             FROM {$this->wpdb->prefix}personal_crm_people p
+             LEFT JOIN {$this->wpdb->prefix}personal_crm_people_groups pg ON p.id = pg.person_id
+             WHERE pg.id IS NULL
+             ORDER BY p.name",
+            ARRAY_A
+        );
+
+        $people = array();
+        foreach ( $results as $row ) {
+            $username = $row['username'];
+            $person = $this->get_person( $username );
+            if ( $person ) {
+                $people[ $username ] = $person;
+            }
+        }
+
+        return $people;
+    }
+
+    /**
+     * Get multiple people by their usernames
+     *
+     * @param array $usernames Array of username strings
+     * @return array Array of Person objects keyed by username
+     */
+    public function get_people_by_usernames( $usernames ) {
+        if ( empty( $usernames ) ) {
+            return array();
+        }
+
+        $usernames = array_map( 'sanitize_text_field', $usernames );
+        $placeholders = implode( ',', array_fill( 0, count( $usernames ), '%s' ) );
+
+        $results = $this->wpdb->get_results(
+            $this->wpdb->prepare(
+                "SELECT username FROM {$this->wpdb->prefix}personal_crm_people
+                 WHERE username IN ($placeholders)
+                 ORDER BY name",
+                $usernames
+            ),
+            ARRAY_A
+        );
+
+        $people = array();
+        foreach ( $results as $row ) {
+            $username = $row['username'];
+            $person = $this->get_person( $username );
+            if ( $person ) {
+                $people[ $username ] = $person;
+            }
+        }
+
+        return $people;
+    }
+
+    /**
      * Save or update a group link
      */
     public function save_group_link( $group_id, $link_name, $link_url ) {
