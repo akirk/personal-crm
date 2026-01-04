@@ -20,8 +20,8 @@ define( 'PERSONAL_CRM_PLUGIN_FILE', __FILE__ );
 // Register activation/deactivation hooks at plugin file level
 // These must be registered here (not in a class constructor) because
 // activation hooks fire BEFORE plugins_loaded
-register_activation_hook( __FILE__, 'PersonalCRM\personal_crm_activate' );
-register_deactivation_hook( __FILE__, 'PersonalCRM\personal_crm_deactivate' );
+\register_activation_hook( __FILE__, 'PersonalCRM\personal_crm_activate' );
+\register_deactivation_hook( __FILE__, 'PersonalCRM\personal_crm_deactivate' );
 
 /**
  * Plugin activation callback
