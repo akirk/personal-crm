@@ -39,7 +39,7 @@ if ( $type_filter ) {
 
 // If there's only one team or no teams, redirect appropriately
 if ( empty( $available_teams ) ) {
-	header( 'Location: ' . $crm->build_url( 'admin/index.php', array( 'create_group' => 'new' ) ) );
+	header( 'Location: ' . $crm->build_url( 'welcome.php' ) );
 	exit;
 } elseif ( count( $available_teams ) === 1 ) {
 	header( 'Location: ' . $crm->build_url( 'group.php' ) );

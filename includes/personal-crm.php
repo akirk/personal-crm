@@ -131,6 +131,9 @@ class PersonalCrm {
 
         // Group assignment utility (assign-groups.php)
         $this->app->route( 'assign-groups', 'assign-groups.php' );
+
+        // Welcome page (welcome.php)
+        $this->app->route( 'welcome', 'welcome.php' );
     }
 
     private function setup_menu() {
