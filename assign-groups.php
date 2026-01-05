@@ -5,10 +5,11 @@
  * Batch-assign people to groups with an easy workflow.
  * URL: /crm/assign-groups
  *
+ * Default behavior: Shows people without any group assignment.
+ *
  * Supported query parameters:
- *   - usernames=user1,user2,user3  Load specific people by username
- *   - query=no-group               Load people without any group assignment
- *   - query=in-group&group=slug    Load people from a specific group
+ *   - person[]=user1&person[]=user2  Load specific people by username
+ *   - query=in-group&group=slug      Load people from a specific group
  */
 namespace PersonalCRM;
 
@@ -69,9 +70,6 @@ if ( ! empty( $_GET['person'] ) ) {
 		: array( sanitize_text_field( $_GET['person'] ) );
 	$people = $crm->storage->get_people_by_usernames( $usernames );
 	$query_description = count( $people ) . ' people from URL';
-} elseif ( $query_type === 'no-group' ) {
-	$people = $crm->storage->get_people_without_groups();
-	$query_description = count( $people ) . ' people without groups';
 } elseif ( $query_type === 'in-group' && ! empty( $_GET['group'] ) ) {
 	$group_slug = sanitize_text_field( $_GET['group'] );
 	$group_obj = $crm->storage->get_group( $group_slug );
@@ -79,6 +77,10 @@ if ( ! empty( $_GET['person'] ) ) {
 		$people = $group_obj->get_members();
 		$query_description = count( $people ) . ' people in ' . $group_obj->group_name;
 	}
+} else {
+	// Default: show people without groups
+	$people = $crm->storage->get_people_without_groups();
+	$query_description = count( $people ) . ' people without groups';
 }
 
 // Convert to indexed array for navigation
@@ -97,8 +99,10 @@ $all_groups = $crm->storage->get_all_groups_with_hierarchy();
 
 // Build base URL for navigation (preserve query params)
 $base_params = array();
-if ( ! empty( $_GET['usernames'] ) ) {
-	$base_params['usernames'] = $_GET['usernames'];
+if ( ! empty( $_GET['person'] ) ) {
+	$base_params['person'] = is_array( $_GET['person'] )
+		? array_map( 'sanitize_text_field', $_GET['person'] )
+		: array( sanitize_text_field( $_GET['person'] ) );
 }
 if ( ! empty( $_GET['query'] ) ) {
 	$base_params['query'] = $_GET['query'];
@@ -369,8 +373,8 @@ function build_nav_url( $crm, $base_params, $index ) {
 		<!-- Query Bar -->
 		<div class="query-bar">
 			<span>Load people:</span>
-			<a href="<?php echo home_url( '/crm/assign-groups?query=no-group' ); ?>"
-			   class="query-button <?php echo $query_type === 'no-group' ? 'active' : ''; ?>">
+			<a href="<?php echo home_url( '/crm/assign-groups' ); ?>"
+			   class="query-button <?php echo empty( $_GET['person'] ) && $query_type !== 'in-group' ? 'active' : ''; ?>">
 				Without Groups
 			</a>
 			<select onchange="if(this.value) window.location.href=this.value">
@@ -390,9 +394,9 @@ function build_nav_url( $crm, $base_params, $index ) {
 
 		<?php if ( empty( $people_list ) ) : ?>
 			<div class="empty-state">
-				<h2>No People Loaded</h2>
-				<p>Use the query bar above to load people for group assignment.</p>
-				<p>You can also pass usernames via URL: <code>?person[]=user1&person[]=user2</code></p>
+				<h2>No People to Assign</h2>
+				<p>Everyone has been assigned to at least one group!</p>
+				<p>Use the query bar above to load people from a specific group, or pass usernames via URL: <code>?person[]=user1&person[]=user2</code></p>
 			</div>
 		<?php else : ?>
 			<div class="assign-groups-layout">
@@ -464,7 +468,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 				<!-- Right Panel: Groups Selection -->
 				<div class="groups-panel">
 					<?php if ( $current_person ) : ?>
-						<form method="post" id="assign-form">
+						<form method="post" action="<?php echo esc_url( home_url( '/crm/assign-groups' ) . '?' . http_build_query( array_merge( $base_params, array( 'index' => $current_index ) ) ) ); ?>" id="assign-form">
 							<input type="hidden" name="action" value="assign_groups">
 							<input type="hidden" name="person_id" value="<?php echo esc_attr( $current_person->id ); ?>">
 
@@ -505,7 +509,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 						<!-- Create New Group -->
 						<details class="create-group-section">
 							<summary>+ Create New Group</summary>
-							<form method="post" class="create-group-form">
+							<form method="post" action="<?php echo esc_url( home_url( '/crm/assign-groups' ) . '?' . http_build_query( array_merge( $base_params, array( 'index' => $current_index ) ) ) ); ?>" class="create-group-form">
 								<input type="hidden" name="action" value="create_group">
 								<input type="text" name="new_group_name" placeholder="Group Name" required>
 								<select name="new_group_type">
