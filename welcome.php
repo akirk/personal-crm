@@ -17,10 +17,21 @@ $is_first_use = empty( $crm->storage->get_available_groups() );
 
 $sections = array();
 
+if ( ! $is_first_use ) {
+	$sections[] = array(
+		'id'          => 'browse-crm',
+		'title'       => 'Browse Your CRM',
+		'description' => 'Jump to your groups or people.',
+		'callback'    => __NAMESPACE__ . '\\render_browse_section',
+		'priority'    => 1,
+		'icon'        => '📋',
+	);
+}
+
 $sections[] = array(
 	'id'          => 'create-first-group',
-	'title'       => 'Create Your First Group',
-	'description' => 'Start by creating a group to organize your contacts.',
+	'title'       => $is_first_use ? 'Create Your First Group' : 'Create Another Group',
+	'description' => $is_first_use ? 'Start by creating a group to organize your contacts.' : 'Add a new group to organize more contacts.',
 	'callback'    => __NAMESPACE__ . '\\render_create_group_section',
 	'priority'    => 5,
 	'icon'        => '+',
@@ -31,6 +42,31 @@ $sections = apply_filters( 'personal_crm_welcome_sections', $sections, $crm );
 usort( $sections, function( $a, $b ) {
 	return ( $a['priority'] ?? 10 ) <=> ( $b['priority'] ?? 10 );
 } );
+
+function render_browse_section( $crm ) {
+	$groups = $crm->storage->get_available_groups();
+	$people_count = count( $crm->storage->get_all_people() );
+	?>
+	<div class="welcome-section-content">
+		<div class="browse-links">
+			<a href="<?php echo home_url( '/crm/select' ); ?>" class="browse-link">
+				<span class="browse-link-icon">📁</span>
+				<span class="browse-link-text">
+					<strong>Groups</strong>
+					<span><?php echo count( $groups ); ?> group<?php echo count( $groups ) !== 1 ? 's' : ''; ?></span>
+				</span>
+			</a>
+			<a href="<?php echo home_url( '/crm/people' ); ?>" class="browse-link">
+				<span class="browse-link-icon">👥</span>
+				<span class="browse-link-text">
+					<strong>People</strong>
+					<span><?php echo $people_count; ?> <?php echo $people_count !== 1 ? 'people' : 'person'; ?></span>
+				</span>
+			</a>
+		</div>
+	</div>
+	<?php
+}
 
 function render_create_group_section( $crm ) {
 	$create_url = $crm->build_url( 'admin/index.php', array( 'create_group' => 'new' ) );
@@ -178,6 +214,42 @@ function render_create_group_section( $crm ) {
 		}
 		.skip-link a:hover {
 			text-decoration: underline;
+		}
+		.browse-links {
+			display: flex;
+			gap: 16px;
+			flex-wrap: wrap;
+		}
+		.browse-link {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			padding: 16px 20px;
+			background: light-dark(#f8f8f8, #2a2a2a);
+			border: 1px solid light-dark(#e0e0e0, #444);
+			border-radius: 8px;
+			text-decoration: none;
+			color: inherit;
+			transition: border-color 0.15s, background 0.15s;
+			min-width: 180px;
+		}
+		.browse-link:hover {
+			border-color: #0073aa;
+			background: light-dark(#f0f7fc, #1a2a3a);
+		}
+		.browse-link-icon {
+			font-size: 1.5em;
+		}
+		.browse-link-text {
+			display: flex;
+			flex-direction: column;
+		}
+		.browse-link-text strong {
+			font-size: 15px;
+		}
+		.browse-link-text span {
+			font-size: 13px;
+			color: light-dark(#666, #999);
 		}
 	</style>
 </head>

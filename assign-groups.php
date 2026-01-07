@@ -203,6 +203,13 @@ function build_nav_url( $crm, $base_params, $index ) {
 			font-weight: 600;
 			margin-bottom: 4px;
 		}
+		.person-card .person-name a {
+			color: inherit;
+			text-decoration: none;
+		}
+		.person-card .person-name a:hover {
+			text-decoration: underline;
+		}
 		.person-card .person-username {
 			color: light-dark(#666, #999);
 			font-size: 14px;
@@ -408,7 +415,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 
 					<?php if ( $current_person ) : ?>
 						<div class="person-card current">
-							<div class="person-name"><?php echo esc_html( $current_person->get_display_name_with_nickname() ); ?></div>
+							<div class="person-name"><a href="<?php echo esc_url( $crm->build_url( 'person.php', array( 'person' => $current_person->username ) ) ); ?>"><?php echo esc_html( $current_person->get_display_name_with_nickname() ); ?></a></div>
 							<div class="person-username">@<?php echo esc_html( $current_person->username ); ?></div>
 							<?php if ( ! empty( $current_person->location ) ) : ?>
 								<div class="person-username">📍 <?php echo esc_html( $current_person->location ); ?></div>
@@ -455,7 +462,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 									<?php else : ?>
 										<span style="opacity: 0.3;">○</span>
 									<?php endif; ?>
-									<?php echo esc_html( $person->name ); ?>
+									<a href="<?php echo esc_url( $crm->build_url( 'person.php', array( 'person' => $person->username ) ) ); ?>"><?php echo esc_html( $person->name ); ?></a>
 								</span>
 								<?php if ( $idx !== $current_index ) : ?>
 									<a href="<?php echo esc_url( build_nav_url( $crm, $base_params, $idx ) ); ?>" style="font-size: 12px;">Jump</a>
@@ -468,7 +475,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 				<!-- Right Panel: Groups Selection -->
 				<div class="groups-panel">
 					<?php if ( $current_person ) : ?>
-						<form method="post" action="<?php echo esc_url( home_url( '/crm/assign-groups' ) . '?' . http_build_query( array_merge( $base_params, array( 'index' => $current_index ) ) ) ); ?>" id="assign-form">
+						<form method="post" action="<?php echo home_url( '/crm/assign-groups' ) . '?' . http_build_query( array_merge( $base_params, array( 'index' => $current_index ) ) ); ?>" id="assign-form">
 							<input type="hidden" name="action" value="assign_groups">
 							<input type="hidden" name="person_id" value="<?php echo esc_attr( $current_person->id ); ?>">
 
@@ -509,7 +516,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 						<!-- Create New Group -->
 						<details class="create-group-section">
 							<summary>+ Create New Group</summary>
-							<form method="post" action="<?php echo esc_url( home_url( '/crm/assign-groups' ) . '?' . http_build_query( array_merge( $base_params, array( 'index' => $current_index ) ) ) ); ?>" class="create-group-form">
+							<form method="post" action="<?php echo home_url( '/crm/assign-groups' ) . '?' . http_build_query( array_merge( $base_params, array( 'index' => $current_index ) ) ); ?>" class="create-group-form">
 								<input type="hidden" name="action" value="create_group">
 								<input type="text" name="new_group_name" placeholder="Group Name" required>
 								<select name="new_group_type">

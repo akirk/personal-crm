@@ -112,6 +112,9 @@ class PersonalCrm {
         $this->app->route( 'finder', 'finder.php' );
         $this->app->route( 'search', 'finder.php' );
 
+        // People list (people.php)
+        $this->app->route( 'people', 'people.php' );
+
         // Person management (person.php)
         $this->app->route( 'person/{person}', 'person.php' );
         $this->app->route( 'group/{group}/history', 'group-history.php' );
@@ -139,14 +142,12 @@ class PersonalCrm {
     private function setup_menu() {
         // Main navigation - Personal CRM focused
         $this->app->add_menu_item( 'dashboard', 'Dashboard', home_url( '/crm/' ) );
-        $this->app->add_menu_item( 'person', 'People', home_url( '/crm/person' ) );
+        $this->app->add_menu_item( 'people', 'People', home_url( '/crm/people' ) );
         $this->app->add_menu_item( 'events', 'Events', home_url( '/crm/events' ) );
         $this->app->add_menu_item( 'select', 'Select Group', home_url( '/crm/select' ) );
 
         // Admin menu items (only for administrators)
         if ( current_user_can( 'manage_options' ) ) {
-            $this->app->add_menu_item( 'admin', 'Admin', home_url( '/crm/admin' ) );
-            $this->app->add_menu_item( 'audit', 'Audit', home_url( '/crm/audit' ) );
             $this->app->add_menu_item( 'settings', 'Plugin Settings', admin_url( 'options-general.php?page=personal-crm-settings' ) );
         }
 
