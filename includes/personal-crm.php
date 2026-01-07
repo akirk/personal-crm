@@ -3,6 +3,7 @@
 namespace PersonalCRM;
 
 require_once __DIR__ . '/storage.php';
+require_once __DIR__ . '/export-import.php';
 
 class PersonalCrm {
     private static $instance = null;
@@ -11,6 +12,7 @@ class PersonalCrm {
     public $app;
     private $current_group;
     private $group;
+    private $export_tables = array();
 
     public static function set_storage( $storage ) {
         self::$storage_instance = $storage;
@@ -75,6 +77,9 @@ class PersonalCrm {
         wp_app_enqueue_script( 'personal-crm-script', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/script.js', [ 'jquery' ], '1.0', true );
         wp_app_enqueue_script( 'personal-crm-local-llm', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/local-llm.js', [], '1.0', true );
 
+        // Register core tables for export/import before firing the loaded action
+        $this->register_core_export_tables();
+
         // Fire action to allow other plugins to register routes and extend functionality
         do_action( 'personal_crm_loaded', $this );
 
@@ -137,17 +142,21 @@ class PersonalCrm {
 
         // Welcome page (welcome.php)
         $this->app->route( 'welcome', 'welcome.php' );
+
+        // Export page (export.php)
+        $this->app->route( 'admin/export', 'export.php' );
     }
 
     private function setup_menu() {
         // Main navigation - Personal CRM focused
-        $this->app->add_menu_item( 'dashboard', 'Dashboard', home_url( '/crm/' ) );
         $this->app->add_menu_item( 'people', 'People', home_url( '/crm/people' ) );
         $this->app->add_menu_item( 'events', 'Events', home_url( '/crm/events' ) );
         $this->app->add_menu_item( 'select', 'Select Group', home_url( '/crm/select' ) );
+        $this->app->add_menu_item( 'welcome', 'Welcome', home_url( '/crm/welcome' ) );
 
         // Admin menu items (only for administrators)
         if ( current_user_can( 'manage_options' ) ) {
+            $this->app->add_menu_item( 'export', 'Export', home_url( '/crm/admin/export' ) );
             $this->app->add_menu_item( 'settings', 'Plugin Settings', admin_url( 'options-general.php?page=personal-crm-settings' ) );
         }
 
@@ -1564,6 +1573,80 @@ class PersonalCrm {
         }
 
         return $timeline;
+    }
+
+    /**
+     * Register a table for export/import.
+     * Extension plugins should call this during personal_crm_loaded action.
+     * Tables are exported in registration order, so register dependencies first.
+     *
+     * @param string $table_name The table name (without WordPress prefix).
+     * @param array  $config Configuration with keys:
+     *   - foreign_keys: array - Map of column => 'table.column' for ID remapping
+     *   - unique_key: string - Column used for merge matching (e.g., 'slug', 'username')
+     */
+    public function register_export_table( $table_name, $config = array() ) {
+        $defaults = array(
+            'foreign_keys' => array(),
+            'unique_key'   => null,
+        );
+        $this->export_tables[ $table_name ] = array_merge( $defaults, $config );
+    }
+
+    /**
+     * Get all registered export tables in registration order.
+     */
+    public function get_registered_export_tables() {
+        return $this->export_tables;
+    }
+
+    /**
+     * Register core Personal CRM tables for export.
+     */
+    private function register_core_export_tables() {
+        $this->register_export_table( 'personal_crm_groups', array(
+            'foreign_keys' => array( 'parent_id' => 'personal_crm_groups.id' ),
+            'unique_key'   => 'slug',
+            'order_by'     => 'COALESCE(parent_id, 0), sort_order',
+        ) );
+
+        $this->register_export_table( 'personal_crm_people', array(
+            'unique_key' => 'username',
+        ) );
+
+        $this->register_export_table( 'personal_crm_people_groups', array(
+            'foreign_keys' => array(
+                'person_id' => 'personal_crm_people.id',
+                'group_id'  => 'personal_crm_groups.id',
+            ),
+        ) );
+
+        $this->register_export_table( 'personal_crm_people_groups_history', array(
+            'foreign_keys' => array(
+                'person_id' => 'personal_crm_people.id',
+                'group_id'  => 'personal_crm_groups.id',
+            ),
+        ) );
+
+        $this->register_export_table( 'personal_crm_notes', array(
+            'foreign_keys' => array( 'person_id' => 'personal_crm_people.id' ),
+        ) );
+
+        $this->register_export_table( 'personal_crm_events', array(
+            'foreign_keys' => array( 'group_id' => 'personal_crm_groups.id' ),
+        ) );
+
+        $this->register_export_table( 'personal_crm_group_links', array(
+            'foreign_keys' => array( 'group_id' => 'personal_crm_groups.id' ),
+        ) );
+
+        $this->register_export_table( 'personal_crm_people_links', array(
+            'foreign_keys' => array( 'person_id' => 'personal_crm_people.id' ),
+        ) );
+
+        $this->register_export_table( 'personal_crm_event_links', array(
+            'foreign_keys' => array( 'event_id' => 'personal_crm_events.id' ),
+        ) );
     }
 
 }

@@ -37,6 +37,18 @@ $sections[] = array(
 	'icon'        => '+',
 );
 
+if ( current_user_can( 'manage_options' ) ) {
+	$sections[] = array(
+		'id'          => 'import-data',
+		'title'       => 'Import Data',
+		'description' => 'Restore from a previous export or import data from another CRM.',
+		'callback'    => __NAMESPACE__ . '\\render_import_section',
+		'priority'    => 50,
+		'icon'        => '↑',
+		'capability'  => 'manage_options',
+	);
+}
+
 $sections = apply_filters( 'personal_crm_welcome_sections', $sections, $crm );
 
 usort( $sections, function( $a, $b ) {
@@ -77,6 +89,78 @@ function render_create_group_section( $crm ) {
 			<input type="hidden" name="create_group" value="new">
 			<input type="text" name="name" placeholder="Group name (e.g., Family, Work)" required>
 			<button type="submit" class="btn btn-primary">Create Group</button>
+		</form>
+	</div>
+	<?php
+}
+
+function render_import_section( $crm ) {
+	$import_result = null;
+
+	// Handle import form submission
+	if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POST['action'] === 'import_data' ) {
+		if ( ! wp_verify_nonce( $_POST['import_nonce'], 'personal_crm_import' ) ) {
+			$import_result = array( 'success' => false, 'error' => 'Security check failed.' );
+		} elseif ( ! isset( $_FILES['import_file'] ) || $_FILES['import_file']['error'] !== UPLOAD_ERR_OK ) {
+			$import_result = array( 'success' => false, 'error' => 'File upload failed. Please try again.' );
+		} else {
+			$file_path = $_FILES['import_file']['tmp_name'];
+			$mode = sanitize_text_field( $_POST['import_mode'] ?? 'replace' );
+
+			$importer = new ExportImport( $crm );
+			$result = $importer->import_from_jsonl( $file_path, $mode );
+
+			if ( is_wp_error( $result ) ) {
+				$import_result = array( 'success' => false, 'error' => $result->get_error_message() );
+			} else {
+				$total = array_sum( $result['counts'] );
+				$skipped = array_sum( $result['skipped'] ?? array() );
+				$import_result = array( 'success' => true, 'count' => $total, 'skipped' => $skipped, 'mode' => $result['mode'] );
+			}
+		}
+	}
+	?>
+	<div class="welcome-section-content">
+		<?php if ( $import_result ) : ?>
+			<?php if ( $import_result['success'] ) : ?>
+				<div class="import-notice import-success">
+					Successfully imported <?php echo number_format( $import_result['count'] ); ?> records
+					(<?php echo $import_result['mode'] === 'replace' ? 'replaced all data' : 'merged with existing'; ?>).
+					<?php if ( ! empty( $import_result['skipped'] ) ) : ?>
+						<?php echo number_format( $import_result['skipped'] ); ?> records skipped (duplicates or missing references).
+					<?php endif; ?>
+				</div>
+			<?php else : ?>
+				<div class="import-notice import-error">
+					Import failed: <?php echo esc_html( $import_result['error'] ); ?>
+				</div>
+			<?php endif; ?>
+		<?php endif; ?>
+
+		<p>Upload a JSONL export file to restore your data. You can export your current data from the <a href="<?php echo home_url( '/crm/admin/export' ); ?>">Export page</a>.</p>
+
+		<form method="post" enctype="multipart/form-data" class="import-form">
+			<?php wp_nonce_field( 'personal_crm_import', 'import_nonce' ); ?>
+			<input type="hidden" name="action" value="import_data">
+
+			<div class="import-options">
+				<label class="import-mode-option">
+					<input type="radio" name="import_mode" value="replace" checked>
+					<span class="option-label">Replace all data</span>
+					<span class="option-desc">Clear existing data and import fresh (recommended for restoring backups)</span>
+				</label>
+				<label class="import-mode-option">
+					<input type="radio" name="import_mode" value="merge">
+					<span class="option-label">Merge with existing</span>
+					<span class="option-desc">Add new records, update existing ones by matching unique keys</span>
+				</label>
+			</div>
+
+			<div class="file-input-wrapper">
+				<input type="file" name="import_file" accept=".jsonl" required>
+			</div>
+
+			<button type="submit" class="btn btn-secondary">Import Data</button>
 		</form>
 	</div>
 	<?php
@@ -250,6 +334,73 @@ function render_create_group_section( $crm ) {
 		.browse-link-text span {
 			font-size: 13px;
 			color: light-dark(#666, #999);
+		}
+		/* Import section styles */
+		.import-form {
+			display: flex;
+			flex-direction: column;
+			gap: 16px;
+		}
+		.import-options {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+		}
+		.import-mode-option {
+			display: flex;
+			flex-direction: column;
+			padding: 12px 16px;
+			background: light-dark(#f8f8f8, #2a2a2a);
+			border: 1px solid light-dark(#e0e0e0, #444);
+			border-radius: 8px;
+			cursor: pointer;
+			transition: border-color 0.15s;
+		}
+		.import-mode-option:has(input:checked) {
+			border-color: #0073aa;
+			background: light-dark(#f0f7fc, #1a2a3a);
+		}
+		.import-mode-option input {
+			position: absolute;
+			opacity: 0;
+			pointer-events: none;
+		}
+		.option-label {
+			font-weight: 500;
+			margin-bottom: 4px;
+		}
+		.import-mode-option:has(input:checked) .option-label::before {
+			content: "✓ ";
+			color: #0073aa;
+		}
+		.option-desc {
+			font-size: 13px;
+			color: light-dark(#666, #999);
+		}
+		.file-input-wrapper {
+			padding: 16px;
+			background: light-dark(#f8f8f8, #2a2a2a);
+			border: 2px dashed light-dark(#ddd, #444);
+			border-radius: 8px;
+			text-align: center;
+		}
+		.file-input-wrapper input[type="file"] {
+			font-size: 14px;
+		}
+		.import-notice {
+			padding: 12px 16px;
+			border-radius: 8px;
+			margin-bottom: 16px;
+		}
+		.import-success {
+			background: light-dark(#d4edda, #1a3a2a);
+			color: light-dark(#155724, #7dcea0);
+			border: 1px solid light-dark(#c3e6cb, #2a5a4a);
+		}
+		.import-error {
+			background: light-dark(#f8d7da, #3a1a2a);
+			color: light-dark(#721c24, #e07080);
+			border: 1px solid light-dark(#f5c6cb, #5a2a3a);
 		}
 	</style>
 </head>

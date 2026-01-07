@@ -86,8 +86,10 @@ function build_filter_url( $params = array() ) {
 	<?php
 	if ( function_exists( 'wp_app_enqueue_style' ) ) {
 		wp_app_enqueue_style( 'personal-crm-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
+		wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css' );
 	} else {
 		echo '<link rel="stylesheet" href="' . plugin_dir_url( __FILE__ ) . 'assets/style.css">';
+		echo '<link rel="stylesheet" href="' . plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css">';
 	}
 	?>
 	<?php if ( function_exists( 'wp_app_head' ) ) wp_app_head(); ?>
@@ -297,11 +299,12 @@ function build_filter_url( $params = array() ) {
 </head>
 <body class="wp-app-body">
 	<?php if ( function_exists( 'wp_app_body_open' ) ) wp_app_body_open(); ?>
+	<?php $crm->render_cmd_k_panel(); ?>
 
 	<div class="container">
 		<div class="header">
 			<h1>People</h1>
-			<div class="navigation">
+			<div class="back-nav">
 				<a href="<?php echo home_url( '/crm/' ); ?>">← Back to CRM</a>
 			</div>
 		</div>
@@ -429,6 +432,9 @@ function build_filter_url( $params = array() ) {
 		});
 	});
 	</script>
+
+	<script src="<?php echo plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js'; ?>"></script>
+	<?php $crm->init_cmd_k_js(); ?>
 
 	<?php if ( function_exists( 'wp_app_body_close' ) ) wp_app_body_close(); ?>
 </body>
