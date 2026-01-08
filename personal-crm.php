@@ -142,3 +142,179 @@ if ( defined( 'WPINC' ) ) {
     PersonalCrm::set_storage( $storage );
 }
 
+add_filter( 'my_apps_plugins', function( $apps ) {
+    $apps['personal-crm'] = array(
+        'name'     => 'Personal CRM',
+        'url'      => home_url( '/crm/' ),
+        'icon_url' => 'data:image/svg+xml,' . rawurlencode( '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#2271b1"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>' ),
+    );
+
+    // Add saved CRM items (groups and people) to my-apps
+    $saved_items = get_option( 'personal_crm_my_apps', array() );
+    if ( ! empty( $saved_items ) ) {
+        $crm = PersonalCrm::get_instance();
+        $storage = $crm->storage;
+
+        foreach ( $saved_items as $item ) {
+            $slug = 'crm-' . $item['type'] . '-' . $item['id'];
+
+            if ( $item['type'] === 'group' ) {
+                $group = $storage->get_group( $item['id'] );
+                if ( $group ) {
+                    $icon = $group->display_icon ?: '';
+                    $apps[ $slug ] = array(
+                        'name'     => $group->group_name,
+                        'url'      => home_url( '/crm/group/' . $group->slug ),
+                        'emoji'    => $icon ?: '👥',
+                    );
+                }
+            } elseif ( $item['type'] === 'person' ) {
+                $person = $storage->get_person( $item['id'] );
+                if ( $person ) {
+                    $icon_url = '';
+                    if ( ! empty( $person->email ) ) {
+                        $hash = md5( strtolower( trim( $person->email ) ) );
+                        $icon_url = 'https://www.gravatar.com/avatar/' . $hash . '?s=120&d=mp';
+                    }
+                    $apps[ $slug ] = array(
+                        'name'     => $person->name,
+                        'url'      => home_url( '/crm/person/' . $person->username ),
+                        'icon_url' => $icon_url ?: '',
+                        'emoji'    => $icon_url ? '' : '👤',
+                    );
+                }
+            }
+        }
+    }
+
+    return $apps;
+} );
+
+// Add masterbar menu items to add current person/group to my-apps
+// Use wp_app_admin_bar_menu which fires after wp-app adds its menu items
+add_action( 'wp_app_admin_bar_menu', function( $wp_admin_bar ) {
+    if ( ! is_user_logged_in() ) {
+        return;
+    }
+
+    $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+
+    // Check if we're on a CRM person page
+    if ( preg_match( '#/crm/person/([^/]+)#', $request_uri, $matches ) ) {
+        $username = $matches[1];
+        $saved_items = get_option( 'personal_crm_my_apps', array() );
+        $is_saved = false;
+        foreach ( $saved_items as $item ) {
+            if ( $item['type'] === 'person' && $item['id'] === $username ) {
+                $is_saved = true;
+                break;
+            }
+        }
+
+        $wp_admin_bar->add_node( array(
+            'id'    => 'crm-add-to-my-apps',
+            'title' => $is_saved ? '★ In My Apps' : '☆ Add to My Apps',
+            'href'  => '#',
+            'meta'  => array(
+                'onclick' => 'personalCrmToggleMyApps("person", "' . esc_js( $username ) . '"); return false;',
+            ),
+        ) );
+    }
+
+    // Check if we're on a CRM group page
+    if ( preg_match( '#/crm/group/([^/]+)#', $request_uri, $matches ) ) {
+        $group_slug = $matches[1];
+        $saved_items = get_option( 'personal_crm_my_apps', array() );
+        $is_saved = false;
+        foreach ( $saved_items as $item ) {
+            if ( $item['type'] === 'group' && $item['id'] === $group_slug ) {
+                $is_saved = true;
+                break;
+            }
+        }
+
+        $wp_admin_bar->add_node( array(
+            'id'    => 'crm-add-to-my-apps',
+            'title' => $is_saved ? '★ In My Apps' : '☆ Add to My Apps',
+            'href'  => '#',
+            'meta'  => array(
+                'onclick' => 'personalCrmToggleMyApps("group", "' . esc_js( $group_slug ) . '"); return false;',
+            ),
+        ) );
+    }
+} );
+
+// Enqueue JS for my-apps toggle functionality
+add_action( 'wp_head', function() {
+    $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+    if ( strpos( $request_uri, '/crm/' ) === false ) {
+        return;
+    }
+    ?>
+    <script>
+    function personalCrmToggleMyApps(type, id) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', true);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                var response = JSON.parse(xhr.responseText);
+                if (response.success) {
+                    var menuItem = document.querySelector('#wp-admin-bar-crm-add-to-my-apps .ab-item');
+                    if (menuItem) {
+                        menuItem.textContent = response.data.is_saved ? '★ In My Apps' : '☆ Add to My Apps';
+                    }
+                }
+            }
+        };
+        xhr.send('action=personal_crm_toggle_my_apps&type=' + encodeURIComponent(type) + '&id=' + encodeURIComponent(id) + '&nonce=<?php echo esc_js( wp_create_nonce( 'personal_crm_my_apps' ) ); ?>');
+    }
+    </script>
+    <?php
+}, 100 );
+
+// AJAX handler to toggle my-apps items
+add_action( 'wp_ajax_personal_crm_toggle_my_apps', function() {
+    check_ajax_referer( 'personal_crm_my_apps', 'nonce' );
+
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( 'Not logged in' );
+    }
+
+    $type = isset( $_POST['type'] ) ? sanitize_text_field( wp_unslash( $_POST['type'] ) ) : '';
+    $id = isset( $_POST['id'] ) ? sanitize_text_field( wp_unslash( $_POST['id'] ) ) : '';
+
+    if ( empty( $type ) || empty( $id ) || ! in_array( $type, array( 'person', 'group' ), true ) ) {
+        wp_send_json_error( 'Invalid parameters' );
+    }
+
+    $saved_items = get_option( 'personal_crm_my_apps', array() );
+    $is_saved = false;
+    $found_index = -1;
+
+    foreach ( $saved_items as $index => $item ) {
+        if ( $item['type'] === $type && $item['id'] === $id ) {
+            $is_saved = true;
+            $found_index = $index;
+            break;
+        }
+    }
+
+    if ( $is_saved ) {
+        // Remove from my-apps
+        array_splice( $saved_items, $found_index, 1 );
+        $is_saved = false;
+    } else {
+        // Add to my-apps
+        $saved_items[] = array(
+            'type' => $type,
+            'id'   => $id,
+        );
+        $is_saved = true;
+    }
+
+    update_option( 'personal_crm_my_apps', $saved_items );
+
+    wp_send_json_success( array( 'is_saved' => $is_saved ) );
+} );
+
