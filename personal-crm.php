@@ -347,6 +347,7 @@ add_action( 'wp_ajax_personal_crm_quick_update', function() {
     $allowed_fields = apply_filters( 'personal_crm_quick_update_fields', array(
         'birthday' => array( 'sanitize' => $date_sanitizer ),
         'partner_birthday' => array( 'sanitize' => $date_sanitizer ),
+        'email' => array( 'sanitize' => 'sanitize_email' ),
     ) );
 
     // Check if it's a child birthday field (child_birthday_0, child_birthday_1, etc.)

@@ -56,7 +56,7 @@ function get_missing_data_points( $person, $person_type = 'member', $group_slug 
 
 	// Recommended fields - likely to be filled out for most people
 	if ( empty( $person->email ) ) {
-		$missing[] = array( 'field' => 'Email address', 'priority' => 'recommended' );
+		$missing[] = array( 'field' => 'Primary email address', 'priority' => 'recommended' );
 	}
 	if ( empty( $person->website ) ) {
 		$missing[] = array( 'field' => 'Website', 'priority' => 'recommended' );

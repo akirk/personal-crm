@@ -991,7 +991,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 		</div>
 
 		<div class="form-group">
-			<label for="email">Email Address</label>
+			<label for="email">Primary Email Address</label>
 			<input type="email" id="email" name="email" value="<?php echo get_person_form_value( 'email', $edit_data, $is_editing ); ?>">
 		</div>
 	</div>

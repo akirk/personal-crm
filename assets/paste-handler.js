@@ -85,6 +85,32 @@
 		registerBuiltInDetectors: function() {
 			const self = this;
 
+			// Email detector
+			this.registerDetector('email', {
+				label: 'Primary Email Address',
+				icon: '📧',
+				fieldId: 'email',
+				priority: 5,
+				detect: function(text) {
+					text = text.trim();
+					const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+					if (emailRegex.test(text)) {
+						return { value: text, display: text };
+					}
+					return null;
+				},
+				formatForSave: (value) => value,
+				fillForm: function(value) {
+					const emailInput = document.getElementById('email');
+					if (emailInput) {
+						emailInput.value = value;
+						emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+						return true;
+					}
+					return false;
+				}
+			});
+
 			// Main birthday detector
 			this.registerDetector('birthday', {
 				label: 'Birthday',

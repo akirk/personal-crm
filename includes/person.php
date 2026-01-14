@@ -572,11 +572,17 @@ class Person {
 	 * @return string|null Gravatar URL or null if no email
 	 */
 	public function get_gravatar_url( $size = 80, $default = 'identicon', $rating = 'g' ) {
-		if ( empty( $this->email ) ) {
+		$email = $this->email;
+
+		if ( empty( $email ) ) {
+			$email = apply_filters( 'personal_crm_person_gravatar_email', '', $this );
+		}
+
+		if ( empty( $email ) ) {
 			return null;
 		}
 
-		$hash = md5( strtolower( trim( $this->email ) ) );
+		$hash = md5( strtolower( trim( $email ) ) );
 		$url = "https://www.gravatar.com/avatar/{$hash}?s={$size}&d={$default}&r={$rating}";
 
 		return $url;
@@ -588,11 +594,17 @@ class Person {
 	 * @return bool True if person has a custom Gravatar
 	 */
 	public function has_gravatar() {
-		if ( empty( $this->email ) ) {
+		$email = $this->email;
+
+		if ( empty( $email ) ) {
+			$email = apply_filters( 'personal_crm_person_gravatar_email', '', $this );
+		}
+
+		if ( empty( $email ) ) {
 			return false;
 		}
 
-		$hash = md5( strtolower( trim( $this->email ) ) );
+		$hash = md5( strtolower( trim( $email ) ) );
 		$url = "https://www.gravatar.com/avatar/{$hash}?d=404";
 
 		// Check if Gravatar returns 404 (no custom avatar) or 200 (has avatar)
