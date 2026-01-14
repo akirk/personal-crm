@@ -47,11 +47,11 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 			$group_slug = sanitize_title( $group_name );
 			$group_slug = str_replace( '-', '_', $group_slug );
 
-			$result = $crm->storage->create_group( $group_name, $group_slug, $group_type );
-			if ( $result ) {
-				$group_id = $crm->storage->db->lastInsertId();
-				if ( $person_id && $group_id ) {
-					$crm->storage->add_person_to_group( $person_id, $group_id );
+			$new_slug = $crm->storage->create_group( $group_name, $group_slug, $group_type );
+			if ( $new_slug ) {
+				$new_group = $crm->storage->get_group( $new_slug );
+				if ( $person_id && $new_group ) {
+					$crm->storage->add_person_to_group( $person_id, $new_group->id );
 					$message = "Created and assigned group: $group_name";
 				} else {
 					$message = "Created group: $group_name";
@@ -596,6 +596,13 @@ function build_nav_url( $crm, $base_params, $index ) {
 					updateSelectedSummary();
 				}
 			});
+		});
+
+		// Focus on group name input when expanding create group section
+		document.querySelector('.create-group-section')?.addEventListener('toggle', function(e) {
+			if (this.open) {
+				this.querySelector('input[name="new_group_name"]')?.focus();
+			}
 		});
 
 		// Auto-advance after successful assignment
