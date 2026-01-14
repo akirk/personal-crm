@@ -31,7 +31,12 @@ if ( $current_group === 'team' ) {
 	exit;
 }
 
+// When editing a person, don't let get_globals() override current_group with default
+$saved_current_group = $is_editing_person ? $current_group : null;
 extract( PersonalCrm::get_globals() );
+if ( $is_editing_person && $saved_current_group === null ) {
+	$current_group = null;
+}
 
 $config_file = $current_group ? __DIR__ . '/../' . $current_group . '.json' : null;
 $action = $_POST['action'] ?? $_GET['action'] ?? 'dashboard';

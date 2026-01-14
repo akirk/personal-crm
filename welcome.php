@@ -177,8 +177,10 @@ function render_import_section( $crm ) {
 	<?php
 	if ( function_exists( '\wp_app_enqueue_style' ) ) {
 		wp_app_enqueue_style( 'personal-crm-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
+		wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css' );
 	} else {
 		echo '<link rel="stylesheet" href="assets/style.css">';
+		echo '<link rel="stylesheet" href="assets/cmd-k.css">';
 	}
 	?>
 	<?php if ( function_exists( '\wp_app_head' ) ) \wp_app_head(); ?>
@@ -406,6 +408,7 @@ function render_import_section( $crm ) {
 </head>
 <body class="wp-app-body">
 	<?php if ( function_exists( '\wp_app_body_open' ) ) \wp_app_body_open(); ?>
+	<?php $crm->render_cmd_k_panel(); ?>
 
 	<div class="welcome-container">
 		<div class="welcome-header">
@@ -449,6 +452,8 @@ function render_import_section( $crm ) {
 		<?php endif; ?>
 	</div>
 
+	<script src="<?php echo plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js'; ?>"></script>
+	<?php $crm->init_cmd_k_js(); ?>
 	<?php if ( function_exists( '\wp_app_footer' ) ) \wp_app_footer(); ?>
 </body>
 </html>

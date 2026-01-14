@@ -9,16 +9,17 @@ window.CmdK = {
     filteredItems: [],
     teams: [],
     searchIndex: [],
+    pages: [],
     privacyMode: false,
     searchTimeout: null,
     detailsTimeout: null,
     currentSearchQuery: '',
     personDetailsCache: {},
 
-    init(teams, searchIndex, privacyMode = false, ajaxUrl = '', baseUrl = '') {
+    init(teams, searchIndex, ajaxUrl = '', baseUrl = '', pages = []) {
         this.teams = teams || [];
         this.searchIndex = searchIndex || [];
-        this.privacyMode = privacyMode;
+        this.pages = pages || [];
         this.ajaxUrl = ajaxUrl;
         this.baseUrl = baseUrl || '/crm/';
         this.bindEvents();
@@ -31,7 +32,13 @@ window.CmdK = {
 
         if (!query.trim()) {
             this.currentSearchQuery = '';
-            this.filteredItems = this.teams.map(team => ({
+            const pageItems = this.pages.map(page => ({
+                name: page.name,
+                icon: page.icon || '📄',
+                itemType: 'page',
+                url: page.url
+            }));
+            const teamItems = this.teams.map(team => ({
                 slug: team.slug,
                 name: team.name,
                 team_members: team.team_members,
@@ -41,6 +48,7 @@ window.CmdK = {
                 itemType: 'team',
                 url: team.url
             }));
+            this.filteredItems = [...pageItems, ...teamItems];
             this.selectedIndex = 0;
             this.selectedLinkIndex = -1;
             this.renderResults();
@@ -51,6 +59,16 @@ window.CmdK = {
         this.searchTimeout = setTimeout(() => {
             this.currentSearchQuery = query;
             const searchLower = query.toLowerCase();
+
+            // Search pages
+            const matchingPages = this.pages
+                .filter(page => page.name.toLowerCase().includes(searchLower))
+                .map(page => ({
+                    name: page.name,
+                    icon: page.icon || '📄',
+                    itemType: 'page',
+                    url: page.url
+                }));
 
             // Search teams
             const matchingTeams = this.teams
@@ -84,7 +102,7 @@ window.CmdK = {
                 detailsLoading: false
             }));
 
-            this.filteredItems = [...matchingTeams, ...matchingPeople];
+            this.filteredItems = [...matchingPages, ...matchingTeams, ...matchingPeople];
             this.selectedIndex = 0;
             this.selectedLinkIndex = -1;
             this.renderResults();
@@ -364,8 +382,14 @@ window.CmdK = {
         }
         this.updatePlaceholder();
 
-        // Show team overview by default (instant - no loading)
-        this.filteredItems = this.teams.map(team => ({
+        // Show pages and teams by default (instant - no loading)
+        const pageItems = this.pages.map(page => ({
+            name: page.name,
+            icon: page.icon || '📄',
+            itemType: 'page',
+            url: page.url
+        }));
+        const teamItems = this.teams.map(team => ({
             slug: team.slug,
             name: team.name,
             team_members: team.team_members,
@@ -375,6 +399,7 @@ window.CmdK = {
             itemType: 'team',
             url: team.url
         }));
+        this.filteredItems = [...pageItems, ...teamItems];
         this.renderResults();
     },
 
@@ -401,7 +426,13 @@ window.CmdK = {
         }
 
         this.currentSearchQuery = '';
-        this.filteredItems = this.teams.map(team => ({
+        const closedPageItems = this.pages.map(page => ({
+            name: page.name,
+            icon: page.icon || '📄',
+            itemType: 'page',
+            url: page.url
+        }));
+        const closedTeamItems = this.teams.map(team => ({
             slug: team.slug,
             name: team.name,
             team_members: team.team_members,
@@ -411,6 +442,7 @@ window.CmdK = {
             itemType: 'team',
             url: team.url
         }));
+        this.filteredItems = [...closedPageItems, ...closedTeamItems];
     },
 
     updatePlaceholder() {
@@ -493,17 +525,10 @@ window.CmdK = {
         const currentItem = this.filteredItems[this.selectedIndex];
         if (!currentItem) return;
 
-        if (currentItem.itemType === 'team') {
-            // Navigate to team page
+        if (currentItem.itemType === 'person' && this.selectedLinkIndex >= 0 && currentItem.links && currentItem.links[this.selectedLinkIndex]) {
+            window.open(currentItem.links[this.selectedLinkIndex].url, '_blank');
+        } else {
             window.location.href = currentItem.url;
-        } else if (currentItem.itemType === 'person') {
-            if (this.selectedLinkIndex >= 0 && currentItem.links && currentItem.links[this.selectedLinkIndex]) {
-                // Open the selected link
-                window.open(currentItem.links[this.selectedLinkIndex].url, '_blank');
-            } else {
-                // Navigate to person page
-                window.location.href = currentItem.url;
-            }
         }
         this.close();
     },
@@ -513,30 +538,33 @@ window.CmdK = {
         if (!resultsContainer) return;
 
         if (this.filteredItems.length === 0) {
-            resultsContainer.innerHTML = `<div class="cmd-k-no-results">No teams or people found</div>`;
+            resultsContainer.innerHTML = `<div class="cmd-k-no-results">No results found</div>`;
             return;
         }
 
         let html = this.filteredItems.map((item, index) => {
             const isSelected = index === this.selectedIndex;
 
-            if (item.itemType === 'team') {
-                // Render team item
-                return `
-                    <div class="cmd-k-item cmd-k-team ${isSelected ? 'selected' : ''}" data-index="${index}">
-                        <div class="cmd-k-item-header">
-                            <div class="cmd-k-item-name">
-                                <span class="cmd-k-item-icon">🏢</span>
-                                ${this.escapeHtml(item.name)}
-                                ${item.is_default ? '<span class="cmd-k-default-badge">Default</span>' : ''}
-                            </div>
-                            <div class="cmd-k-item-stats">${item.total_people || 0} people</div>
-                        </div>
+            if (item.itemType === 'page' || item.itemType === 'team') {
+                const icon = item.icon || '🏢';
+                const statsHtml = item.itemType === 'team' ? `<div class="cmd-k-item-stats">${item.total_people || 0} people</div>` : '';
+                const breakdownHtml = item.itemType === 'team' ? `
                         <div class="cmd-k-team-breakdown">
                             ${item.team_members > 0 ? `<span class="cmd-k-stat">👥 ${item.team_members} members</span>` : ''}
                             ${item.leadership > 0 ? `<span class="cmd-k-stat">👑 ${item.leadership} leaders</span>` : ''}
                             ${item.alumni > 0 ? `<span class="cmd-k-stat">🎓 ${item.alumni} alumni</span>` : ''}
+                        </div>` : '';
+                return `
+                    <div class="cmd-k-item cmd-k-${item.itemType} ${isSelected ? 'selected' : ''}" data-index="${index}">
+                        <div class="cmd-k-item-header">
+                            <div class="cmd-k-item-name">
+                                <span class="cmd-k-item-icon">${icon}</span>
+                                ${this.escapeHtml(item.name)}
+                                ${item.is_default ? '<span class="cmd-k-default-badge">Default</span>' : ''}
+                            </div>
+                            ${statsHtml}
                         </div>
+                        ${breakdownHtml}
                     </div>
                 `;
             } else if (item.itemType === 'person') {

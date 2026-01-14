@@ -152,6 +152,7 @@ class PersonalCrm {
         $this->app->add_menu_item( 'people', 'People', home_url( '/crm/people' ) );
         $this->app->add_menu_item( 'events', 'Events', home_url( '/crm/events' ) );
         $this->app->add_menu_item( 'select', 'Select Group', home_url( '/crm/select' ) );
+        $this->app->add_menu_item( 'assign-groups', 'Assign Groups', home_url( '/crm/assign-groups' ) );
         $this->app->add_menu_item( 'welcome', 'Welcome', home_url( '/crm/welcome' ) );
 
         // Admin menu items (only for administrators)
@@ -558,23 +559,17 @@ class PersonalCrm {
         $crm = self::get_instance();
         $current_group = $crm->get_current_group_from_params();
 
-        // Check if we're on a front-end group page (not admin) to redirect for non-existent groups
-        $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-        $is_group_page = ( preg_match( '#/crm/group/[^/]+#', $request_uri ) && strpos( $request_uri, '/admin/' ) === false );
-
-        if ( ! $current_group && ! $is_group_page ) {
+        // If no group specified, try to use default
+        if ( ! $current_group ) {
             $current_group = $crm->use_default_group();
-            $available_groups = $crm->storage->get_available_groups();
-            if ( count( $available_groups ) > 1 && ! $current_group ) {
-                header( 'Location: ' . $crm->build_url( 'index.php' ) );
-                exit;
-            }
         }
 
         // Load group object - members and events will be lazy loaded
         $group_data = $crm->storage->get_group( $current_group );
 
-        // Handle case where group doesn't exist - redirect to select page
+        // Handle case where group doesn't exist on a group page - redirect to select page
+        $request_uri = $_SERVER['REQUEST_URI'] ?? '';
+        $is_group_page = ( preg_match( '#/crm/group/[^/]+#', $request_uri ) && strpos( $request_uri, '/admin/' ) === false );
         if ( ! $group_data && $is_group_page ) {
             header( 'Location: ' . $crm->build_url( 'index.php', array( 'not_found' => $current_group ) ) );
             exit;
@@ -1223,6 +1218,37 @@ class PersonalCrm {
 
         $ajax_url = admin_url( 'admin-ajax.php' );
         $base_url = home_url( '/crm/' );
+
+        $pages = array(
+            array(
+                'name' => 'Assign Groups',
+                'icon' => '🏷️',
+                'url'  => home_url( '/crm/assign-groups' ),
+            ),
+            array(
+                'name' => 'People',
+                'icon' => '👥',
+                'url'  => home_url( '/crm/people' ),
+            ),
+            array(
+                'name' => 'Events',
+                'icon' => '📅',
+                'url'  => home_url( '/crm/events' ),
+            ),
+            array(
+                'name' => 'Welcome',
+                'icon' => '👋',
+                'url'  => home_url( '/crm/welcome' ),
+            ),
+        );
+
+        if ( current_user_can( 'manage_options' ) ) {
+            $pages[] = array(
+                'name' => 'Export',
+                'icon' => '📤',
+                'url'  => home_url( '/crm/admin/export' ),
+            );
+        }
         ?>
         <script>
             document.addEventListener('DOMContentLoaded', () => {
@@ -1231,7 +1257,8 @@ class PersonalCrm {
                     const searchIndex = <?php echo json_encode( $search_index ); ?>;
                     const ajaxUrl = <?php echo json_encode( $ajax_url ); ?>;
                     const baseUrl = <?php echo json_encode( $base_url ); ?>;
-                    CmdK.init(teams, searchIndex, ajaxUrl, baseUrl);
+                    const pages = <?php echo json_encode( $pages ); ?>;
+                    CmdK.init(teams, searchIndex, ajaxUrl, baseUrl, pages);
 
                     // Trigger privacy mode now that searchIndex is available
                     if (typeof applyPrivacyMode === 'function' && localStorage.getItem('privacyMode') === 'true') {
