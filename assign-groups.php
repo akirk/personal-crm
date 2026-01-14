@@ -41,6 +41,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 	} elseif ( $action === 'create_group' ) {
 		$group_name = sanitize_text_field( $_POST['new_group_name'] ?? '' );
 		$group_type = sanitize_text_field( $_POST['new_group_type'] ?? 'group' );
+		$person_id = intval( $_POST['person_id'] ?? 0 );
 
 		if ( ! empty( $group_name ) ) {
 			$group_slug = sanitize_title( $group_name );
@@ -48,7 +49,13 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 
 			$result = $crm->storage->create_group( $group_name, $group_slug, $group_type );
 			if ( $result ) {
-				$message = "Created group: $group_name";
+				$group_id = $crm->storage->db->lastInsertId();
+				if ( $person_id && $group_id ) {
+					$crm->storage->add_person_to_group( $person_id, $group_id );
+					$message = "Created and assigned group: $group_name";
+				} else {
+					$message = "Created group: $group_name";
+				}
 				$message_type = 'success';
 			} else {
 				$message = "Failed to create group (may already exist)";
@@ -518,6 +525,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 							<summary>+ Create New Group</summary>
 							<form method="post" action="<?php echo home_url( '/crm/assign-groups' ) . '?' . http_build_query( array_merge( $base_params, array( 'index' => $current_index ) ) ); ?>" class="create-group-form">
 								<input type="hidden" name="action" value="create_group">
+								<input type="hidden" name="person_id" value="<?php echo esc_attr( $current_person->id ); ?>">
 								<input type="text" name="new_group_name" placeholder="Group Name" required>
 								<select name="new_group_type">
 									<option value="group">Personal (group)</option>
