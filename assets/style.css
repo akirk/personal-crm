@@ -3089,3 +3089,167 @@ a.calendar-event:hover {
 	font-weight: normal;
 	margin-left: 10px;
 }
+
+/* Paste Handler */
+.paste-handler-dialog {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 10000;
+	animation: paste-handler-fade-in 0.15s ease-out;
+}
+
+@keyframes paste-handler-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+.paste-handler-content {
+	background: light-dark(#fff, #2a2a2a);
+	border-radius: 12px;
+	box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+	max-width: 400px;
+	width: 90%;
+	overflow: hidden;
+	animation: paste-handler-slide-up 0.2s ease-out;
+}
+
+@keyframes paste-handler-slide-up {
+	from { transform: translateY(20px); opacity: 0; }
+	to { transform: translateY(0); opacity: 1; }
+}
+
+.paste-handler-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 16px 20px;
+	border-bottom: 1px solid light-dark(#e0e0e0, #444);
+}
+
+.paste-handler-title {
+	font-weight: 600;
+	font-size: 1em;
+}
+
+.paste-handler-close {
+	background: none;
+	border: none;
+	font-size: 24px;
+	cursor: pointer;
+	color: light-dark(#666, #999);
+	padding: 0;
+	line-height: 1;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 6px;
+}
+
+.paste-handler-close:hover {
+	background: light-dark(#f0f0f0, #3a3a3a);
+	color: light-dark(#333, #fff);
+}
+
+.paste-handler-body {
+	padding: 20px;
+}
+
+.paste-handler-preview {
+	background: light-dark(#f5f5f5, #1a1a1a);
+	padding: 12px 16px;
+	border-radius: 8px;
+	font-family: monospace;
+	font-size: 0.9em;
+	margin-bottom: 16px;
+	word-break: break-all;
+	color: light-dark(#666, #999);
+}
+
+.paste-handler-options {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.paste-handler-option {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 16px;
+	background: light-dark(#f8f9fa, #333);
+	border: 1px solid light-dark(#e0e0e0, #444);
+	border-radius: 8px;
+	cursor: pointer;
+	text-align: left;
+	transition: all 0.15s ease;
+}
+
+.paste-handler-option:hover {
+	background: light-dark(#e8f4fd, #2a4a6a);
+	border-color: light-dark(#007cba, #4a9edd);
+}
+
+.paste-handler-option-icon {
+	font-size: 1.5em;
+}
+
+.paste-handler-option-label {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.paste-handler-option-label strong {
+	font-size: 0.95em;
+}
+
+.paste-handler-option-value {
+	font-size: 0.85em;
+	color: light-dark(#666, #999);
+}
+
+/* Toast notifications */
+.paste-handler-toast {
+	position: fixed;
+	bottom: 24px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: light-dark(#333, #444);
+	color: #fff;
+	padding: 12px 24px;
+	border-radius: 8px;
+	font-size: 0.95em;
+	z-index: 10001;
+	animation: paste-handler-toast-in 0.2s ease-out;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes paste-handler-toast-in {
+	from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+	to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+.paste-handler-toast-success {
+	background: light-dark(#28a745, #2d5a2d);
+}
+
+.paste-handler-toast-error {
+	background: light-dark(#dc3545, #8b2635);
+}
+
+.paste-handler-toast-loading {
+	background: light-dark(#007cba, #2a4a6a);
+}
+
+.paste-handler-toast-info {
+	background: light-dark(#6c757d, #555);
+}

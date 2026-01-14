@@ -696,9 +696,14 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 	</div>
 
 	<?php
-	if ( ! function_exists( '\wp_app_enqueue_script' ) ) {
+	if ( function_exists( '\wp_app_enqueue_script' ) ) {
+		wp_app_enqueue_script( 'personal-crm-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js' );
+		wp_app_enqueue_script( 'personal-crm-script', plugin_dir_url( __FILE__ ) . 'assets/script.js' );
+		wp_app_enqueue_script( 'personal-crm-paste-handler', plugin_dir_url( __FILE__ ) . 'assets/paste-handler.js' );
+	} else {
 		echo '<script src="assets/cmd-k.js"></script>';
 		echo '<script src="assets/script.js"></script>';
+		echo '<script src="assets/paste-handler.js"></script>';
 	}
 	if ( function_exists( '\wp_app_body_close' ) ) \wp_app_body_close();
 	?>
@@ -710,6 +715,20 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 				verboseDifference: true
 			});
 			<?php endif; ?>
+
+			// Initialize paste handler for quick field updates
+			if (window.PersonalCRMPasteHandler) {
+				window.PersonalCRMPasteHandler.init({
+					username: '<?php echo esc_js( $person ); ?>',
+					ajaxUrl: '<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>',
+					nonce: '<?php echo esc_js( wp_create_nonce( 'personal_crm_quick_update' ) ); ?>',
+					mode: 'view',
+					personData: {
+						partner: <?php echo wp_json_encode( $person_data->partner ?? '' ); ?>,
+						kids: <?php echo wp_json_encode( $person_data->kids ?? array() ); ?>
+					}
+				});
+			}
 
 			// Keyboard shortcut: Press 'e' to edit person
 			document.addEventListener('keydown', (event) => {
@@ -790,5 +809,6 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 			}
 		}
 	</script>
+	<?php do_action( 'personal_crm_footer_scripts' ); ?>
 </body>
 </html>

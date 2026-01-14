@@ -1148,12 +1148,31 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
     if ( function_exists( 'wp_app_enqueue_script' ) ) {
         wp_app_enqueue_script( 'personal-crm-admin-js', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/admin.js' );
         wp_app_enqueue_script( 'personal-crm-script-js', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/script.js' );
+        wp_app_enqueue_script( 'personal-crm-paste-handler-js', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/paste-handler.js' );
     } else {
         echo '<script src="' . plugin_dir_url( dirname( __FILE__ ) ) . 'assets/admin.js"></script>';
         echo '<script src="' . plugin_dir_url( dirname( __FILE__ ) ) . 'assets/script.js"></script>';
+        echo '<script src="' . plugin_dir_url( dirname( __FILE__ ) ) . 'assets/paste-handler.js"></script>';
     }
 	if ( function_exists( '\wp_app_body_close' ) ) \wp_app_body_close();
     ?>
     <?php $crm->init_cmd_k_js(); ?>
+    <script>
+    // Initialize paste handler in edit mode (fills form fields instead of AJAX save)
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.PersonalCRMPasteHandler) {
+            window.PersonalCRMPasteHandler.init({
+                mode: 'edit',
+                <?php if ( ! empty( $edit_data ) && is_object( $edit_data ) && isset( $edit_data->partner ) ) : ?>
+                personData: {
+                    partner: <?php echo wp_json_encode( $edit_data->partner ?? '' ); ?>,
+                    kids: <?php echo wp_json_encode( $edit_data->kids ?? array() ); ?>
+                }
+                <?php endif; ?>
+            });
+        }
+    });
+    </script>
+    <?php do_action( 'personal_crm_footer_scripts' ); ?>
 </body>
 </html>

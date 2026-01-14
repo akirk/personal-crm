@@ -318,3 +318,127 @@ add_action( 'wp_ajax_personal_crm_toggle_my_apps', function() {
     wp_send_json_success( array( 'is_saved' => $is_saved ) );
 } );
 
+// AJAX handler for quick field updates (used by paste handler)
+add_action( 'wp_ajax_personal_crm_quick_update', function() {
+    check_ajax_referer( 'personal_crm_quick_update', 'nonce' );
+
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => 'Not logged in' ) );
+    }
+
+    $username = isset( $_POST['username'] ) ? sanitize_text_field( wp_unslash( $_POST['username'] ) ) : '';
+    $field = isset( $_POST['field'] ) ? sanitize_text_field( wp_unslash( $_POST['field'] ) ) : '';
+    $value = isset( $_POST['value'] ) ? sanitize_text_field( wp_unslash( $_POST['value'] ) ) : '';
+
+    if ( empty( $username ) || empty( $field ) ) {
+        wp_send_json_error( array( 'message' => 'Missing required parameters' ) );
+    }
+
+    // Date sanitizer function
+    $date_sanitizer = function( $val ) {
+        if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $val ) || preg_match( '/^\d{2}-\d{2}$/', $val ) ) {
+            return $val;
+        }
+        return '';
+    };
+
+    // Define allowed fields that can be quick-updated
+    // Other plugins can filter this to add their own fields
+    $allowed_fields = apply_filters( 'personal_crm_quick_update_fields', array(
+        'birthday' => array( 'sanitize' => $date_sanitizer ),
+        'partner_birthday' => array( 'sanitize' => $date_sanitizer ),
+    ) );
+
+    // Check if it's a child birthday field (child_birthday_0, child_birthday_1, etc.)
+    $is_child_birthday = preg_match( '/^child_birthday_(\d+)$/', $field, $child_matches );
+
+    if ( ! isset( $allowed_fields[ $field ] ) && ! $is_child_birthday ) {
+        wp_send_json_error( array( 'message' => 'Field not allowed for quick update' ) );
+    }
+
+    // Sanitize the value
+    if ( $is_child_birthday ) {
+        $sanitized_value = $date_sanitizer( $value );
+    } else {
+        $sanitizer = $allowed_fields[ $field ]['sanitize'] ?? 'sanitize_text_field';
+        $sanitized_value = is_callable( $sanitizer ) ? $sanitizer( $value ) : sanitize_text_field( $value );
+    }
+
+    if ( $value !== '' && $sanitized_value === '' ) {
+        wp_send_json_error( array( 'message' => 'Invalid value format' ) );
+    }
+
+    // Get the CRM instance and update the person
+    $crm = \PersonalCRM\PersonalCrm::get_instance();
+    $person = $crm->storage->get_person( $username );
+
+    if ( ! $person ) {
+        wp_send_json_error( array( 'message' => 'Person not found' ) );
+    }
+
+    // Build person data array with the updated field
+    $person_data = array(
+        'name' => $person->name,
+        'nickname' => $person->nickname ?? '',
+        'role' => $person->role ?? '',
+        'email' => $person->email ?? '',
+        'birthday' => $person->birthday ?? '',
+        'company_anniversary' => $person->company_anniversary ?? '',
+        'partner' => $person->partner ?? '',
+        'partner_birthday' => $person->partner_birthday ?? '',
+        'location' => $person->location ?? '',
+        'timezone' => $person->timezone ?? '',
+        'github' => $person->github ?? '',
+        'linear' => $person->linear ?? '',
+        'wordpress' => $person->wordpress ?? '',
+        'linkedin' => $person->linkedin ?? '',
+        'website' => $person->website ?? '',
+        'new_company' => $person->new_company ?? '',
+        'new_company_website' => $person->new_company_website ?? '',
+        'deceased_date' => $person->deceased_date ?? '',
+        'left_company' => $person->left_company ?? 0,
+        'deceased' => $person->deceased ?? 0,
+        'kids' => $person->kids ?? array(),
+        'github_repos' => $person->github_repos ?? array(),
+        'personal_events' => $person->personal_events ?? array(),
+        'links' => $person->links ?? array(),
+    );
+
+    // Update the specific field
+    if ( $is_child_birthday ) {
+        // Update child's birthday in the kids array
+        $child_index = (int) $child_matches[1];
+        if ( isset( $person_data['kids'][ $child_index ] ) ) {
+            $person_data['kids'][ $child_index ]['birthday'] = $sanitized_value;
+        } else {
+            wp_send_json_error( array( 'message' => 'Child not found' ) );
+        }
+    } else {
+        $person_data[ $field ] = $sanitized_value;
+    }
+
+    // Allow plugins to modify the data before saving
+    $person_data = apply_filters( 'personal_crm_quick_update_before_save', $person_data, $field, $sanitized_value, $username );
+
+    // Get current groups to preserve them
+    $groups_with_dates = array();
+    if ( ! empty( $person->groups ) ) {
+        foreach ( $person->groups as $group ) {
+            $groups_with_dates[ $group['id'] ] = array(
+                'joined_date' => ! empty( $group['group_joined_date'] ) ? substr( $group['group_joined_date'], 0, 10 ) : null,
+                'left_date' => ! empty( $group['group_left_date'] ) ? substr( $group['group_left_date'], 0, 10 ) : null,
+            );
+        }
+    }
+
+    // Save the updated person data
+    $result = $crm->storage->save_person( $username, $person_data, $groups_with_dates );
+
+    if ( $result !== false ) {
+        do_action( 'personal_crm_quick_update_saved', $username, $field, $sanitized_value );
+        wp_send_json_success( array( 'message' => 'Updated successfully' ) );
+    } else {
+        wp_send_json_error( array( 'message' => 'Failed to save' ) );
+    }
+} );
+
