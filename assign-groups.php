@@ -407,11 +407,51 @@ function build_nav_url( $crm, $base_params, $index ) {
 		</div>
 
 		<?php if ( empty( $people_list ) ) : ?>
-			<div class="empty-state">
-				<h2>No People to Assign</h2>
-				<p>Everyone has been assigned to at least one group!</p>
-				<p>Use the query bar above to load people from a specific group, or pass usernames via URL: <code>?person[]=user1&person[]=user2</code></p>
+			<?php
+			// Get recently assigned people (those who have at least one group)
+			global $wpdb;
+			$recently_assigned = $wpdb->get_results(
+				"SELECT p.*, MAX(pg.created_at) as last_assigned
+				 FROM {$wpdb->prefix}personal_crm_people p
+				 INNER JOIN {$wpdb->prefix}personal_crm_people_groups pg ON p.id = pg.person_id
+				 GROUP BY p.id
+				 ORDER BY last_assigned DESC
+				 LIMIT 20",
+				ARRAY_A
+			);
+			$recently_assigned_people = array();
+			foreach ( $recently_assigned as $row ) {
+				$recently_assigned_people[] = $crm->storage->get_person( $row['username'] );
+			}
+			?>
+			<div class="empty-state" style="padding: 20px;">
+				<h2 style="margin-bottom: 8px;">All Done!</h2>
+				<p style="margin-bottom: 24px;">Everyone has been assigned to at least one group.</p>
 			</div>
+			<?php if ( ! empty( $recently_assigned_people ) ) : ?>
+				<div class="people-panel" style="margin-top: 20px;">
+					<h3 style="margin-bottom: 16px;">Recently Assigned People</h3>
+					<div style="max-height: 400px; overflow-y: auto;">
+						<?php foreach ( $recently_assigned_people as $person ) : ?>
+							<div class="person-card">
+								<div class="person-name">
+									<a href="<?php echo esc_url( $crm->build_url( 'person.php', array( 'person' => $person->username ) ) ); ?>">
+										<?php echo esc_html( $person->get_display_name_with_nickname() ); ?>
+									</a>
+								</div>
+								<div class="person-username">@<?php echo esc_html( $person->username ); ?></div>
+								<div class="current-groups">
+									<?php foreach ( $person->groups as $group ) : ?>
+										<?php if ( empty( $group['group_left_date'] ) ) : ?>
+											<span><?php echo esc_html( $group['display_icon'] . ' ' . $group['group_name'] ); ?></span>
+										<?php endif; ?>
+									<?php endforeach; ?>
+								</div>
+							</div>
+						<?php endforeach; ?>
+					</div>
+				</div>
+			<?php endif; ?>
 		<?php else : ?>
 			<div class="assign-groups-layout">
 				<!-- Left Panel: People Queue -->
