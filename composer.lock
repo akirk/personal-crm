@@ -4,15 +4,21 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "abbe0c8e8f1f1461e9a3fd840e28742f",
+    "content-hash": "eac9f73578a5fae353695402741432ef",
     "packages": [
         {
             "name": "akirk/wp-app",
             "version": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/akirk/wp-app.git",
+                "reference": "d10a04f24d987ee35b7b768aa26b860186dd04db"
+            },
             "dist": {
-                "type": "path",
-                "url": "/Users/alex/Sites/wp-app",
-                "reference": "2dd3bb37dfb72cd089b99318ed37ef0428b2453c"
+                "type": "zip",
+                "url": "https://api.github.com/repos/akirk/wp-app/zipball/d10a04f24d987ee35b7b768aa26b860186dd04db",
+                "reference": "d10a04f24d987ee35b7b768aa26b860186dd04db",
+                "shasum": ""
             },
             "require": {
                 "php": ">=7.4"
@@ -22,6 +28,7 @@
                 "squizlabs/php_codesniffer": "^3.7",
                 "wp-coding-standards/wpcs": "^3.0"
             },
+            "default-branch": true,
             "type": "library",
             "autoload": {
                 "files": [
@@ -34,35 +41,21 @@
                     "src/functions.php"
                 ]
             },
-            "autoload-dev": {
-                "psr-4": {
-                    "WpApp\\Tests\\": "tests/"
-                }
-            },
-            "scripts": {
-                "test": [
-                    "phpunit"
-                ],
-                "phpcs": [
-                    "phpcs"
-                ],
-                "phpcbf": [
-                    "phpcbf"
-                ]
-            },
+            "notification-url": "https://packagist.org/downloads/",
             "license": [
-                "MIT"
+                "GPL-2.0-or-later"
             ],
             "authors": [
                 {
-                    "name": "Your Name",
-                    "email": "your.email@example.com"
+                    "name": "Alex Kirk"
                 }
             ],
             "description": "A lightweight framework for building web applications on WordPress with routing, admin bar integration, and theme isolation",
-            "transport-options": {
-                "relative": false
-            }
+            "support": {
+                "issues": "https://github.com/akirk/wp-app/issues",
+                "source": "https://github.com/akirk/wp-app/tree/v1.0.0"
+            },
+            "time": "2026-01-23T05:25:47+00:00"
         }
     ],
     "packages-dev": [],
@@ -75,5 +68,5 @@
     "prefer-lowest": false,
     "platform": {},
     "platform-dev": {},
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }

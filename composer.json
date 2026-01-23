@@ -1,0 +1,14 @@
+{
+    "name": "akirk/personal-crm",
+    "license": "GPL-2.0-or-later",
+    "type": "wordpress-plugin",
+    "authors": [
+        {
+            "name": "Alex Kirk",
+            "email": "akirk@users.noreply.github.com"
+        }
+    ],
+    "require": {
+        "akirk/wp-app": "dev-main"
+    }
+}

@@ -348,7 +348,7 @@ composer phpcbf
 
 ## License
 
-MIT License
+GPL-2.0-or-later
 
 ## Learn More
 
