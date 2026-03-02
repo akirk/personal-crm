@@ -4,6 +4,7 @@
  * Description: WordPress-based personal CRM tool for managing contacts, teams, and relationships with extensible architecture
  * Version: 1.0.0
  * Author: Alex Kirk
+ * Author URI: https://alex.kirk.at/
  * Requires at least: 5.0
  * Tested up to: 6.4
  * Requires PHP: 7.4
