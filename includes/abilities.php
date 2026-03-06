@@ -166,6 +166,80 @@ function register_crm_abilities() {
 		),
 	) );
 
+	wp_register_ability( 'personal-crm/create-group', array(
+		'label'       => __( 'Create Group', 'personal-crm' ),
+		'description' => __( 'Create a new group in the CRM. Returns the slug of the created group, which can be used to assign people to it.', 'personal-crm' ),
+		'category'    => 'personal-crm',
+		'input_schema' => array(
+			'type'       => 'object',
+			'properties' => array(
+				'name' => array( 'type' => 'string', 'description' => 'Display name of the group', 'minLength' => 1 ),
+				'type' => array(
+					'type'        => 'string',
+					'description' => 'Group type: "team" for work groups, "social" for friend/family circles',
+					'enum'        => array( 'team', 'social' ),
+					'default'     => 'social',
+				),
+				'icon'      => array( 'type' => 'string', 'description' => 'Optional emoji icon, e.g. "🏠"' ),
+				'parent_slug' => array( 'type' => 'string', 'description' => 'Slug of parent group to nest under (optional)' ),
+			),
+			'required'             => array( 'name' ),
+			'additionalProperties' => false,
+		),
+		'output_schema' => array(
+			'type'       => 'object',
+			'properties' => array(
+				'slug'    => array( 'type' => 'string', 'description' => 'Use this slug in assign-person-to-group' ),
+				'created' => array( 'type' => 'boolean', 'description' => 'False if a group with this slug already existed' ),
+			),
+		),
+		'execute_callback'    => __NAMESPACE__ . '\ability_create_group',
+		'permission_callback' => __NAMESPACE__ . '\ability_permission_write',
+		'meta' => array(
+			'show_in_rest' => true,
+			'annotations'  => array(
+				'instructions' => 'Call list-groups first to check whether the group already exists. Only call this if no matching group is found. Use type "social" for family/friend/neighbourhood groups, "team" for work/project groups. The returned slug is what you pass to assign-person-to-group.',
+				'readonly'     => false,
+				'destructive'  => false,
+				'idempotent'   => false,
+			),
+		),
+	) );
+
+	wp_register_ability( 'personal-crm/assign-person-to-group', array(
+		'label'       => __( 'Assign Person to Group', 'personal-crm' ),
+		'description' => __( 'Add an existing person to a group. Safe to call even if they are already a member.', 'personal-crm' ),
+		'category'    => 'personal-crm',
+		'input_schema' => array(
+			'type'       => 'object',
+			'properties' => array(
+				'username'   => array( 'type' => 'string', 'description' => 'Username of the person', 'minLength' => 1 ),
+				'group_slug' => array( 'type' => 'string', 'description' => 'Slug of the group (from list-groups or create-group)', 'minLength' => 1 ),
+				'joined_date' => array( 'type' => 'string', 'description' => 'Optional join date in YYYY-MM-DD format', 'pattern' => '^\d{4}-\d{2}-\d{2}$' ),
+			),
+			'required'             => array( 'username', 'group_slug' ),
+			'additionalProperties' => false,
+		),
+		'output_schema' => array(
+			'type'       => 'object',
+			'properties' => array(
+				'success'       => array( 'type' => 'boolean' ),
+				'already_member' => array( 'type' => 'boolean', 'description' => 'True if the person was already in the group' ),
+			),
+		),
+		'execute_callback'    => __NAMESPACE__ . '\ability_assign_person_to_group',
+		'permission_callback' => __NAMESPACE__ . '\ability_permission_write',
+		'meta' => array(
+			'show_in_rest' => true,
+			'annotations'  => array(
+				'instructions' => 'Use after create-group (or with a slug from list-groups) to add a person to a group. This is idempotent — calling it again for an existing member is safe and returns already_member: true. Use search-people or add-person first to obtain the username.',
+				'readonly'     => false,
+				'destructive'  => false,
+				'idempotent'   => true,
+			),
+		),
+	) );
+
 	wp_register_ability( 'personal-crm/add-person', array(
 		'label'       => __( 'Add Person', 'personal-crm' ),
 		'description' => __( 'Create a new person in the CRM. Username is auto-generated from name if not provided. Returns the username and whether the person was newly created.', 'personal-crm' ),
@@ -492,6 +566,90 @@ function ability_get_person( $input ) {
 		'recent_notes'    => $recent_notes,
 		'personal_events' => $person->personal_events ?? array(),
 	);
+}
+
+function ability_create_group( $input ) {
+	$crm     = PersonalCrm::get_instance();
+	$storage = $crm->storage;
+
+	$name = sanitize_text_field( $input['name'] );
+	$type = sanitize_text_field( $input['type'] ?? 'social' );
+	$icon = sanitize_text_field( $input['icon'] ?? '' );
+
+	// Build base slug from name.
+	$base_slug = sanitize_title( $name );
+	$base_slug = str_replace( '-', '_', $base_slug );
+
+	// Handle optional parent.
+	$parent_id = null;
+	if ( ! empty( $input['parent_slug'] ) ) {
+		$parent = $storage->get_group( sanitize_text_field( $input['parent_slug'] ) );
+		if ( $parent ) {
+			$parent_id = $parent->id;
+			$base_slug = $parent->slug . '_' . $base_slug;
+		}
+	}
+
+	// Check if it already exists.
+	$existing = $storage->get_group( $base_slug );
+	if ( $existing ) {
+		return array( 'slug' => $base_slug, 'created' => false );
+	}
+
+	$config = array(
+		'group_name'          => $name,
+		'type'                => $type,
+		'display_icon'        => $icon,
+		'parent_id'           => $parent_id,
+		'activity_url_prefix' => '',
+		'sort_order'          => 0,
+		'default'             => 0,
+	);
+
+	$slug = $storage->save_group( null, $config );
+
+	if ( ! $slug ) {
+		return new \WP_Error( 'save_failed', __( 'Failed to create group.', 'personal-crm' ) );
+	}
+
+	return array( 'slug' => $slug, 'created' => true );
+}
+
+function ability_assign_person_to_group( $input ) {
+	$crm     = PersonalCrm::get_instance();
+	$storage = $crm->storage;
+
+	$username   = $input['username'];
+	$group_slug = $input['group_slug'];
+
+	$person_id = $storage->get_person_id( $username );
+	if ( ! $person_id ) {
+		return new \WP_Error( 'person_not_found', sprintf( __( 'No person found with username "%s".', 'personal-crm' ), $username ) );
+	}
+
+	$group = $storage->get_group( $group_slug );
+	if ( ! $group ) {
+		return new \WP_Error( 'group_not_found', sprintf( __( 'No group found with slug "%s".', 'personal-crm' ), $group_slug ) );
+	}
+
+	global $wpdb;
+	$existing = $wpdb->get_var( $wpdb->prepare(
+		"SELECT id FROM {$wpdb->prefix}personal_crm_people_groups WHERE person_id = %d AND group_id = %d",
+		$person_id, $group->id
+	) );
+
+	if ( $existing ) {
+		return array( 'success' => true, 'already_member' => true );
+	}
+
+	$joined_date = ! empty( $input['joined_date'] ) ? $input['joined_date'] : 'default';
+	$result      = $storage->add_person_to_group( $person_id, $group->id, $joined_date );
+
+	if ( $result === false ) {
+		return new \WP_Error( 'save_failed', __( 'Failed to assign person to group.', 'personal-crm' ) );
+	}
+
+	return array( 'success' => true, 'already_member' => false );
 }
 
 function ability_add_person( $input ) {
