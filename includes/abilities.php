@@ -93,7 +93,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Pass all names at once to resolve a list of people in a single call. Returns a map of query → matches. An empty array for a query means no match — call add-person for those. If a query returns multiple matches, call get-person on each candidate to disambiguate. Only call add-person when a query returns no results.',
+				'instructions' => 'Pass all names at once to resolve a list of people in a single call. Returns a map of query → matches. An empty array for a query means no match — collect all unmatched names and call add-people for them in one batch. If a query returns multiple matches, call get-person on each candidate to disambiguate. Only call add-people when a query returns no results.',
 				'readonly'     => true,
 				'destructive'  => false,
 			),
@@ -117,6 +117,8 @@ function register_crm_abilities() {
 			'properties' => array(
 				'username'        => array( 'type' => 'string' ),
 				'name'            => array( 'type' => 'string' ),
+				'url'             => array( 'type' => 'string', 'description' => 'Link to this person\'s profile in the CRM' ),
+				'edit_url'        => array( 'type' => 'string', 'description' => 'Link to edit this person\'s profile' ),
 				'email'           => array( 'type' => 'string' ),
 				'role'            => array( 'type' => 'string' ),
 				'location'        => array( 'type' => 'string' ),
@@ -134,7 +136,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Use to disambiguate between multiple search results: compare role and recent_notes to determine which person matches your source text. Also use before adding notes or meetings to check whether the same information was already recorded (look at personal_events dates and recent_notes content).',
+				'instructions' => 'Use to disambiguate between multiple search results: compare role and recent_notes to determine which person matches your source text. Also use before adding notes or meetings to check whether the same information was already recorded. Always include the returned "url" as a markdown link when mentioning the person. Use "edit_url" if the user wants to make changes themselves.',
 				'readonly'     => true,
 				'destructive'  => false,
 			),
@@ -245,39 +247,102 @@ function register_crm_abilities() {
 		),
 	) );
 
-	wp_register_ability( 'personal-crm/add-person', array(
-		'label'       => __( 'Add Person', 'personal-crm' ),
-		'description' => __( 'Create a new person in the CRM. Username is auto-generated from name if not provided. Returns the username and whether the person was newly created.', 'personal-crm' ),
+	wp_register_ability( 'personal-crm/add-people', array(
+		'label'       => __( 'Add People', 'personal-crm' ),
+		'description' => __( 'Create one or more new people in the CRM in a single call. Usernames are auto-generated from names. Each person can optionally be assigned to groups immediately.', 'personal-crm' ),
 		'category'    => 'personal-crm',
 		'input_schema' => array(
 			'type'       => 'object',
 			'properties' => array(
-				'name'     => array( 'type' => 'string', 'description' => 'Full name', 'minLength' => 1 ),
-				'username' => array( 'type' => 'string', 'description' => 'Optional. Auto-generated from name if omitted.' ),
-				'email'    => array( 'type' => 'string', 'description' => 'Email address' ),
-				'role'     => array( 'type' => 'string', 'description' => 'Job title or role' ),
-				'location' => array( 'type' => 'string', 'description' => 'City or country' ),
-				'note'     => array( 'type' => 'string', 'description' => 'Initial note to attach' ),
+				'people' => array(
+					'type'     => 'array',
+					'minItems' => 1,
+					'items'    => array(
+						'type'       => 'object',
+						'properties' => array(
+							'name'     => array( 'type' => 'string', 'description' => 'Full name', 'minLength' => 1 ),
+							'username' => array( 'type' => 'string', 'description' => 'Optional. Auto-generated from name if omitted.' ),
+							'email'    => array( 'type' => 'string', 'description' => 'Email address' ),
+							'role'     => array( 'type' => 'string', 'description' => 'Job title or role' ),
+							'location' => array( 'type' => 'string', 'description' => 'City or country' ),
+							'note'     => array( 'type' => 'string', 'description' => 'Initial note to attach' ),
+							'groups'   => array(
+								'type'        => 'array',
+								'description' => 'Group slugs to assign this person to (from list-groups or create-group)',
+								'items'       => array( 'type' => 'string' ),
+							),
+						),
+						'required'             => array( 'name' ),
+						'additionalProperties' => false,
+					),
+				),
 			),
-			'required'             => array( 'name' ),
+			'required'             => array( 'people' ),
+			'additionalProperties' => false,
+		),
+		'output_schema' => array(
+			'type'  => 'array',
+			'items' => array(
+				'type'       => 'object',
+				'properties' => array(
+					'username' => array( 'type' => 'string', 'description' => 'Use this in subsequent add-note and add-meeting calls' ),
+					'name'     => array( 'type' => 'string' ),
+					'created'  => array( 'type' => 'boolean', 'description' => 'False means a person with this username already existed' ),
+				),
+			),
+		),
+		'execute_callback'    => __NAMESPACE__ . '\ability_add_people',
+		'permission_callback' => __NAMESPACE__ . '\ability_permission_write',
+		'meta' => array(
+			'show_in_rest' => true,
+			'annotations'  => array(
+				'instructions' => 'Only call this for names where search-people returned no results. Pass all new contacts at once. Include "groups" per entry to assign group membership immediately without a separate assign-person-to-group call. If created is false for an entry, that username already exists — use the returned username for subsequent calls.',
+				'readonly'     => false,
+				'destructive'  => false,
+				'idempotent'   => false,
+			),
+		),
+	) );
+
+	wp_register_ability( 'personal-crm/update-person', array(
+		'label'       => __( 'Update Person', 'personal-crm' ),
+		'description' => __( 'Update fields on an existing person. Only the fields you provide are changed; all others are left as-is.', 'personal-crm' ),
+		'category'    => 'personal-crm',
+		'input_schema' => array(
+			'type'       => 'object',
+			'properties' => array(
+				'username'        => array( 'type' => 'string', 'description' => 'Username of the person to update', 'minLength' => 1 ),
+				'name'            => array( 'type' => 'string' ),
+				'nickname'        => array( 'type' => 'string' ),
+				'email'           => array( 'type' => 'string' ),
+				'role'            => array( 'type' => 'string', 'description' => 'Job title or role' ),
+				'location'        => array( 'type' => 'string' ),
+				'birthday'        => array( 'type' => 'string', 'description' => 'YYYY-MM-DD or MM-DD' ),
+				'github'          => array( 'type' => 'string' ),
+				'linkedin'        => array( 'type' => 'string' ),
+				'wordpress'       => array( 'type' => 'string' ),
+				'website'         => array( 'type' => 'string' ),
+				'deceased'        => array( 'type' => 'boolean', 'description' => 'Set to true if the person has passed away' ),
+				'deceased_date'   => array( 'type' => 'string', 'description' => 'Date of passing in YYYY-MM-DD format', 'pattern' => '^\d{4}-\d{2}-\d{2}$' ),
+			),
+			'required'             => array( 'username' ),
 			'additionalProperties' => false,
 		),
 		'output_schema' => array(
 			'type'       => 'object',
 			'properties' => array(
-				'username' => array( 'type' => 'string', 'description' => 'Use this in subsequent add-note and add-meeting calls' ),
-				'created'  => array( 'type' => 'boolean', 'description' => 'False means a person with this username already existed — use the returned username to add notes, do not retry' ),
+				'success' => array( 'type' => 'boolean' ),
 			),
 		),
-		'execute_callback'    => __NAMESPACE__ . '\ability_add_person',
+		'execute_callback'    => __NAMESPACE__ . '\ability_update_person',
 		'permission_callback' => __NAMESPACE__ . '\ability_permission_write',
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Only call this after search-people returned no results. If created is false, someone with that username already exists — use the returned username to add notes instead of calling add-person again.',
+				'instructions' => 'Use to change profile fields on an existing person — for example marking someone as deceased, correcting a name, or adding a missing email. Only supply the fields you want to change. To add a note use add-note instead.',
 				'readonly'     => false,
 				'destructive'  => false,
-				'idempotent'   => false,
+				'idempotent'   => true,
 			),
 		),
 	) );
@@ -307,7 +372,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Use for context, background, or observations without a specific meeting date. When you physically met someone, prefer add-meeting (which records the date in their timeline) and optionally also call add-note for detailed context.',
+				'instructions' => 'Use for context, background, or observations about a person. Attach free-form text that should be visible on their profile.',
 				'readonly'     => false,
 				'destructive'  => false,
 				'idempotent'   => false,
@@ -315,93 +380,7 @@ function register_crm_abilities() {
 		),
 	) );
 
-	wp_register_ability( 'personal-crm/add-meeting', array(
-		'label'       => __( 'Add Meeting', 'personal-crm' ),
-		'description' => __( 'Record a meeting with a person on a specific date. Adds a dated personal event to their profile timeline.', 'personal-crm' ),
-		'category'    => 'personal-crm',
-		'input_schema' => array(
-			'type'       => 'object',
-			'properties' => array(
-				'username'    => array( 'type' => 'string', 'description' => 'Username of the person you met', 'minLength' => 1 ),
-				'date'        => array( 'type' => 'string', 'description' => 'Date of meeting in YYYY-MM-DD format', 'pattern' => '^\d{4}-\d{2}-\d{2}$' ),
-				'description' => array( 'type' => 'string', 'description' => 'Brief description of the meeting or context', 'minLength' => 1 ),
-			),
-			'required'             => array( 'username', 'date', 'description' ),
-			'additionalProperties' => false,
-		),
-		'output_schema' => array(
-			'type'       => 'object',
-			'properties' => array(
-				'success' => array( 'type' => 'boolean' ),
-			),
-		),
-		'execute_callback'    => __NAMESPACE__ . '\ability_add_meeting',
-		'permission_callback' => __NAMESPACE__ . '\ability_permission_write',
-		'meta' => array(
-			'show_in_rest' => true,
-			'annotations'  => array(
-				'instructions' => 'Preferred over add-note when you physically met someone — the date is recorded in their event timeline. Before calling, check get-person personal_events to avoid adding a duplicate entry for the same date. You can also call add-note alongside this for longer context.',
-				'readonly'     => false,
-				'destructive'  => false,
-				'idempotent'   => false,
-			),
-		),
-	) );
 
-	wp_register_ability( 'personal-crm/import-meetings', array(
-		'label'       => __( 'Import Meetings', 'personal-crm' ),
-		'description' => __( 'Batch-import meetings from resolved trip notes in a single call. Each entry is either an existing person (provide username) or a new person (provide name). Adds a meeting event and optional note for each entry. Returns a per-entry summary.', 'personal-crm' ),
-		'category'    => 'personal-crm',
-		'input_schema' => array(
-			'type'       => 'object',
-			'properties' => array(
-				'meetings' => array(
-					'type'        => 'array',
-					'description' => 'List of resolved meeting entries',
-					'minItems'    => 1,
-					'items'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'username'    => array( 'type' => 'string', 'description' => 'Username of existing person. Provide this OR name, not both.' ),
-							'name'        => array( 'type' => 'string', 'description' => 'Full name for a new person (when username is absent).' ),
-							'email'       => array( 'type' => 'string', 'description' => 'Email for new person (optional)' ),
-							'role'        => array( 'type' => 'string', 'description' => 'Role/title for new person (optional)' ),
-							'location'    => array( 'type' => 'string', 'description' => 'Location for new person (optional)' ),
-							'date'        => array( 'type' => 'string', 'description' => 'Meeting date in YYYY-MM-DD format', 'pattern' => '^\d{4}-\d{2}-\d{2}$' ),
-							'description' => array( 'type' => 'string', 'description' => 'Short meeting description for the event timeline entry' ),
-							'note'        => array( 'type' => 'string', 'description' => 'Longer note to attach (optional, supplements description)' ),
-						),
-						'required' => array( 'date', 'description' ),
-					),
-				),
-			),
-			'required'             => array( 'meetings' ),
-			'additionalProperties' => false,
-		),
-		'output_schema' => array(
-			'type'  => 'array',
-			'items' => array(
-				'type'       => 'object',
-				'properties' => array(
-					'username' => array( 'type' => 'string' ),
-					'name'     => array( 'type' => 'string' ),
-					'action'   => array( 'type' => 'string', 'description' => 'created, updated, or error' ),
-					'error'    => array( 'type' => 'string', 'description' => 'Error message if action is error' ),
-				),
-			),
-		),
-		'execute_callback'    => __NAMESPACE__ . '\ability_import_meetings',
-		'permission_callback' => __NAMESPACE__ . '\ability_permission_write',
-		'meta' => array(
-			'show_in_rest' => true,
-			'annotations'  => array(
-				'instructions' => 'Use this for efficient batch processing after you have resolved all names via search-people or list-people. For each entry: provide "username" if the person exists, or "name" (plus optional email/role) if they are new. The "description" becomes the timeline event; "note" is an optional longer text note. Check the returned "action" for each entry — entries with action "error" were not saved.',
-				'readonly'     => false,
-				'destructive'  => false,
-				'idempotent'   => false,
-			),
-		),
-	) );
 }
 
 function ability_permission_read() {
@@ -500,6 +479,7 @@ function search_people_by_query( $raw ) {
 		return array(
 			'username'      => $row['username'],
 			'name'          => $row['name'],
+			'url'           => home_url( '/crm/person/' . $row['username'] ),
 			'email'         => $row['email'],
 			'role'          => $row['role'],
 			'match_quality' => $row['match_quality'],
@@ -564,6 +544,8 @@ function ability_get_person( $input ) {
 	return array(
 		'username'        => $person->username,
 		'name'            => $person->name,
+		'url'             => home_url( '/crm/person/' . $person->username ),
+		'edit_url'        => home_url( '/crm/admin/person/' . $person->username ),
 		'email'           => $person->email ?? '',
 		'role'            => $person->role ?? '',
 		'location'        => $person->location ?? '',
@@ -661,34 +643,91 @@ function ability_assign_person_to_group( $input ) {
 	return array( 'success' => true, 'already_member' => false );
 }
 
-function ability_add_person( $input ) {
+function ability_add_people( $input ) {
 	$crm     = PersonalCrm::get_instance();
 	$storage = $crm->storage;
+	$results = array();
 
-	$name     = sanitize_text_field( $input['name'] );
-	$username = ! empty( $input['username'] )
-		? sanitize_text_field( $input['username'] )
-		: generate_crm_username( $name, $storage );
+	foreach ( $input['people'] as $entry ) {
+		$name     = sanitize_text_field( $entry['name'] );
+		$username = ! empty( $entry['username'] )
+			? sanitize_text_field( $entry['username'] )
+			: generate_crm_username( $name, $storage );
 
-	if ( $storage->get_person( $username ) ) {
-		return array( 'username' => $username, 'created' => false );
-	}
+		if ( $storage->get_person( $username ) ) {
+			$results[] = array( 'username' => $username, 'name' => $name, 'created' => false );
+			continue;
+		}
 
-	$person_data = build_empty_person_data( $name, $input );
-	$result      = $storage->save_person( $username, $person_data );
+		$person_data = build_empty_person_data( $name, $entry );
+		if ( $storage->save_person( $username, $person_data ) === false ) {
+			$results[] = array( 'username' => $username, 'name' => $name, 'created' => false );
+			continue;
+		}
 
-	if ( $result === false ) {
-		return new \WP_Error( 'save_failed', __( 'Failed to create person.', 'personal-crm' ) );
-	}
-
-	if ( ! empty( $input['note'] ) ) {
 		$person_id = $storage->get_person_id( $username );
-		if ( $person_id ) {
-			$storage->add_person_note( $person_id, sanitize_textarea_field( $input['note'] ) );
+
+		if ( ! empty( $entry['note'] ) && $person_id ) {
+			$storage->add_person_note( $person_id, sanitize_textarea_field( $entry['note'] ) );
+		}
+
+		if ( ! empty( $entry['groups'] ) && $person_id ) {
+			foreach ( $entry['groups'] as $group_slug ) {
+				$group = $storage->get_group( sanitize_text_field( $group_slug ) );
+				if ( $group ) {
+					$storage->add_person_to_group( $person_id, $group->id, 'default' );
+				}
+			}
+		}
+
+		$results[] = array( 'username' => $username, 'name' => $name, 'created' => true );
+	}
+
+	return $results;
+}
+
+function ability_update_person( $input ) {
+	global $wpdb;
+
+	$crm       = PersonalCrm::get_instance();
+	$person_id = $crm->storage->get_person_id( $input['username'] );
+
+	if ( ! $person_id ) {
+		return new \WP_Error( 'person_not_found', sprintf( __( 'No person found with username "%s".', 'personal-crm' ), $input['username'] ) );
+	}
+
+	$update_data   = array();
+	$update_format = array();
+
+	foreach ( array( 'name', 'nickname', 'email', 'role', 'location', 'birthday', 'github', 'linkedin', 'wordpress', 'website', 'deceased_date' ) as $field ) {
+		if ( isset( $input[ $field ] ) ) {
+			$update_data[ $field ] = sanitize_text_field( $input[ $field ] );
+			$update_format[]       = '%s';
 		}
 	}
 
-	return array( 'username' => $username, 'created' => true );
+	if ( isset( $input['deceased'] ) ) {
+		$update_data['deceased'] = $input['deceased'] ? 1 : 0;
+		$update_format[]         = '%d';
+	}
+
+	if ( empty( $update_data ) ) {
+		return array( 'success' => true );
+	}
+
+	$result = $wpdb->update(
+		$wpdb->prefix . 'personal_crm_people',
+		$update_data,
+		array( 'id' => $person_id ),
+		$update_format,
+		array( '%d' )
+	);
+
+	if ( $result === false ) {
+		return new \WP_Error( 'save_failed', $wpdb->last_error ?: __( 'Failed to update person.', 'personal-crm' ) );
+	}
+
+	return array( 'success' => true );
 }
 
 function ability_add_note( $input ) {
@@ -710,137 +749,8 @@ function ability_add_note( $input ) {
 	return array( 'success' => true, 'note_id' => $wpdb->insert_id );
 }
 
-function ability_add_meeting( $input ) {
-	$crm     = PersonalCrm::get_instance();
-	$storage = $crm->storage;
-	$person  = $storage->get_person( $input['username'] );
 
-	if ( ! $person ) {
-		return new \WP_Error( 'person_not_found', sprintf( __( 'No person found with username "%s".', 'personal-crm' ), $input['username'] ) );
-	}
 
-	$result = save_meeting_event( $storage, $person, $input['date'], $input['description'] );
-
-	if ( $result === false ) {
-		return new \WP_Error( 'save_failed', __( 'Failed to save meeting.', 'personal-crm' ) );
-	}
-
-	return array( 'success' => true );
-}
-
-function ability_import_meetings( $input ) {
-	$crm     = PersonalCrm::get_instance();
-	$storage = $crm->storage;
-	$results = array();
-
-	foreach ( $input['meetings'] as $entry ) {
-		$username = ! empty( $entry['username'] ) ? sanitize_text_field( $entry['username'] ) : null;
-		$action   = 'updated';
-
-		// Create new person if no username was given.
-		if ( ! $username ) {
-			if ( empty( $entry['name'] ) ) {
-				$results[] = array(
-					'username' => '',
-					'name'     => '',
-					'action'   => 'error',
-					'error'    => 'Each entry must have either "username" or "name".',
-				);
-				continue;
-			}
-
-			$name     = sanitize_text_field( $entry['name'] );
-			$username = generate_crm_username( $name, $storage );
-
-			if ( ! $storage->get_person( $username ) ) {
-				$person_data = build_empty_person_data( $name, $entry );
-				if ( $storage->save_person( $username, $person_data ) === false ) {
-					$results[] = array(
-						'username' => $username,
-						'name'     => $name,
-						'action'   => 'error',
-						'error'    => 'Failed to create person.',
-					);
-					continue;
-				}
-				$action = 'created';
-			}
-		}
-
-		$person = $storage->get_person( $username );
-		if ( ! $person ) {
-			$results[] = array(
-				'username' => $username,
-				'name'     => $entry['name'] ?? '',
-				'action'   => 'error',
-				'error'    => sprintf( 'No person found with username "%s".', $username ),
-			);
-			continue;
-		}
-
-		// Add the meeting event.
-		if ( ! empty( $entry['date'] ) && ! empty( $entry['description'] ) ) {
-			$saved = save_meeting_event( $storage, $person, $entry['date'], $entry['description'] );
-			if ( $saved === false ) {
-				$results[] = array(
-					'username' => $username,
-					'name'     => $person->name,
-					'action'   => 'error',
-					'error'    => 'Failed to save meeting event.',
-				);
-				continue;
-			}
-			// Re-fetch so subsequent note saves have fresh state.
-			$person = $storage->get_person( $username );
-		}
-
-		// Attach optional longer note.
-		if ( ! empty( $entry['note'] ) ) {
-			$person_id = $storage->get_person_id( $username );
-			if ( $person_id ) {
-				$storage->add_person_note( $person_id, sanitize_textarea_field( $entry['note'] ) );
-			}
-		}
-
-		$results[] = array(
-			'username' => $username,
-			'name'     => $person->name,
-			'action'   => $action,
-			'error'    => '',
-		);
-	}
-
-	return $results;
-}
-
-/**
- * Append a meeting personal_event to a person and save.
- *
- * @return int|false wpdb result.
- */
-function save_meeting_event( $storage, $person, $date, $description ) {
-	$events   = $person->personal_events ?? array();
-	$events[] = array(
-		'date'        => sanitize_text_field( $date ),
-		'type'        => 'other',
-		'description' => sanitize_text_field( $description ),
-	);
-
-	$person_data                    = person_object_to_data( $person );
-	$person_data['personal_events'] = $events;
-
-	$groups_with_dates = array();
-	if ( ! empty( $person->groups ) ) {
-		foreach ( $person->groups as $group ) {
-			$groups_with_dates[ $group['id'] ] = array(
-				'joined_date' => ! empty( $group['group_joined_date'] ) ? substr( $group['group_joined_date'], 0, 10 ) : null,
-				'left_date'   => ! empty( $group['group_left_date'] ) ? substr( $group['group_left_date'], 0, 10 ) : null,
-			);
-		}
-	}
-
-	return $storage->save_person( $person->username, $person_data, $groups_with_dates );
-}
 
 /**
  * Convert a person object to the array format expected by save_person().
