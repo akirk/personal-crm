@@ -61,25 +61,30 @@ function register_crm_abilities() {
 		'input_schema' => array(
 			'type'       => 'object',
 			'properties' => array(
-				'query' => array(
-					'type'        => 'string',
-					'description' => 'Full or partial name to search for (e.g. "Jane", "Smith", "Jane Smith")',
-					'minLength'   => 1,
+				'queries' => array(
+					'type'        => 'array',
+					'description' => 'One or more names to search for. Each entry is searched independently.',
+					'items'       => array( 'type' => 'string', 'minLength' => 1 ),
+					'minItems'    => 1,
 				),
 			),
-			'required'             => array( 'query' ),
+			'required'             => array( 'queries' ),
 			'additionalProperties' => false,
 		),
 		'output_schema' => array(
-			'type'  => 'array',
-			'items' => array(
-				'type'       => 'object',
-				'properties' => array(
-					'username'      => array( 'type' => 'string' ),
-					'name'          => array( 'type' => 'string' ),
-					'email'         => array( 'type' => 'string' ),
-					'role'          => array( 'type' => 'string' ),
-					'match_quality' => array( 'type' => 'string', 'description' => 'exact, full, first, last, or nickname' ),
+			'type'                 => 'object',
+			'description'          => 'Map of query → array of matches. Each match includes username, name, email, role, and match_quality.',
+			'additionalProperties' => array(
+				'type'  => 'array',
+				'items' => array(
+					'type'       => 'object',
+					'properties' => array(
+						'username'      => array( 'type' => 'string' ),
+						'name'          => array( 'type' => 'string' ),
+						'email'         => array( 'type' => 'string' ),
+						'role'          => array( 'type' => 'string' ),
+						'match_quality' => array( 'type' => 'string', 'description' => 'exact, full, first, last, or nickname' ),
+					),
 				),
 			),
 		),
@@ -88,7 +93,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Always call this before add-person to check if the person already exists. If multiple results are returned for an ambiguous name (e.g. first name only), call get-person on each to inspect role and recent_notes, then pick the best match. Only call add-person when this returns an empty array.',
+				'instructions' => 'Pass all names at once to resolve a list of people in a single call. Returns a map of query → matches. An empty array for a query means no match — call add-person for those. If a query returns multiple matches, call get-person on each candidate to disambiguate. Only call add-person when a query returns no results.',
 				'readonly'     => true,
 				'destructive'  => false,
 			),
@@ -432,30 +437,20 @@ function ability_list_people() {
 }
 
 function ability_search_people( $input ) {
+	$results = array();
+	foreach ( $input['queries'] as $query ) {
+		$results[ $query ] = search_people_by_query( $query );
+	}
+	return $results;
+}
+
+function search_people_by_query( $raw ) {
 	global $wpdb;
 
-	$raw   = $input['query'];
 	$words = preg_split( '/\s+/', trim( $raw ), -1, PREG_SPLIT_NO_EMPTY );
 	$full  = '%' . $wpdb->esc_like( $raw ) . '%';
 	$first = '%' . $wpdb->esc_like( $words[0] ) . '%';
 	$last  = count( $words ) > 1 ? '%' . $wpdb->esc_like( end( $words ) ) . '%' : null;
-
-	// Fetch candidates matching full query, first word, last word, or nickname.
-	// Use UNION to keep the query readable while allowing nickname search.
-	$sql = $wpdb->prepare(
-		"SELECT username, name, email, role, nickname,
-		        CASE
-		            WHEN LOWER(name) = LOWER(%s)        THEN 'exact'
-		            WHEN name LIKE %s                   THEN 'full'
-		            WHEN name LIKE %s                   THEN 'first'
-		            WHEN nickname LIKE %s               THEN 'nickname'
-		            ELSE 'last'
-		        END AS match_quality
-		 FROM {$wpdb->prefix}personal_crm_people
-		 WHERE name LIKE %s OR name LIKE %s OR nickname LIKE %s",
-		$raw, $full, $first, $full,
-		$full, $first, $full
-	);
 
 	if ( $last ) {
 		$sql = $wpdb->prepare(
@@ -473,6 +468,21 @@ function ability_search_people( $input ) {
 			$raw, $full, $first, $last, $full,
 			$full, $first, $last, $full
 		);
+	} else {
+		$sql = $wpdb->prepare(
+			"SELECT username, name, email, role, nickname,
+			        CASE
+			            WHEN LOWER(name) = LOWER(%s)        THEN 'exact'
+			            WHEN name LIKE %s                   THEN 'full'
+			            WHEN name LIKE %s                   THEN 'first'
+			            WHEN nickname LIKE %s               THEN 'nickname'
+			            ELSE 'last'
+			        END AS match_quality
+			 FROM {$wpdb->prefix}personal_crm_people
+			 WHERE name LIKE %s OR name LIKE %s OR nickname LIKE %s",
+			$raw, $full, $first, $full,
+			$full, $first, $full
+		);
 	}
 
 	$rows = $wpdb->get_results( $sql, ARRAY_A );
@@ -480,7 +490,6 @@ function ability_search_people( $input ) {
 		return array();
 	}
 
-	// Sort: exact → full → first → last → nickname, then alphabetically.
 	$order = array( 'exact' => 0, 'full' => 1, 'first' => 2, 'last' => 3, 'nickname' => 4 );
 	usort( $rows, function( $a, $b ) use ( $order ) {
 		$diff = ( $order[ $a['match_quality'] ] ?? 5 ) - ( $order[ $b['match_quality'] ] ?? 5 );
