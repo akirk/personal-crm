@@ -4,6 +4,7 @@
  * Description: WordPress-based personal CRM tool for managing contacts, teams, and relationships with extensible architecture
  * Version: 1.0.0
  * Author: Alex Kirk
+ * Author URI: https://alex.kirk.at/
  * Requires at least: 5.0
  * Tested up to: 6.4
  * Requires PHP: 7.4
@@ -126,6 +127,7 @@ require_once __DIR__ . '/includes/time-travel.php';
 \PersonalCRM\TimeTravel::init();
 
 require_once __DIR__ . '/includes/personal-crm.php';
+require_once __DIR__ . '/includes/abilities.php';
 
 // Initialize storage and set up PersonalCrm
 if ( defined( 'WPINC' ) ) {
@@ -135,6 +137,7 @@ if ( defined( 'WPINC' ) ) {
         $storage = new Storage( $wpdb );
         PersonalCrm::set_storage( $storage );
         PersonalCrm::get_instance();
+        \PersonalCRM\register_abilities();
     } );
 } else {
     $sqlite_file = __DIR__ . '/data/a8c.db';

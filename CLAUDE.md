@@ -1,3 +1,19 @@
+# Personal CRM Plugin
+
+A WordPress-based personal CRM for managing contacts, groups, and relationships. It runs as a front-end app at `/crm` (powered by the `akirk/wp-app` framework) and stores data in WordPress's database via a custom `Storage` class.
+
+**Key features:**
+- **People** – detailed profiles with birthdays, partner/kids info, social links (GitHub, LinkedIn, WordPress.org), notes, and Gravatar photos
+- **Groups** – hierarchical groups (teams, circles, family) with membership history and join/leave dates
+- **Events** – birthday/anniversary tracking, custom events, calendar views
+- **Finder** – Cmd+K quick search across all contacts
+- **Export/Import** – JSONL-based data portability; audit reports for data completeness
+- **Extensibility** – hooks/filters; integrates with [Keeping Contact](https://github.com/akirk/keeping-contact) and [Contact Sync](https://github.com/akirk/contact-sync-personal-crm)
+
+**Tech stack:** PHP 7.4+, WordPress 6.0+, `WpApp\WpApp` router, Composer autoloading, optional WP-CLI commands, optional local-LLM integration.
+
+---
+
 # Claude Instructions
 
 ## Playground Link
