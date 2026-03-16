@@ -107,7 +107,8 @@ function register_crm_abilities() {
 		'input_schema' => array(
 			'type'       => 'object',
 			'properties' => array(
-				'username' => array( 'type' => 'string', 'description' => 'The unique username of the person', 'minLength' => 1 ),
+				'username'    => array( 'type' => 'string', 'description' => 'The unique username of the person', 'minLength' => 1 ),
+				'notes_limit' => array( 'type' => 'integer', 'description' => 'Number of notes to return (default 5, pass -1 for all)', 'default' => 5 ),
 			),
 			'required'             => array( 'username' ),
 			'additionalProperties' => false,
@@ -126,8 +127,20 @@ function register_crm_abilities() {
 				'github'          => array( 'type' => 'string' ),
 				'linkedin'        => array( 'type' => 'string' ),
 				'wordpress'       => array( 'type' => 'string' ),
+				'website'         => array( 'type' => 'string' ),
 				'groups'          => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-				'recent_notes'    => array( 'type' => 'array', 'items' => array( 'type' => 'string' ), 'description' => 'Up to 5 most recent notes' ),
+				'recent_notes'    => array(
+					'type'        => 'array',
+					'description' => 'Up to 5 most recent notes',
+					'items'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'id'   => array( 'type' => 'integer', 'description' => 'Use this in edit-note and delete-note' ),
+							'text' => array( 'type' => 'string' ),
+							'date' => array( 'type' => 'string' ),
+						),
+					),
+				),
 				'personal_events' => array( 'type' => 'array', 'items' => array( 'type' => 'object' ), 'description' => 'Past meetings and events' ),
 			),
 		),
@@ -380,6 +393,69 @@ function register_crm_abilities() {
 		),
 	) );
 
+	wp_register_ability( 'personal-crm/edit-note', array(
+		'label'       => __( 'Edit Note', 'personal-crm' ),
+		'description' => __( 'Replace the text of an existing note. Use the note ID from get-person.', 'personal-crm' ),
+		'category'    => 'personal-crm',
+		'input_schema' => array(
+			'type'       => 'object',
+			'properties' => array(
+				'note_id' => array( 'type' => 'integer', 'description' => 'The ID of the note to edit (from get-person recent_notes)' ),
+				'note'    => array( 'type' => 'string', 'description' => 'The replacement text', 'minLength' => 1 ),
+			),
+			'required'             => array( 'note_id', 'note' ),
+			'additionalProperties' => false,
+		),
+		'output_schema' => array(
+			'type'       => 'object',
+			'properties' => array(
+				'success' => array( 'type' => 'boolean' ),
+			),
+		),
+		'execute_callback'    => __NAMESPACE__ . '\ability_edit_note',
+		'permission_callback' => __NAMESPACE__ . '\ability_permission_write',
+		'meta' => array(
+			'show_in_rest' => true,
+			'annotations'  => array(
+				'instructions' => 'Use to correct or update the text of an existing note. Call get-person first to obtain the note ID.',
+				'readonly'     => false,
+				'destructive'  => false,
+				'idempotent'   => true,
+			),
+		),
+	) );
+
+	wp_register_ability( 'personal-crm/delete-note', array(
+		'label'       => __( 'Delete Note', 'personal-crm' ),
+		'description' => __( 'Permanently delete a note by its ID. Use the note ID from get-person.', 'personal-crm' ),
+		'category'    => 'personal-crm',
+		'input_schema' => array(
+			'type'       => 'object',
+			'properties' => array(
+				'note_id' => array( 'type' => 'integer', 'description' => 'The ID of the note to delete (from get-person recent_notes)' ),
+			),
+			'required'             => array( 'note_id' ),
+			'additionalProperties' => false,
+		),
+		'output_schema' => array(
+			'type'       => 'object',
+			'properties' => array(
+				'success' => array( 'type' => 'boolean' ),
+			),
+		),
+		'execute_callback'    => __NAMESPACE__ . '\ability_delete_note',
+		'permission_callback' => __NAMESPACE__ . '\ability_permission_write',
+		'meta' => array(
+			'show_in_rest' => true,
+			'annotations'  => array(
+				'instructions' => 'Permanently removes a note. Call get-person first to obtain the note ID. This cannot be undone.',
+				'readonly'     => false,
+				'destructive'  => true,
+				'idempotent'   => false,
+			),
+		),
+	) );
+
 
 }
 
@@ -536,8 +612,14 @@ function ability_get_person( $input ) {
 
 	$recent_notes = array();
 	if ( ! empty( $person->notes ) ) {
-		foreach ( array_slice( $person->notes, 0, 5 ) as $note ) {
-			$recent_notes[] = $note['note_text'];
+		$notes_limit = isset( $input['notes_limit'] ) ? (int) $input['notes_limit'] : 5;
+		$notes_slice = $notes_limit === -1 ? $person->notes : array_slice( $person->notes, 0, $notes_limit );
+		foreach ( $notes_slice as $note ) {
+			$recent_notes[] = array(
+				'id'   => (int) $note['id'],
+				'text' => $note['text'],
+				'date' => $note['date'],
+			);
 		}
 	}
 
@@ -553,6 +635,7 @@ function ability_get_person( $input ) {
 		'github'          => $person->github ?? '',
 		'linkedin'        => $person->linkedin ?? '',
 		'wordpress'       => $person->wordpress ?? '',
+		'website'         => $person->website ?? '',
 		'groups'          => $groups,
 		'recent_notes'    => $recent_notes,
 		'personal_events' => $person->personal_events ?? array(),
@@ -747,6 +830,28 @@ function ability_add_note( $input ) {
 
 	global $wpdb;
 	return array( 'success' => true, 'note_id' => $wpdb->insert_id );
+}
+
+function ability_edit_note( $input ) {
+	$crm    = PersonalCrm::get_instance();
+	$result = $crm->storage->update_person_note( (int) $input['note_id'], sanitize_textarea_field( $input['note'] ) );
+
+	if ( $result === false ) {
+		return new \WP_Error( 'save_failed', __( 'Failed to update note.', 'personal-crm' ) );
+	}
+
+	return array( 'success' => true );
+}
+
+function ability_delete_note( $input ) {
+	$crm    = PersonalCrm::get_instance();
+	$result = $crm->storage->delete_person_note( (int) $input['note_id'] );
+
+	if ( $result === false ) {
+		return new \WP_Error( 'delete_failed', __( 'Failed to delete note.', 'personal-crm' ) );
+	}
+
+	return array( 'success' => true );
 }
 
 
