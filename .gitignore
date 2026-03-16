@@ -1,5 +1,4 @@
 data
 config.php
 import-person.php
-!composer.json
-!composer.lock
+vendor/

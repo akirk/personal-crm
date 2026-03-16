@@ -18,6 +18,10 @@ class PersonalCrm {
         self::$storage_instance = $storage;
     }
 
+    public static function set_instance( $instance ) {
+        self::$instance = $instance;
+    }
+
     public static function get_instance() {
         if ( self::$instance === null ) {
             if ( ! self::$storage_instance ) {
