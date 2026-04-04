@@ -25,15 +25,10 @@ function ability_domains( $domains ) {
 }
 
 function ability_instructions( $instructions, $ability_id, $args, $result ) {
-	$abilities_with_people = array( 'personal-crm/search-people', 'personal-crm/get-person', 'personal-crm/add-people' );
+	$abilities_with_people = array( 'personal-crm/search-people', 'personal-crm/get-person', 'personal-crm/add-people', 'personal-crm/add-note' );
 
 	if ( in_array( $ability_id, $abilities_with_people, true ) && ! empty( $result ) ) {
 		$instructions = "Present each person's name as a markdown link using their url field, e.g. [Name](url).";
-	}
-
-	if ( $ability_id === 'personal-crm/add-note' && ! empty( $args['username'] ) && ! empty( $result['success'] ) ) {
-		$url          = home_url( '/crm/person/' . $args['username'] );
-		$instructions = "The note was saved. Link to the person's profile: {$url}";
 	}
 
 	return $instructions;
@@ -407,6 +402,7 @@ function register_crm_abilities() {
 			'properties' => array(
 				'success' => array( 'type' => 'boolean' ),
 				'note_id' => array( 'type' => 'integer' ),
+				'url'     => array( 'type' => 'string', 'description' => 'Link to this person\'s profile in the CRM' ),
 			),
 		),
 		'execute_callback'    => __NAMESPACE__ . '\ability_add_note',
@@ -890,7 +886,7 @@ function ability_add_note( $input ) {
 	}
 
 	global $wpdb;
-	return array( 'success' => true, 'note_id' => $wpdb->insert_id );
+	return array( 'success' => true, 'note_id' => $wpdb->insert_id, 'url' => home_url( '/crm/person/' . $input['username'] ) );
 }
 
 function ability_edit_note( $input ) {
