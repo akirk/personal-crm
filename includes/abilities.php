@@ -31,6 +31,11 @@ function ability_instructions( $instructions, $ability_id, $args, $result ) {
 		$instructions = "Present each person's name as a markdown link using their url field, e.g. [Name](url).";
 	}
 
+	if ( $ability_id === 'personal-crm/add-note' && ! empty( $args['username'] ) && ! empty( $result['success'] ) ) {
+		$url          = home_url( '/crm/person/' . $args['username'] );
+		$instructions = "The note was saved. Link to the person's profile: {$url}";
+	}
+
 	return $instructions;
 }
 
