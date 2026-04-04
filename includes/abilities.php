@@ -386,7 +386,7 @@ function register_crm_abilities() {
 
 	wp_register_ability( 'personal-crm/add-note', array(
 		'label'       => __( 'Add Note', 'personal-crm' ),
-		'description' => __( 'Add a timestamped text note to an existing person.', 'personal-crm' ),
+		'description' => __( 'Add a timestamped text note to an existing person. Call once per note — call multiple times to add multiple notes.', 'personal-crm' ),
 		'category'    => 'personal-crm',
 		'input_schema' => array(
 			'type'       => 'object',
@@ -410,7 +410,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Use for context, background, or observations about a person. Attach free-form text that should be visible on their profile.',
+				'instructions' => 'Use for context, background, or observations about a person. Attach free-form text that should be visible on their profile. To add multiple notes, call this ability once per note.',
 				'readonly'     => false,
 				'destructive'  => false,
 				'idempotent'   => false,
