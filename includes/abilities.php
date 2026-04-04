@@ -16,6 +16,12 @@ function register_abilities() {
 	add_action( 'wp_abilities_api_categories_init', __NAMESPACE__ . '\register_ability_categories' );
 	add_action( 'wp_abilities_api_init', __NAMESPACE__ . '\register_crm_abilities' );
 	add_filter( 'ai_assistant_ability_instructions', __NAMESPACE__ . '\ability_instructions', 10, 4 );
+	add_filter( 'ai_assistant_ability_domains', __NAMESPACE__ . '\ability_domains' );
+}
+
+function ability_domains( $domains ) {
+	$domains['personal-crm'] = 'people, contacts, CRM, persons, relationships';
+	return $domains;
 }
 
 function ability_instructions( $instructions, $ability_id, $args, $result ) {
