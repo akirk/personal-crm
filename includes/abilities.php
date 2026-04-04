@@ -15,6 +15,34 @@ function register_abilities() {
 
 	add_action( 'wp_abilities_api_categories_init', __NAMESPACE__ . '\register_ability_categories' );
 	add_action( 'wp_abilities_api_init', __NAMESPACE__ . '\register_crm_abilities' );
+	add_filter( 'ai_assistant_ability_instructions', __NAMESPACE__ . '\ability_instructions', 10, 4 );
+}
+
+function ability_instructions( $instructions, $ability_id, $args, $result ) {
+	switch ( $ability_id ) {
+		case 'personal-crm/search-people':
+			$has_matches = ! empty( $result ) && array_reduce( $result, function( $carry, $matches ) {
+				return $carry || ( is_array( $matches ) && ! empty( $matches ) );
+			}, false );
+			if ( $has_matches ) {
+				$instructions = "Present each person's name as a markdown link using their url field, e.g. [Name](url).";
+			}
+			break;
+
+		case 'personal-crm/get-person':
+			if ( ! empty( $result['url'] ) ) {
+				$instructions = "Present this person's name as a markdown link: [{$result['name']}]({$result['url']}).";
+			}
+			break;
+
+		case 'personal-crm/add-people':
+			if ( ! empty( $result ) ) {
+				$instructions = "Present each created person's name as a markdown link using their url field, e.g. [Name](url).";
+			}
+			break;
+	}
+
+	return $instructions;
 }
 
 function register_ability_categories() {
