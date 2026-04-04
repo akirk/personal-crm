@@ -19,27 +19,10 @@ function register_abilities() {
 }
 
 function ability_instructions( $instructions, $ability_id, $args, $result ) {
-	switch ( $ability_id ) {
-		case 'personal-crm/search-people':
-			$has_matches = ! empty( $result ) && array_reduce( $result, function( $carry, $matches ) {
-				return $carry || ( is_array( $matches ) && ! empty( $matches ) );
-			}, false );
-			if ( $has_matches ) {
-				$instructions = "Present each person's name as a markdown link using their url field, e.g. [Name](url).";
-			}
-			break;
+	$abilities_with_people = array( 'personal-crm/search-people', 'personal-crm/get-person', 'personal-crm/add-people' );
 
-		case 'personal-crm/get-person':
-			if ( ! empty( $result['url'] ) ) {
-				$instructions = "Present this person's name as a markdown link: [{$result['name']}]({$result['url']}).";
-			}
-			break;
-
-		case 'personal-crm/add-people':
-			if ( ! empty( $result ) ) {
-				$instructions = "Present each created person's name as a markdown link using their url field, e.g. [Name](url).";
-			}
-			break;
+	if ( in_array( $ability_id, $abilities_with_people, true ) && ! empty( $result ) ) {
+		$instructions = "Present each person's name as a markdown link using their url field, e.g. [Name](url).";
 	}
 
 	return $instructions;
