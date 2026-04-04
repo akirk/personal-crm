@@ -15,6 +15,23 @@ function register_abilities() {
 
 	add_action( 'wp_abilities_api_categories_init', __NAMESPACE__ . '\register_ability_categories' );
 	add_action( 'wp_abilities_api_init', __NAMESPACE__ . '\register_crm_abilities' );
+	add_filter( 'ai_assistant_ability_instructions', __NAMESPACE__ . '\ability_instructions', 10, 4 );
+	add_filter( 'ai_assistant_ability_domains', __NAMESPACE__ . '\ability_domains' );
+}
+
+function ability_domains( $domains ) {
+	$domains['personal-crm'] = 'people, contacts, CRM, persons, relationships';
+	return $domains;
+}
+
+function ability_instructions( $instructions, $ability_id, $args, $result ) {
+	$abilities_with_people = array( 'personal-crm/search-people', 'personal-crm/get-person', 'personal-crm/add-people', 'personal-crm/add-note' );
+
+	if ( in_array( $ability_id, $abilities_with_people, true ) && ! empty( $result ) ) {
+		$instructions = "Present each person's name as a markdown link using their url field, e.g. [Name](url).";
+	}
+
+	return $instructions;
 }
 
 function register_ability_categories() {
@@ -63,13 +80,16 @@ function register_crm_abilities() {
 			'properties' => array(
 				'queries' => array(
 					'type'        => 'array',
-					'description' => 'One or more names to search for. Each entry is searched independently.',
-					'items'       => array( 'type' => 'string', 'minLength' => 1 ),
+					'description' => 'One or more name strings to search for. Each entry is searched independently.',
+					'items'       => array( 'type' => 'string' ),
 					'minItems'    => 1,
 				),
+				'name'    => array(
+					'type'        => 'string',
+					'description' => 'Shorthand for searching a single name. Equivalent to queries: [name].',
+					'minLength'   => 1,
+				),
 			),
-			'required'             => array( 'queries' ),
-			'additionalProperties' => false,
 		),
 		'output_schema' => array(
 			'type'                 => 'object',
@@ -93,7 +113,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Pass all names at once to resolve a list of people in a single call. Returns a map of query → matches. An empty array for a query means no match — collect all unmatched names and call add-people for them in one batch. If a query returns multiple matches, call get-person on each candidate to disambiguate. Only call add-people when a query returns no results.',
+				'instructions' => 'Pass all names at once to resolve a list of people in a single call. Use queries (array of strings) for multiple names, or name (single string) for one. Returns a map of query → matches. An empty array for a query means no match — collect all unmatched names and call add-people for them in one batch. If a query returns multiple matches, call get-person on each candidate to disambiguate. Only call add-people when a query returns no results.',
 				'readonly'     => true,
 				'destructive'  => false,
 			),
@@ -301,6 +321,7 @@ function register_crm_abilities() {
 					'username' => array( 'type' => 'string', 'description' => 'Use this in subsequent add-note and add-meeting calls' ),
 					'name'     => array( 'type' => 'string' ),
 					'created'  => array( 'type' => 'boolean', 'description' => 'False means a person with this username already existed' ),
+					'url'      => array( 'type' => 'string', 'description' => 'Link to this person\'s profile in the CRM' ),
 				),
 			),
 		),
@@ -325,6 +346,7 @@ function register_crm_abilities() {
 			'type'       => 'object',
 			'properties' => array(
 				'username'        => array( 'type' => 'string', 'description' => 'Username of the person to update', 'minLength' => 1 ),
+				'new_username'    => array( 'type' => 'string', 'description' => 'Rename the person to this new username. Must be unique.', 'minLength' => 1 ),
 				'name'            => array( 'type' => 'string' ),
 				'nickname'        => array( 'type' => 'string' ),
 				'email'           => array( 'type' => 'string' ),
@@ -344,7 +366,9 @@ function register_crm_abilities() {
 		'output_schema' => array(
 			'type'       => 'object',
 			'properties' => array(
-				'success' => array( 'type' => 'boolean' ),
+				'success'  => array( 'type' => 'boolean' ),
+				'username' => array( 'type' => 'string', 'description' => 'The (possibly updated) username' ),
+				'url'      => array( 'type' => 'string', 'description' => 'Link to this person\'s profile in the CRM' ),
 			),
 		),
 		'execute_callback'    => __NAMESPACE__ . '\ability_update_person',
@@ -352,7 +376,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Use to change profile fields on an existing person — for example marking someone as deceased, correcting a name, or adding a missing email. Only supply the fields you want to change. To add a note use add-note instead.',
+				'instructions' => 'Use to change profile fields on an existing person — for example marking someone as deceased, correcting a name, adding a missing email, or renaming via new_username. Only supply the fields you want to change. To add a note use add-note instead. Always include the returned "url" as a markdown link when mentioning the person.',
 				'readonly'     => false,
 				'destructive'  => false,
 				'idempotent'   => true,
@@ -362,7 +386,7 @@ function register_crm_abilities() {
 
 	wp_register_ability( 'personal-crm/add-note', array(
 		'label'       => __( 'Add Note', 'personal-crm' ),
-		'description' => __( 'Add a timestamped text note to an existing person.', 'personal-crm' ),
+		'description' => __( 'Add a timestamped text note to an existing person. Call once per note — call multiple times to add multiple notes.', 'personal-crm' ),
 		'category'    => 'personal-crm',
 		'input_schema' => array(
 			'type'       => 'object',
@@ -378,6 +402,7 @@ function register_crm_abilities() {
 			'properties' => array(
 				'success' => array( 'type' => 'boolean' ),
 				'note_id' => array( 'type' => 'integer' ),
+				'url'     => array( 'type' => 'string', 'description' => 'Link to this person\'s profile in the CRM' ),
 			),
 		),
 		'execute_callback'    => __NAMESPACE__ . '\ability_add_note',
@@ -385,7 +410,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Use for context, background, or observations about a person. Attach free-form text that should be visible on their profile.',
+				'instructions' => 'Use for context, background, or observations about a person. Attach free-form text that should be visible on their profile. To add multiple notes, call this ability once per note.',
 				'readonly'     => false,
 				'destructive'  => false,
 				'idempotent'   => false,
@@ -492,8 +517,27 @@ function ability_list_people() {
 }
 
 function ability_search_people( $input ) {
+	$queries = array();
+
+	if ( ! empty( $input['queries'] ) ) {
+		foreach ( $input['queries'] as $q ) {
+			$queries[] = is_array( $q ) ? ( $q['name'] ?? '' ) : (string) $q;
+		}
+		$queries = array_values( array_filter( $queries ) );
+	} else {
+		foreach ( $input as $value ) {
+			if ( is_string( $value ) && $value !== '' ) {
+				$queries[] = $value;
+			}
+		}
+	}
+
+	if ( empty( $queries ) ) {
+		return new \WP_Error( 'missing_input', __( 'Provide "queries" (array of name strings) or "name" (single name string).', 'personal-crm' ) );
+	}
+
 	$results = array();
-	foreach ( $input['queries'] as $query ) {
+	foreach ( $queries as $query ) {
 		$results[ $query ] = search_people_by_query( $query );
 	}
 	return $results;
@@ -738,13 +782,13 @@ function ability_add_people( $input ) {
 			: generate_crm_username( $name, $storage );
 
 		if ( $storage->get_person( $username ) ) {
-			$results[] = array( 'username' => $username, 'name' => $name, 'created' => false );
+			$results[] = array( 'username' => $username, 'name' => $name, 'created' => false, 'url' => home_url( '/crm/person/' . $username ) );
 			continue;
 		}
 
 		$person_data = build_empty_person_data( $name, $entry );
 		if ( $storage->save_person( $username, $person_data ) === false ) {
-			$results[] = array( 'username' => $username, 'name' => $name, 'created' => false );
+			$results[] = array( 'username' => $username, 'name' => $name, 'created' => false, 'url' => home_url( '/crm/person/' . $username ) );
 			continue;
 		}
 
@@ -763,7 +807,7 @@ function ability_add_people( $input ) {
 			}
 		}
 
-		$results[] = array( 'username' => $username, 'name' => $name, 'created' => true );
+		$results[] = array( 'username' => $username, 'name' => $name, 'created' => true, 'url' => home_url( '/crm/person/' . $username ) );
 	}
 
 	return $results;
@@ -773,14 +817,25 @@ function ability_update_person( $input ) {
 	global $wpdb;
 
 	$crm       = PersonalCrm::get_instance();
-	$person_id = $crm->storage->get_person_id( $input['username'] );
+	$username  = $input['username'];
+	$person_id = $crm->storage->get_person_id( $username );
 
 	if ( ! $person_id ) {
-		return new \WP_Error( 'person_not_found', sprintf( __( 'No person found with username "%s".', 'personal-crm' ), $input['username'] ) );
+		return new \WP_Error( 'person_not_found', sprintf( __( 'No person found with username "%s".', 'personal-crm' ), $username ) );
 	}
 
 	$update_data   = array();
 	$update_format = array();
+
+	if ( ! empty( $input['new_username'] ) ) {
+		$new_username = sanitize_text_field( $input['new_username'] );
+		if ( $new_username !== $username && $crm->storage->get_person_id( $new_username ) ) {
+			return new \WP_Error( 'username_taken', sprintf( __( 'Username "%s" is already in use.', 'personal-crm' ), $new_username ) );
+		}
+		$update_data['username'] = $new_username;
+		$update_format[]         = '%s';
+		$username                = $new_username;
+	}
 
 	foreach ( array( 'name', 'nickname', 'email', 'role', 'location', 'birthday', 'github', 'linkedin', 'wordpress', 'website', 'deceased_date' ) as $field ) {
 		if ( isset( $input[ $field ] ) ) {
@@ -794,23 +849,25 @@ function ability_update_person( $input ) {
 		$update_format[]         = '%d';
 	}
 
-	if ( empty( $update_data ) ) {
-		return array( 'success' => true );
+	if ( ! empty( $update_data ) ) {
+		$result = $wpdb->update(
+			$wpdb->prefix . 'personal_crm_people',
+			$update_data,
+			array( 'id' => $person_id ),
+			$update_format,
+			array( '%d' )
+		);
+
+		if ( $result === false ) {
+			return new \WP_Error( 'save_failed', $wpdb->last_error ?: __( 'Failed to update person.', 'personal-crm' ) );
+		}
 	}
 
-	$result = $wpdb->update(
-		$wpdb->prefix . 'personal_crm_people',
-		$update_data,
-		array( 'id' => $person_id ),
-		$update_format,
-		array( '%d' )
+	return array(
+		'success'  => true,
+		'username' => $username,
+		'url'      => home_url( '/crm/person/' . $username ),
 	);
-
-	if ( $result === false ) {
-		return new \WP_Error( 'save_failed', $wpdb->last_error ?: __( 'Failed to update person.', 'personal-crm' ) );
-	}
-
-	return array( 'success' => true );
 }
 
 function ability_add_note( $input ) {
@@ -829,7 +886,7 @@ function ability_add_note( $input ) {
 	}
 
 	global $wpdb;
-	return array( 'success' => true, 'note_id' => $wpdb->insert_id );
+	return array( 'success' => true, 'note_id' => $wpdb->insert_id, 'url' => home_url( '/crm/person/' . $input['username'] ) );
 }
 
 function ability_edit_note( $input ) {
