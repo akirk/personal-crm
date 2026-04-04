@@ -63,12 +63,16 @@ function register_crm_abilities() {
 			'properties' => array(
 				'queries' => array(
 					'type'        => 'array',
-					'description' => 'One or more names to search for. Each entry is searched independently.',
-					'items'       => array( 'type' => 'string', 'minLength' => 1 ),
+					'description' => 'One or more name strings to search for. Each entry is searched independently.',
+					'items'       => array( 'type' => 'string' ),
 					'minItems'    => 1,
 				),
+				'name'    => array(
+					'type'        => 'string',
+					'description' => 'Shorthand for searching a single name. Equivalent to queries: [name].',
+					'minLength'   => 1,
+				),
 			),
-			'required'             => array( 'queries' ),
 			'additionalProperties' => false,
 		),
 		'output_schema' => array(
@@ -93,7 +97,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Pass all names at once to resolve a list of people in a single call. Returns a map of query → matches. An empty array for a query means no match — collect all unmatched names and call add-people for them in one batch. If a query returns multiple matches, call get-person on each candidate to disambiguate. Only call add-people when a query returns no results.',
+				'instructions' => 'Pass all names at once to resolve a list of people in a single call. Use queries (array of strings) for multiple names, or name (single string) for one. Returns a map of query → matches. An empty array for a query means no match — collect all unmatched names and call add-people for them in one batch. If a query returns multiple matches, call get-person on each candidate to disambiguate. Only call add-people when a query returns no results.',
 				'readonly'     => true,
 				'destructive'  => false,
 			),
@@ -496,8 +500,21 @@ function ability_list_people() {
 }
 
 function ability_search_people( $input ) {
+	$queries = array();
+
+	if ( ! empty( $input['queries'] ) ) {
+		foreach ( $input['queries'] as $q ) {
+			$queries[] = is_array( $q ) ? ( $q['name'] ?? '' ) : (string) $q;
+		}
+		$queries = array_values( array_filter( $queries ) );
+	} elseif ( ! empty( $input['name'] ) ) {
+		$queries[] = $input['name'];
+	} else {
+		return new \WP_Error( 'missing_input', __( 'Provide "queries" (array of name strings) or "name" (single name string).', 'personal-crm' ) );
+	}
+
 	$results = array();
-	foreach ( $input['queries'] as $query ) {
+	foreach ( $queries as $query ) {
 		$results[ $query ] = search_people_by_query( $query );
 	}
 	return $results;
