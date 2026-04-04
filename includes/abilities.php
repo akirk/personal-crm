@@ -73,7 +73,6 @@ function register_crm_abilities() {
 					'minLength'   => 1,
 				),
 			),
-			'additionalProperties' => false,
 		),
 		'output_schema' => array(
 			'type'                 => 'object',
@@ -507,9 +506,15 @@ function ability_search_people( $input ) {
 			$queries[] = is_array( $q ) ? ( $q['name'] ?? '' ) : (string) $q;
 		}
 		$queries = array_values( array_filter( $queries ) );
-	} elseif ( ! empty( $input['name'] ) ) {
-		$queries[] = $input['name'];
 	} else {
+		foreach ( $input as $value ) {
+			if ( is_string( $value ) && $value !== '' ) {
+				$queries[] = $value;
+			}
+		}
+	}
+
+	if ( empty( $queries ) ) {
 		return new \WP_Error( 'missing_input', __( 'Provide "queries" (array of name strings) or "name" (single name string).', 'personal-crm' ) );
 	}
 
