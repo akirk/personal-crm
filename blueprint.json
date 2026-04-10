@@ -1,0 +1,16 @@
+{
+	"landingPage": "/crm",
+	"steps": [
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "git:directory",
+				"url": "https://github.com/akirk/personal-crm",
+				"ref": "refs/heads/dist/main"
+			},
+			"options": {
+				"activate": true
+			}
+		}
+	]
+}
