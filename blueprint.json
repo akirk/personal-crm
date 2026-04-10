@@ -9,7 +9,8 @@
 				"ref": "refs/heads/dist/main"
 			},
 			"options": {
-				"activate": true
+				"activate": true,
+				"targetFolderName": "personal-crm"
 			}
 		}
 	]
