@@ -18,7 +18,7 @@
 			"pluginData": {
 				"resource": "git:directory",
 				"url": "https://github.com/akirk/keeping-contact",
-				"ref": "refs/heads/dist/main"
+				"ref": "refs/heads/main"
 			},
 			"options": {
 				"activate": true,
