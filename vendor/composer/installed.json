@@ -1,0 +1,60 @@
+{
+    "packages": [
+        {
+            "name": "akirk/wp-app",
+            "version": "dev-main",
+            "version_normalized": "dev-main",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/akirk/wp-app.git",
+                "reference": "d10a04f24d987ee35b7b768aa26b860186dd04db"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/akirk/wp-app/zipball/d10a04f24d987ee35b7b768aa26b860186dd04db",
+                "reference": "d10a04f24d987ee35b7b768aa26b860186dd04db",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.4"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.0",
+                "squizlabs/php_codesniffer": "^3.7",
+                "wp-coding-standards/wpcs": "^3.0"
+            },
+            "time": "2026-01-23T05:25:47+00:00",
+            "default-branch": true,
+            "type": "library",
+            "installation-source": "dist",
+            "autoload": {
+                "files": [
+                    "src/class-registry.php",
+                    "src/class-router.php",
+                    "src/class-masterbar.php",
+                    "src/class-wpapp.php",
+                    "src/BaseStorage.php",
+                    "src/abstract-baseapp.php",
+                    "src/functions.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL-2.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "Alex Kirk"
+                }
+            ],
+            "description": "A lightweight framework for building web applications on WordPress with routing, admin bar integration, and theme isolation",
+            "support": {
+                "issues": "https://github.com/akirk/wp-app/issues",
+                "source": "https://github.com/akirk/wp-app/tree/v1.0.0"
+            },
+            "install-path": "../akirk/wp-app"
+        }
+    ],
+    "dev": false,
+    "dev-package-names": []
+}
