@@ -26,10 +26,14 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 	$is_ajax = isset( $_POST['format'] ) && $_POST['format'] === 'json';
 
 	if ( $action === 'assign_groups' ) {
-		$person_id = intval( $_POST['person_id'] ?? 0 );
-		$group_ids = array_map( 'intval', $_POST['group_ids'] ?? array() );
+		$person_id        = intval( $_POST['person_id'] ?? 0 );
+		$group_ids        = array_map( 'intval', $_POST['group_ids'] ?? array() );
+		$group_ids_remove = array_map( 'intval', $_POST['group_ids_remove'] ?? array() );
 
-		if ( $person_id && ! empty( $group_ids ) ) {
+		if ( $person_id && ( ! empty( $group_ids ) || ! empty( $group_ids_remove ) ) ) {
+			foreach ( $group_ids_remove as $group_id ) {
+				$crm->storage->remove_person_from_group( $person_id, $group_id );
+			}
 			$assigned_count = 0;
 			foreach ( $group_ids as $group_id ) {
 				if ( $crm->storage->add_person_to_group( $person_id, $group_id ) ) {
@@ -77,6 +81,26 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) ) {
 				$response['group_id'] = $new_group->id;
 			}
 			echo wp_json_encode( $response );
+			exit;
+		}
+	} elseif ( $action === 'undo_assignment' ) {
+		$person_id = intval( $_POST['person_id'] ?? 0 );
+		$group_ids = array_map( 'intval', $_POST['group_ids'] ?? array() );
+
+		if ( $person_id && ! empty( $group_ids ) ) {
+			foreach ( $group_ids as $group_id ) {
+				$crm->storage->remove_person_from_group( $person_id, $group_id );
+			}
+			$message      = 'Assignment undone.';
+			$message_type = 'success';
+		} else {
+			$message      = 'Could not undo assignment.';
+			$message_type = 'error';
+		}
+
+		if ( $is_ajax ) {
+			header( 'Content-Type: application/json' );
+			echo wp_json_encode( array( 'success' => $message_type === 'success', 'message' => $message ) );
 			exit;
 		}
 	}
@@ -186,6 +210,33 @@ function build_nav_url( $crm, $base_params, $index ) {
 			grid-template-columns: 1fr 350px;
 			gap: 24px;
 			margin-top: 20px;
+		}
+		@media (max-width: 700px) {
+			.assign-groups-layout {
+				grid-template-columns: 1fr;
+			}
+			.assign-groups-layout .groups-panel {
+				order: -1;
+			}
+			.mobile-person-header {
+				display: flex;
+				align-items: baseline;
+				gap: 8px;
+				margin-bottom: 16px;
+				padding-bottom: 12px;
+				border-bottom: 1px solid light-dark(#e0e0e0, #333);
+			}
+			.mobile-person-header .mobile-person-name {
+				font-weight: 600;
+				font-size: 16px;
+			}
+			.mobile-person-header .mobile-person-username {
+				font-size: 13px;
+				opacity: 0.6;
+			}
+		}
+		@media (min-width: 701px) {
+			.mobile-person-header { display: none; }
 		}
 		.query-bar {
 			display: flex;
@@ -322,9 +373,15 @@ function build_nav_url( $crm, $base_params, $index ) {
 			border-color: #005a87;
 		}
 		.group-chip.already-member {
-			opacity: 0.5;
-			cursor: not-allowed;
+			opacity: 0.6;
+			cursor: pointer;
+		}
+		.group-chip.marked-for-removal {
+			background: light-dark(#fdecea, #4a1a1a);
+			border-color: light-dark(#e74c3c, #c0392b);
+			color: light-dark(#c0392b, #e07070);
 			text-decoration: line-through;
+			opacity: 1;
 		}
 		.groups-search {
 			width: 100%;
@@ -424,6 +481,11 @@ function build_nav_url( $crm, $base_params, $index ) {
 			text-decoration: none;
 		}
 		.queue-item a:hover { text-decoration: underline; }
+		.queue-item-actions { display: flex; gap: 8px; }
+		.queue-item-actions a { font-size: 12px; }
+		.queue-undo { color: light-dark(#c0392b, #e07070); }
+		.requeue-link { font-size: 13px; white-space: nowrap; color: light-dark(#0073aa, #6ab0d4); text-decoration: none; padding: 4px 8px; border: 1px solid light-dark(#b8d9ec, #3a5a7a); border-radius: 4px; }
+		.requeue-link:hover { text-decoration: underline; }
 		.assign-skip-link {
 			display: block;
 			text-align: center;
@@ -523,20 +585,23 @@ function build_nav_url( $crm, $base_params, $index ) {
 					<h3 style="margin-bottom: 16px;">Recently Assigned People</h3>
 					<div style="max-height: 400px; overflow-y: auto;">
 						<?php foreach ( $recently_assigned_people as $person ) : ?>
-							<div class="person-card">
-								<div class="person-name">
-									<a href="<?php echo esc_url( $crm->build_url( 'person.php', array( 'person' => $person->username ) ) ); ?>">
-										<?php echo esc_html( $person->get_display_name_with_nickname() ); ?>
-									</a>
+							<div class="person-card" style="display: flex; justify-content: space-between; align-items: flex-start;">
+								<div>
+									<div class="person-name">
+										<a href="<?php echo esc_url( $crm->build_url( 'person.php', array( 'person' => $person->username ) ) ); ?>">
+											<?php echo esc_html( $person->get_display_name_with_nickname() ); ?>
+										</a>
+									</div>
+									<div class="person-username">@<?php echo esc_html( $person->username ); ?></div>
+									<div class="current-groups">
+										<?php foreach ( $person->groups as $group ) : ?>
+											<?php if ( empty( $group['group_left_date'] ) ) : ?>
+												<span><?php echo esc_html( $group['display_icon'] . ' ' . $group['group_name'] ); ?></span>
+											<?php endif; ?>
+										<?php endforeach; ?>
+									</div>
 								</div>
-								<div class="person-username">@<?php echo esc_html( $person->username ); ?></div>
-								<div class="current-groups">
-									<?php foreach ( $person->groups as $group ) : ?>
-										<?php if ( empty( $group['group_left_date'] ) ) : ?>
-											<span><?php echo esc_html( $group['display_icon'] . ' ' . $group['group_name'] ); ?></span>
-										<?php endif; ?>
-									<?php endforeach; ?>
-								</div>
+								<a href="<?php echo esc_url( home_url( '/crm/assign-groups' ) . '?person[]=' . urlencode( $person->username ) ); ?>" class="requeue-link">Reassign</a>
 							</div>
 						<?php endforeach; ?>
 					</div>
@@ -585,7 +650,9 @@ function build_nav_url( $crm, $base_params, $index ) {
 									<a href="<?php echo esc_url( $crm->build_url( 'person.php', array( 'person' => $person->username ) ) ); ?>"><?php echo esc_html( $person->name ); ?></a>
 								</span>
 								<?php if ( $idx !== $current_index ) : ?>
-									<a href="#" data-jump-index="<?php echo $idx; ?>" style="font-size: 12px;">Jump</a>
+									<span class="queue-item-actions">
+										<a href="#" data-jump-index="<?php echo $idx; ?>">Jump</a>
+									</span>
 								<?php endif; ?>
 							</div>
 						<?php endforeach; ?>
@@ -599,6 +666,10 @@ function build_nav_url( $crm, $base_params, $index ) {
 							<input type="hidden" name="action" value="assign_groups">
 							<input type="hidden" name="person_id" value="<?php echo esc_attr( $current_person->id ); ?>">
 
+							<div class="mobile-person-header">
+								<span class="mobile-person-name" id="mobile-person-name"><?php echo esc_html( $current_person->get_display_name_with_nickname() ); ?></span>
+								<span class="mobile-person-username" id="mobile-person-username">@<?php echo esc_html( $current_person->username ); ?></span>
+							</div>
 							<h3>Select Groups</h3>
 							<input type="text" class="groups-search" placeholder="Filter groups..." id="groups-search" oninput="filterGroups()">
 
@@ -637,7 +708,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 								Selected: <span id="selected-count">0</span> group(s)
 							</div>
 
-							<button type="submit" class="assign-button" id="assign-button" disabled>
+							<button type="submit" class="assign-button" id="assign-button">
 								Assign & Next →
 							</button>
 							<?php if ( $current_index < count( $people_list ) - 1 ) : ?>
@@ -658,6 +729,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 		const crmPeople = <?php echo wp_json_encode( $people_data ); ?>;
 		let currentIndex = <?php echo $current_index; ?>;
 		const assignedInSession = new Set();
+		const sessionAssignedGroups = new Map();
 
 		function buildNavUrl(index) {
 			const url = new URL(window.location.href);
@@ -759,14 +831,16 @@ function build_nav_url( $crm, $base_params, $index ) {
 
 		function updateSelectedSummary() {
 			const checkboxes = document.querySelectorAll('#group-chips input[type="checkbox"]:checked:not(:disabled)');
+			const removals = document.querySelectorAll('#group-chips .group-chip.marked-for-removal');
 			const count = checkboxes.length;
+			const removeCount = removals.length;
 			const summary = document.getElementById('selected-summary');
 			const button = document.getElementById('assign-button');
 
-			summary.style.display = count > 0 ? 'block' : 'none';
+			summary.style.display = (count > 0 || removeCount > 0) ? 'block' : 'none';
 			const countSpan = document.getElementById('selected-count');
-			if (countSpan) countSpan.textContent = count;
-			button.disabled = count === 0;
+			if (countSpan) countSpan.textContent = count + (removeCount > 0 ? ' (−' + removeCount + ' removed)' : '');
+			button.disabled = false;
 
 			document.querySelectorAll('.group-chip').forEach(chip => {
 				const checkbox = chip.querySelector('input[type="checkbox"]');
@@ -800,6 +874,38 @@ function build_nav_url( $crm, $base_params, $index ) {
 			item.className = 'queue-item ' + (isCurrent ? 'queue-item--current' : isAssigned ? 'queue-item--assigned' : index < currentIndex ? 'queue-item--past' : 'queue-item--future');
 			const status = item.querySelector('.queue-status');
 			if (status) status.textContent = isCurrent ? '→' : isAssigned ? '✓' : index < currentIndex ? '–' : '○';
+
+			var actionsEl = item.querySelector('.queue-item-actions');
+			if (isCurrent) {
+				if (actionsEl) actionsEl.style.display = 'none';
+				return;
+			}
+			if (!actionsEl) {
+				actionsEl = document.createElement('span');
+				actionsEl.className = 'queue-item-actions';
+				item.appendChild(actionsEl);
+			}
+			actionsEl.style.display = '';
+
+			if (!actionsEl.querySelector('[data-jump-index]')) {
+				var jumpLink = document.createElement('a');
+				jumpLink.href = '#';
+				jumpLink.dataset.jumpIndex = index;
+				jumpLink.textContent = 'Jump';
+				actionsEl.appendChild(jumpLink);
+			}
+
+			var undoLink = actionsEl.querySelector('[data-undo-index]');
+			if (isAssigned && !undoLink) {
+				undoLink = document.createElement('a');
+				undoLink.href = '#';
+				undoLink.dataset.undoIndex = index;
+				undoLink.className = 'queue-undo';
+				undoLink.textContent = 'Undo';
+				actionsEl.appendChild(undoLink);
+			} else if (!isAssigned && undoLink) {
+				undoLink.parentNode.removeChild(undoLink);
+			}
 		}
 
 		function navigateTo(index, pushState) {
@@ -815,6 +921,11 @@ function build_nav_url( $crm, $base_params, $index ) {
 
 			var usernameEl = document.getElementById('current-person-username');
 			if (usernameEl) usernameEl.textContent = '@' + person.username;
+
+			var mobileNameEl = document.getElementById('mobile-person-name');
+			if (mobileNameEl) mobileNameEl.textContent = person.name;
+			var mobileUsernameEl = document.getElementById('mobile-person-username');
+			if (mobileUsernameEl) mobileUsernameEl.textContent = '@' + person.username;
 
 			var locationEl = document.getElementById('current-person-location');
 			if (locationEl) {
@@ -843,7 +954,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 			var formAction = buildNavUrl(index);
 			var assignForm = document.getElementById('assign-form');
 			if (assignForm) {
-				assignForm.action = formAction;
+				assignForm.setAttribute('action', formAction);
 				var personIdInput = assignForm.querySelector('input[name="person_id"]');
 				if (personIdInput) personIdInput.value = person.id;
 			}
@@ -858,13 +969,13 @@ function build_nav_url( $crm, $base_params, $index ) {
 			document.querySelectorAll('.group-chip').forEach(function(chip) {
 				var groupId = parseInt(chip.dataset.groupId);
 				var checkbox = chip.querySelector('input[type="checkbox"]');
-				chip.classList.remove('selected', 'already-member');
+				chip.classList.remove('selected', 'already-member', 'marked-for-removal');
 				chip.title = '';
 				chip.style.display = '';
 				if (checkbox) { checkbox.checked = false; checkbox.disabled = false; }
 				if (memberGroupIds.has(groupId)) {
 					chip.classList.add('already-member');
-					chip.title = 'Already a member';
+					chip.title = 'Already a member — click to remove';
 					if (checkbox) checkbox.disabled = true;
 				}
 			});
@@ -891,20 +1002,41 @@ function build_nav_url( $crm, $base_params, $index ) {
 				form.querySelectorAll('input[name="group_ids[]"]:checked:not(:disabled)')
 			).map(function(cb) { return parseInt(cb.value); });
 
-			if (selectedGroupIds.length === 0) return;
+			var groupIdsToRemove = Array.from(
+				form.querySelectorAll('.group-chip.marked-for-removal')
+			).map(function(chip) { return parseInt(chip.dataset.groupId); });
+
+			if (selectedGroupIds.length === 0 && groupIdsToRemove.length === 0) {
+				if (currentIndex < crmPeople.length - 1) navigateTo(currentIndex + 1);
+				else window.location.href = window.location.pathname;
+				return;
+			}
 
 			button.disabled = true;
 			button.textContent = 'Saving…';
 
 			var formData = new FormData(form);
 			formData.set('format', 'json');
+			groupIdsToRemove.forEach(function(gid) { formData.append('group_ids_remove[]', gid); });
 
 			try {
-				var response = await fetch(form.action, { method: 'POST', body: formData });
+				var response = await fetch(form.getAttribute('action'), { method: 'POST', body: formData });
 				var data = await response.json();
 
 				if (data.success) {
 					var person = crmPeople[currentIndex];
+					if (groupIdsToRemove.length > 0) {
+						var removedSet = new Set(groupIdsToRemove);
+						var newIds = [], newLabels = [];
+						for (var i = 0; i < person.group_ids.length; i++) {
+							if (!removedSet.has(person.group_ids[i])) {
+								newIds.push(person.group_ids[i]);
+								newLabels.push(person.group_labels[i]);
+							}
+						}
+						person.group_ids = newIds;
+						person.group_labels = newLabels;
+					}
 					selectedGroupIds.forEach(function(gid) {
 						if (!person.group_ids.includes(gid)) {
 							person.group_ids.push(gid);
@@ -913,10 +1045,11 @@ function build_nav_url( $crm, $base_params, $index ) {
 						}
 					});
 					assignedInSession.add(currentIndex);
+					sessionAssignedGroups.set(currentIndex, selectedGroupIds.slice());
 					if (currentIndex < crmPeople.length - 1) {
 						navigateTo(currentIndex + 1);
 					} else {
-						window.location.reload();
+						window.location.href = window.location.pathname;
 					}
 				} else {
 					button.disabled = false;
@@ -930,7 +1063,12 @@ function build_nav_url( $crm, $base_params, $index ) {
 
 		document.querySelectorAll('.group-chip').forEach(function(chip) {
 			chip.addEventListener('click', function(e) {
-				if (this.classList.contains('already-member')) { e.preventDefault(); return; }
+				if (this.classList.contains('already-member')) {
+					e.preventDefault();
+					this.classList.toggle('marked-for-removal');
+					updateSelectedSummary();
+					return;
+				}
 				var checkbox = this.querySelector('input[type="checkbox"]');
 				if (checkbox && !checkbox.disabled) { checkbox.checked = !checkbox.checked; updateSelectedSummary(); }
 			});
@@ -940,9 +1078,46 @@ function build_nav_url( $crm, $base_params, $index ) {
 			if (!e.target.closest('select')) createGroupFromSearch();
 		});
 
+		async function undoAssignment(index) {
+			var person = crmPeople[index];
+			var groupIds = sessionAssignedGroups.get(index);
+			if (!groupIds || groupIds.length === 0) return;
+
+			var formData = new FormData();
+			formData.set('action', 'undo_assignment');
+			formData.set('format', 'json');
+			formData.set('person_id', person.id);
+			groupIds.forEach(function(gid) { formData.append('group_ids[]', gid); });
+
+			try {
+				var response = await fetch(buildNavUrl(currentIndex), { method: 'POST', body: formData });
+				var data = await response.json();
+
+				if (data.success) {
+					var removedSet = new Set(groupIds);
+					var newIds = [], newLabels = [];
+					for (var i = 0; i < person.group_ids.length; i++) {
+						if (!removedSet.has(person.group_ids[i])) {
+							newIds.push(person.group_ids[i]);
+							newLabels.push(person.group_labels[i]);
+						}
+					}
+					person.group_ids = newIds;
+					person.group_labels = newLabels;
+
+					assignedInSession.delete(index);
+					sessionAssignedGroups.delete(index);
+					updateQueueItem(index);
+					navigateTo(index);
+				}
+			} catch (err) {}
+		}
+
 		document.getElementById('people-queue') && document.getElementById('people-queue').addEventListener('click', function(e) {
 			var jumpLink = e.target.closest('[data-jump-index]');
-			if (jumpLink) { e.preventDefault(); navigateTo(parseInt(jumpLink.dataset.jumpIndex)); }
+			if (jumpLink) { e.preventDefault(); navigateTo(parseInt(jumpLink.dataset.jumpIndex)); return; }
+			var undoLink = e.target.closest('[data-undo-index]');
+			if (undoLink) { e.preventDefault(); undoAssignment(parseInt(undoLink.dataset.undoIndex)); }
 		});
 
 		document.getElementById('nav-prev') && document.getElementById('nav-prev').addEventListener('click', function(e) {
