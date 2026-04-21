@@ -1010,6 +1010,7 @@ details summary span:last-child {
 
 .nav-tabs {
     display: flex;
+    flex-wrap: wrap;
     border-bottom: 1px solid light-dark(#ddd, #444);
     margin-bottom: 30px;
 }
@@ -1022,6 +1023,18 @@ details summary span:last-child {
     cursor: pointer;
     text-decoration: none;
     color: light-dark(#333, #e0e0e0);
+}
+
+@media (max-width: 600px) {
+    .nav-tab {
+        padding: 8px 14px;
+        font-size: 14px;
+        border-bottom: 1px solid light-dark(#ddd, #555);
+    }
+    .nav-tab.active {
+        border-top: 3px solid #0073aa;
+        border-bottom: 1px solid light-dark(#ddd, #555);
+    }
 }
 
 .nav-tab:hover, .nav-tab.active {
