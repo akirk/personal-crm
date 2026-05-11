@@ -522,7 +522,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
             const container = document.getElementById(prefix + 'links-container');
             const newRow = document.createElement('div');
             newRow.className = 'link-row';
-            newRow.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
+            newRow.style.cssText = '';
             newRow.innerHTML = `
                 <input type="text" name="link_text[]" placeholder="Link text (e.g., 'Project docs')" style="flex: 1;">
                 <input type="url" name="link_url[]" placeholder="URL" style="flex: 2;">
@@ -690,7 +690,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                     const currentIndex = getNextTeamLinkIndex();
                     const linkRow = document.createElement('div');
                     linkRow.className = 'team-link-row';
-                    linkRow.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
+                    linkRow.style.cssText = '';
 
                     linkRow.innerHTML = `
                         <input type="text" name="team_links[${currentIndex}][text]" value="" placeholder="Link text (e.g., Linear)" style="flex: 0 0 150px;">
@@ -892,7 +892,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
             const container = document.getElementById('event-links-container');
             const newRow = document.createElement('div');
             newRow.className = 'link-row';
-            newRow.style.cssText = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
+            newRow.style.cssText = '';
             newRow.innerHTML = `
                 <input type="text" name="event_links[${eventLinkCounter}][text]" 
                        placeholder="Link text (e.g., Zoom, Agenda)" 
