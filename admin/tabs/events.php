@@ -195,7 +195,7 @@ if ( $is_editing_event ) {
                         <div id="event-links-container" style="margin-bottom: 15px;">
                             <?php if ( $is_editing_event && ! empty( $edit_data['links'] ) ) : ?>
                                 <?php $link_index = 0; foreach ( $edit_data['links'] as $link_text => $link_url ) : ?>
-                                    <div class="link-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                                    <div class="link-row">
                                         <input type="text" name="event_links[<?php echo $link_index; ?>][text]" 
                                                value="<?php echo htmlspecialchars( $link_text ); ?>" 
                                                placeholder="Link text (e.g., Zoom, Agenda)" 

@@ -951,7 +951,7 @@ function render_person_form_new( $default_group_id, $parent_group_id, $edit_data
 
 				foreach ( $current_links as $link_text => $link_url ) :
 				?>
-					<div class="link-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+					<div class="link-row">
 						<input type="text" name="link_text[]" placeholder="Link text (e.g., '1:1 doc')" value="<?php echo htmlspecialchars( $link_text ); ?>" style="flex: 1;">
 						<input type="url" name="link_url[]" placeholder="URL" value="<?php echo htmlspecialchars( $link_url ); ?>" style="flex: 2;">
 						<button type="button" onclick="removeLink(this)" class="btn-remove">Remove</button>

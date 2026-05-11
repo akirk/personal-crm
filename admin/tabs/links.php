@@ -68,7 +68,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                 $link_index = 0;
                 if ( ! empty( $team_links ) ) :
                     foreach ( $team_links as $link_text => $link_url ) : ?>
-                        <div class="team-link-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                        <div class="team-link-row">
                             <input type="text" name="team_links[<?php echo $link_index; ?>][text]" value="<?php echo htmlspecialchars( $link_text ); ?>" placeholder="Link text (e.g., Linear)" style="flex: 0 0 150px;">
                             <input type="url" name="team_links[<?php echo $link_index; ?>][url]" value="<?php echo htmlspecialchars( $link_url ); ?>" placeholder="https://..." style="flex: 1;">
                             <button type="button" class="remove-team-link btn-remove-personal">Remove</button>
@@ -77,7 +77,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
                     $link_index++;
                     endforeach;
                 else : ?>
-                    <div class="team-link-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                    <div class="team-link-row">
                         <input type="text" name="team_links[0][text]" value="" placeholder="Link text (e.g., Linear)" style="flex: 0 0 150px;">
                         <input type="url" name="team_links[0][url]" value="" placeholder="https://..." style="flex: 1;">
                         <button type="button" class="remove-team-link btn-remove-personal">Remove</button>
