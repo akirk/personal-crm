@@ -135,9 +135,9 @@ function build_filter_url( $params = array() ) {
 			background: light-dark(#e8e8e8, #444);
 		}
 		.filter-bar a.filter-button.active {
-			background: #0073aa;
+			background: var(--wp-app-color-primary, #0073aa);
 			color: white;
-			border-color: #0073aa;
+			border-color: var(--wp-app-color-primary, #0073aa);
 		}
 		.sort-controls {
 			display: flex;
@@ -158,7 +158,7 @@ function build_filter_url( $params = array() ) {
 			background: light-dark(#e8e8e8, #333);
 		}
 		.sort-controls a.active {
-			background: #0073aa;
+			background: var(--wp-app-color-primary, #0073aa);
 			color: white;
 		}
 		.contact-list {

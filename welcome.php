@@ -262,7 +262,7 @@ function render_import_section( $crm ) {
 		}
 		.create-group-form input[type="text"]:focus {
 			outline: none;
-			border-color: #0073aa;
+			border-color: var(--wp-app-color-primary, #0073aa);
 		}
 		.btn {
 			padding: 12px 24px;
@@ -277,11 +277,11 @@ function render_import_section( $crm ) {
 			border: none;
 		}
 		.btn-primary {
-			background: #0073aa;
+			background: var(--wp-app-color-primary, #0073aa);
 			color: white;
 		}
 		.btn-primary:hover {
-			background: #005a87;
+			background: var(--wp-app-color-primary-hover, #005a87);
 		}
 		.btn-secondary {
 			background: light-dark(#e8e8e8, #333);
@@ -320,7 +320,7 @@ function render_import_section( $crm ) {
 			min-width: 180px;
 		}
 		.browse-link:hover {
-			border-color: #0073aa;
+			border-color: var(--wp-app-color-primary, #0073aa);
 			background: light-dark(#f0f7fc, #1a2a3a);
 		}
 		.browse-link-icon {
@@ -359,7 +359,7 @@ function render_import_section( $crm ) {
 			transition: border-color 0.15s;
 		}
 		.import-mode-option:has(input:checked) {
-			border-color: #0073aa;
+			border-color: var(--wp-app-color-primary, #0073aa);
 			background: light-dark(#f0f7fc, #1a2a3a);
 		}
 		.import-mode-option input {
@@ -373,7 +373,7 @@ function render_import_section( $crm ) {
 		}
 		.import-mode-option:has(input:checked) .option-label::before {
 			content: "✓ ";
-			color: #0073aa;
+			color: var(--wp-app-color-primary, #0073aa);
 		}
 		.option-desc {
 			font-size: 13px;

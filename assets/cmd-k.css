@@ -18,7 +18,7 @@
 }
 
 .cmd-k-panel {
-    background: light-dark(white, #2a2a2a);
+    background: var(--wp-app-color-surface, light-dark(white, #2a2a2a));
     border-radius: 12px;
     box-shadow: 0 25px 50px -12px light-dark(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.5));
     width: 90%;
@@ -31,7 +31,7 @@
 
 .cmd-k-search-container {
     padding: 20px;
-    border-bottom: 1px solid light-dark(#e5e7eb, #444);
+    border-bottom: 1px solid var(--wp-app-color-border, light-dark(#e5e7eb, #444));
 }
 
 .cmd-k-search {
@@ -41,11 +41,11 @@
     font-size: 18px;
     padding: 0;
     background: transparent;
-    color: light-dark(#111827, #e0e0e0);
+    color: var(--wp-app-color-text, light-dark(#111827, #e0e0e0));
 }
 
 .cmd-k-search::placeholder {
-    color: light-dark(#9ca3af, #888);
+    color: var(--wp-app-color-muted, light-dark(#9ca3af, #888));
 }
 
 .cmd-k-results {
@@ -55,14 +55,14 @@
 
 .cmd-k-item {
     padding: 12px 20px;
-    border-bottom: 1px solid light-dark(#f3f4f6, #3a3a3a);
+    border-bottom: 1px solid var(--wp-app-color-border, light-dark(#f3f4f6, #3a3a3a));
     cursor: pointer;
     transition: background-color 0.1s;
 }
 
 .cmd-k-item:hover,
 .cmd-k-item.selected {
-    background-color: light-dark(#f3f4f6, #3a3a3a);
+    background-color: var(--wp-app-color-surface-alt, light-dark(#f3f4f6, #3a3a3a));
 }
 
 .cmd-k-item:last-child {
@@ -78,7 +78,7 @@
 
 .cmd-k-item-name {
     font-weight: 600;
-    color: light-dark(#111827, #e0e0e0);
+    color: var(--wp-app-color-text, light-dark(#111827, #e0e0e0));
     font-size: 16px;
     display: flex;
     align-items: center;
@@ -86,12 +86,12 @@
 }
 
 .cmd-k-item-stats {
-    color: light-dark(#6b7280, #aaa);
+    color: var(--wp-app-color-muted, light-dark(#6b7280, #aaa));
     font-size: 14px;
 }
 
 .cmd-k-person-role {
-    color: light-dark(#6b7280, #aaa);
+    color: var(--wp-app-color-muted, light-dark(#6b7280, #aaa));
     font-size: 14px;
 }
 
@@ -112,8 +112,8 @@
 }
 
 .cmd-k-stat {
-    background: light-dark(#f3f4f6, #3a3a3a);
-    color: light-dark(#374151, #ccc);
+    background: var(--wp-app-color-surface-alt, light-dark(#f3f4f6, #3a3a3a));
+    color: var(--wp-app-color-text, light-dark(#374151, #ccc));
     font-size: 12px;
     padding: 2px 8px;
     border-radius: 12px;
@@ -130,7 +130,7 @@
     flex-wrap: wrap;
     gap: 12px;
     font-size: 14px;
-    color: light-dark(#6b7280, #aaa);
+    color: var(--wp-app-color-muted, light-dark(#6b7280, #aaa));
 }
 
 .cmd-k-person-detail {
@@ -148,25 +148,25 @@
 
 .cmd-k-link {
     padding: 4px 8px;
-    background: light-dark(#f3f4f6, #3a3a3a);
+    background: var(--wp-app-color-surface-alt, light-dark(#f3f4f6, #3a3a3a));
     border-radius: 4px;
     font-size: 12px;
-    color: light-dark(#374151, #ccc);
+    color: var(--wp-app-color-text, light-dark(#374151, #ccc));
     text-decoration: none;
     transition: background-color 0.1s;
 }
 
 .cmd-k-link:hover,
 .cmd-k-link.selected {
-    background: light-dark(#e5e7eb, #4a4a4a);
+    background: var(--wp-app-color-secondary-hover, light-dark(#e5e7eb, #4a4a4a));
 }
 
 .cmd-k-instructions {
     padding: 16px 20px;
-    background: light-dark(#f9fafb, #1a1a1a);
-    border-top: 1px solid light-dark(#e5e7eb, #444);
+    background: var(--wp-app-color-background, light-dark(#f9fafb, #1a1a1a));
+    border-top: 1px solid var(--wp-app-color-border, light-dark(#e5e7eb, #444));
     font-size: 13px;
-    color: light-dark(#6b7280, #aaa);
+    color: var(--wp-app-color-muted, light-dark(#6b7280, #aaa));
     line-height: 1.4;
 }
 
@@ -174,12 +174,12 @@
     display: inline-block;
     padding: 2px 6px;
     background: light-dark(white, #3a3a3a);
-    border: 1px solid light-dark(#d1d5db, #555);
+    border: 1px solid var(--wp-app-color-border, light-dark(#d1d5db, #555));
     border-radius: 4px;
     font-family: monospace;
     font-size: 11px;
     font-weight: 600;
-    color: light-dark(#374151, #ccc);
+    color: var(--wp-app-color-text, light-dark(#374151, #ccc));
 }
 
 @keyframes fadeIn {
@@ -206,7 +206,7 @@
 .cmd-k-loading {
     padding: 40px 20px;
     text-align: center;
-    color: light-dark(#9ca3af, #888);
+    color: var(--wp-app-color-muted, light-dark(#9ca3af, #888));
     font-style: italic;
 }
 

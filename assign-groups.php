@@ -261,9 +261,9 @@ function build_nav_url( $crm, $base_params, $index ) {
 			background: light-dark(#e8e8e8, #444);
 		}
 		.query-bar a.query-button.active {
-			background: #0073aa;
+			background: var(--wp-app-color-primary, #0073aa);
 			color: white;
-			border-color: #0073aa;
+			border-color: var(--wp-app-color-primary, #0073aa);
 		}
 		.query-bar select {
 			padding: 8px 12px;
@@ -293,7 +293,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 			margin-bottom: 16px;
 		}
 		.person-card.current {
-			border: 2px solid #0073aa;
+			border: 2px solid var(--wp-app-color-primary, #0073aa);
 			background: light-dark(#f0f7fc, #1a2a3a);
 		}
 		.person-card .person-name {
@@ -368,9 +368,9 @@ function build_nav_url( $crm, $base_params, $index ) {
 			background: light-dark(#e0e0e0, #444);
 		}
 		.group-chip.selected {
-			background: #0073aa;
+			background: var(--wp-app-color-primary, #0073aa);
 			color: white;
-			border-color: #005a87;
+			border-color: var(--wp-app-color-primary-hover, #005a87);
 		}
 		.group-chip.already-member {
 			opacity: 0.6;
@@ -418,7 +418,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 		.assign-button {
 			width: 100%;
 			padding: 14px;
-			background: #0073aa;
+			background: var(--wp-app-color-primary, #0073aa);
 			color: white;
 			border: none;
 			border-radius: 6px;
@@ -428,7 +428,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 			margin-top: 16px;
 		}
 		.assign-button:hover {
-			background: #005a87;
+			background: var(--wp-app-color-primary-hover, #005a87);
 		}
 		.assign-button:disabled {
 			background: #999;
@@ -484,7 +484,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 		.queue-item-actions { display: flex; gap: 8px; }
 		.queue-item-actions a { font-size: 12px; }
 		.queue-undo { color: light-dark(#c0392b, #e07070); }
-		.requeue-link { font-size: 13px; white-space: nowrap; color: light-dark(#0073aa, #6ab0d4); text-decoration: none; padding: 4px 8px; border: 1px solid light-dark(#b8d9ec, #3a5a7a); border-radius: 4px; }
+		.requeue-link { font-size: 13px; white-space: nowrap; color: var(--wp-app-color-primary, light-dark(#0073aa, #6ab0d4)); text-decoration: none; padding: 4px 8px; border: 1px solid light-dark(#b8d9ec, #3a5a7a); border-radius: 4px; }
 		.requeue-link:hover { text-decoration: underline; }
 		.assign-skip-link {
 			display: block;
