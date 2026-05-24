@@ -72,7 +72,7 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 	?>
 	<?php if ( function_exists( 'wp_app_head' ) ) wp_app_head(); ?>
 </head>
-<body class="wp-app-body">
+<body class="wp-app-body person-detail-view">
 	<?php if ( function_exists( 'wp_app_body_open' ) ) wp_app_body_open(); ?>
 	<?php $crm->render_cmd_k_panel(); ?>
 

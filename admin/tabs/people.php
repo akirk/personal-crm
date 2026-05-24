@@ -40,7 +40,7 @@ function render_birthday_dropdown( $field_prefix, $value ) {
 		}
 	}
 	?>
-	<div style="display: flex; gap: 10px; align-items: center;">
+	<div class="birthday-fields" style="display: flex; gap: 10px; align-items: center;">
 		<select name="<?php echo $field_prefix; ?>_day" class="form-select">
 			<option value="">Day</option>
 			<?php for ( $d = 1; $d <= 31; $d++ ) : ?>
