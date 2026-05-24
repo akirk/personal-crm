@@ -38,7 +38,7 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 	?>
 	<?php if ( function_exists( '\wp_app_head' ) ) \wp_app_head(); ?>
 </head>
-<body class="wp-app-body">
+<body class="wp-app-body group-detail-view">
 	<?php if ( function_exists( '\wp_app_body_open' ) ) \wp_app_body_open(); ?>
 	<?php $crm->render_cmd_k_panel(); ?>
 

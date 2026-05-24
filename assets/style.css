@@ -174,8 +174,93 @@ body.wp-app-body a.tab-link.tab-status-none {
 }
 
 @media (max-width: 768px) {
+    body.wp-app-body {
+        padding: 0;
+    }
+
+    body.wp-app-body .container {
+        max-width: none;
+        margin: 0;
+        padding: 16px;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
     .overview-layout {
         grid-template-columns: 1fr;
+    }
+
+    body.wp-app-body .header,
+    body.person-detail-view .person-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        border-bottom: 0;
+        margin-bottom: 0;
+    }
+
+    body.wp-app-body .navigation,
+    body.wp-app-body .nav-container {
+        display: flex !important;
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 8px;
+        width: 100%;
+    }
+
+    body.wp-app-body .group-switcher {
+        display: flex !important;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        width: 100%;
+        margin-right: 0 !important;
+    }
+
+    body.wp-app-body #group-selector {
+        width: 100%;
+    }
+
+    body.wp-app-body .navigation .nav-link,
+    body.wp-app-body .group-switcher .nav-link {
+        margin-left: 0 !important;
+        text-align: center;
+    }
+
+    body.wp-app-body .header .person-links {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    body.wp-app-body .person-row-container {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    body.wp-app-body .person-row {
+        width: 100%;
+    }
+
+    body.wp-app-body .person-links {
+        flex-wrap: wrap;
+    }
+
+    body.wp-app-body .events-sidebar {
+        position: static;
+    }
+
+    body.person-detail-view .section-with-avatar {
+        padding-right: 0;
+    }
+
+    body.person-detail-view .person-avatar-section {
+        position: static;
+        margin-bottom: 16px;
+    }
+
+    body.person-detail-view .person-avatar-section .gravatar-large {
+        margin: 0 auto;
     }
 }
 
@@ -1026,14 +1111,39 @@ body.wp-app-body a.copy-button {
 }
 
 @media (max-width: 600px) {
+    .nav-tabs {
+        flex-wrap: nowrap;
+        gap: 6px;
+        margin: 0 -16px 20px;
+        padding: 0 16px 8px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .nav-dropdown {
+        flex: 0 0 auto;
+    }
+
     .nav-tab {
+        flex: 0 0 auto;
         padding: 8px 14px;
         font-size: 14px;
         border-bottom: 1px solid var(--wp-app-color-border, light-dark(#ddd, #555));
+        border-radius: 4px;
+        white-space: nowrap;
     }
+
     .nav-tab.active {
         border-top: 3px solid var(--wp-app-color-primary, #0073aa);
         border-bottom: 1px solid var(--wp-app-color-border, light-dark(#ddd, #555));
+    }
+
+    .nav-dropdown-menu {
+        position: fixed !important;
+        left: 16px !important;
+        right: 16px !important;
+        width: auto !important;
+        min-width: 0 !important;
     }
 }
 
@@ -1206,6 +1316,115 @@ body.wp-app-body a.btn-primary:hover {
 
 .person-item:last-child {
     border-bottom: none;
+}
+
+@media (max-width: 600px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    #add-person-form > .btn-primary,
+    #edit-person-form > .btn-primary {
+        float: none !important;
+        width: 100%;
+        margin-top: 0 !important;
+        margin-bottom: 12px;
+    }
+
+    .birthday-fields {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+
+    .birthday-fields select {
+        width: 100%;
+    }
+
+    .section-header,
+    .tab-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .tab-header .btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    .person-list {
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0;
+        margin-left: -16px;
+        margin-right: -16px;
+    }
+
+    .person-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .person-item > div:last-child {
+        display: flex !important;
+        align-items: stretch;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .person-item > div:last-child > .btn,
+    .person-item > div:last-child > form,
+    .person-item > div:last-child button {
+        flex: 1;
+    }
+
+    .person-item > div:last-child .btn,
+    .person-item > div:last-child button {
+        width: 100%;
+        text-align: center;
+    }
+
+    .personal-event-row,
+    .historical-group-row,
+    .suggested-group-row {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+
+    .personal-event-row input,
+    .historical-group-row input,
+    .suggested-group-row input,
+    .suggested-group-row button {
+        width: 100% !important;
+        flex: none !important;
+    }
+
+    .group-checkbox-label {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .group-checkbox-label input[type="date"] {
+        width: 100% !important;
+        margin-left: 0 !important;
+    }
+
+    .form-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .form-actions button,
+    .form-actions .btn {
+        width: 100%;
+    }
+
+    #add-group-input {
+        max-width: none !important;
+        width: 100%;
+    }
 }
 
 .person-info h4 {
