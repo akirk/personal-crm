@@ -143,7 +143,7 @@ if ( empty( $available_teams ) ) {
                         <?php endif; ?>
                         <div class="team-matched-person" style="display: none;">
                             <span class="match-label">Found:</span>
-                            <span class="match-name" data-group-slug="<?php echo htmlspecialchars( $team_slug ); ?>" style="cursor: pointer; text-decoration: underline; color: #007cba;"></span>
+                            <span class="match-name" data-group-slug="<?php echo htmlspecialchars( $team_slug ); ?>" style="cursor: pointer; text-decoration: underline; color: var(--wp-app-color-primary, #007cba);"></span>
                         </div>
                     </div>
                 </a>

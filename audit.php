@@ -217,19 +217,19 @@ $available_teams = $crm->storage->get_available_groups();
         .navigation {
             margin: 0;
         }
-        .nav-link {
+        body.wp-app-body a.nav-link {
             display: inline-block;
             margin-left: 10px;
             padding: 8px 16px;
-            background: #007cba;
+            background: var(--wp-app-color-primary, #007cba);
             color: white;
             text-decoration: none;
             border-radius: 4px;
             transition: background 0.3s;
             font-size: 14px;
         }
-        .nav-link:hover {
-            background: #005a87;
+        body.wp-app-body a.nav-link:hover {
+            background: var(--wp-app-color-primary-hover, #005a87);
         }
         .stats-grid {
             display: grid;
@@ -246,7 +246,7 @@ $available_teams = $crm->storage->get_available_groups();
         .stat-number {
             font-size: 2em;
             font-weight: bold;
-            color: #007cba;
+            color: var(--wp-app-color-primary, #007cba);
             margin-bottom: 5px;
         }
         .stat-label {
@@ -304,7 +304,7 @@ $available_teams = $crm->storage->get_available_groups();
             margin-left: 8px;
         }
         .edit-link {
-            color: #007cba;
+            color: var(--wp-app-color-primary, #007cba);
             text-decoration: none;
             font-size: 12px;
         }

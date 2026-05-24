@@ -342,7 +342,7 @@ class PersonalCrm {
                 cursor: pointer;
             }
             .local-llm-model-tag:hover {
-                background: #0073aa;
+                background: var(--wp-app-color-primary, #0073aa);
                 color: white;
             }
         </style>

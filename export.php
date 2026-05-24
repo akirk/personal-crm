@@ -171,11 +171,11 @@ $download_url = add_query_arg(
             border: none;
         }
         .btn-primary {
-            background: #0073aa;
+            background: var(--wp-app-color-primary, #0073aa);
             color: white;
         }
         .btn-primary:hover {
-            background: #005a87;
+            background: var(--wp-app-color-primary-hover, #005a87);
         }
         .btn-secondary {
             background: light-dark(#e8e8e8, #333);
@@ -191,7 +191,7 @@ $download_url = add_query_arg(
         }
         .info-box {
             background: light-dark(#f0f7ff, #1a2a3a);
-            border-left: 4px solid #0073aa;
+            border-left: 4px solid var(--wp-app-color-primary, #0073aa);
             padding: 16px;
             border-radius: 0 8px 8px 0;
             margin-top: 24px;
@@ -256,7 +256,7 @@ $download_url = add_query_arg(
         .tree-actions button {
             background: none;
             border: none;
-            color: #0073aa;
+            color: var(--wp-app-color-primary, #0073aa);
             cursor: pointer;
             padding: 0;
             font-size: inherit;
@@ -357,7 +357,7 @@ $download_url = add_query_arg(
         .selection-summary button {
             background: none;
             border: none;
-            color: #0073aa;
+            color: var(--wp-app-color-primary, #0073aa);
             cursor: pointer;
             padding: 0;
             font-size: inherit;

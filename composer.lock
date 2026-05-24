@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/akirk/wp-app.git",
-                "reference": "e04f5a9e34b45bee989fda87c15bf37ce60e9861"
+                "reference": "110f51d2df9cdb4cd055ae0ef52ed48c5d3900b5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/akirk/wp-app/zipball/e04f5a9e34b45bee989fda87c15bf37ce60e9861",
-                "reference": "e04f5a9e34b45bee989fda87c15bf37ce60e9861",
+                "url": "https://api.github.com/repos/akirk/wp-app/zipball/110f51d2df9cdb4cd055ae0ef52ed48c5d3900b5",
+                "reference": "110f51d2df9cdb4cd055ae0ef52ed48c5d3900b5",
                 "shasum": ""
             },
             "require": {
@@ -53,9 +53,9 @@
             "description": "A lightweight framework for building web applications on WordPress with routing, admin bar integration, and theme isolation",
             "support": {
                 "issues": "https://github.com/akirk/wp-app/issues",
-                "source": "https://github.com/akirk/wp-app/tree/main"
+                "source": "https://github.com/akirk/wp-app/tree/v1.2.0"
             },
-            "time": "2026-04-21T09:15:31+00:00"
+            "time": "2026-05-11T10:57:00+00:00"
         }
     ],
     "packages-dev": [

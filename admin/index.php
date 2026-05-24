@@ -458,7 +458,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
         }
 
         .nav-dropdown-item.active {
-            background-color: #007cba;
+            background-color: var(--wp-app-color-primary, #007cba);
             color: white;
         }
 
@@ -495,14 +495,14 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
             font-size: 0.85em;
             font-weight: normal;
             text-decoration: none;
-            color: #007cba;
+            color: var(--wp-app-color-primary, #007cba);
             padding: 4px 10px;
             border-radius: 3px;
             transition: background-color 0.2s;
         }
 
         .edit-group-link:hover {
-            background-color: rgba(0, 124, 186, 0.1);
+            background-color: color-mix(in srgb, var(--wp-app-color-primary, #007cba) 10%, transparent);
         }
 
         @media (prefers-color-scheme: dark) {
