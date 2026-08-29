@@ -1,0 +1,517 @@
+<?php
+
+/**
+ * Global functions for WpApp framework
+ */
+
+if ( ! defined( 'WP_APP_VERSION' ) ) {
+    define( 'WP_APP_VERSION', '1.2.0' );
+}
+
+if ( ! function_exists( 'wp_app_head' ) ) {
+    /**
+     * Generate HTML head content for app templates
+     * Similar to wp_head() but clean and without theme/plugin interference
+     */
+    function wp_app_head() {
+        if ( function_exists( 'wp_head' ) ) {
+            wp_head();
+        } else {
+            // Basic meta tags (fallback when WordPress is not present)
+            echo '<meta charset="' . esc_attr( get_bloginfo( 'charset' ) ) . '">' . "\n";
+            echo '<meta name="viewport" content="width=device-width, initial-scale=1">' . "\n";
+
+            // CSRF token for AJAX requests
+            echo '<meta name="csrf-token" content="' . esc_attr( wp_create_nonce( 'wp_rest' ) ) . '">' . "\n";
+
+            // Allow language attributes
+            if ( function_exists( 'get_language_attributes' ) ) {
+                echo '<meta name="language" content="' . esc_attr( get_language_attributes() ) . '">' . "\n";
+            }
+        }
+
+        // Custom app head hook - allows components to add styles/scripts
+        do_action( 'wp_app_head' );
+
+        // Allow specific head content injection
+        do_action( 'wp_app_head_meta' );
+        do_action( 'wp_app_head_styles' );
+        do_action( 'wp_app_head_scripts' );
+    }
+}
+
+if ( ! function_exists( 'wp_app_body_open' ) ) {
+    /**
+     * Generate body open content for app templates
+     * Similar to wp_body_open() but for apps
+     */
+    function wp_app_body_open() {
+        // Include WordPress admin bar if showing
+        if ( is_admin_bar_showing() ) {
+            wp_admin_bar_render();
+        }
+
+        // Custom app body open hook
+        do_action( 'wp_app_body_open' );
+    }
+}
+
+if ( ! function_exists( 'wp_app_body_close' ) ) {
+    /**
+     * Generate body close content for app templates
+     */
+    function wp_app_body_close() {
+        if ( function_exists( 'wp_footer' ) ) {
+            wp_footer();
+        }
+
+        // Custom app body close hook
+        do_action( 'wp_app_body_close' );
+    }
+}
+
+
+
+if ( ! function_exists( 'wp_app_title' ) ) {
+    /**
+     * Generate page title for app pages
+     */
+    function wp_app_title( $title = '', $separator = '-' ) {
+        $site_name = get_bloginfo( 'name' );
+
+        if ( empty( $title ) ) {
+            // Try to get title from current route
+            global $wp_app_route;
+            if ( isset( $wp_app_route['pattern'] ) ) {
+                $title = ucwords( str_replace( [ '-', '_', '/' ], ' ', $wp_app_route['pattern'] ) );
+            } else {
+                $title = 'App';
+            }
+        }
+
+        if ( $site_name ) {
+            return esc_html( $title . ' ' . $separator . ' ' . $site_name );
+        }
+
+        return esc_html( $title );
+    }
+}
+
+if ( ! function_exists( 'wp_app_language_attributes' ) ) {
+    /**
+     * Get language attributes for HTML tag
+     */
+    function wp_app_language_attributes() {
+        $attributes = [];
+
+        if ( function_exists( 'is_rtl' ) && is_rtl() ) {
+            $attributes[] = 'dir="rtl"';
+        }
+
+        if ( function_exists( 'get_bloginfo' ) ) {
+            $lang = get_bloginfo( 'language' );
+            if ( $lang ) {
+                $attributes[] = 'lang="' . esc_attr( $lang ) . '"';
+            }
+        }
+
+        return implode( ' ', $attributes );
+    }
+}
+
+if ( ! function_exists( 'wp_app_enqueue_style' ) ) {
+    /**
+     * Enqueue a style for app pages
+     */
+    function wp_app_enqueue_style( $handle, $src = '', $deps = [], $ver = false ) {
+        add_action( 'wp_app_head_styles', function() use ( $handle, $src, $deps, $ver ) {
+            if ( $src ) {
+                $url = $src;
+                if ( $ver ) {
+                    $url .= '?ver=' . esc_attr( $ver );
+                }
+                echo '<link rel="stylesheet" id="' . esc_attr( $handle ) . '-css" href="' . esc_url( $url ) . '" type="text/css" media="all">' . "\n";
+            }
+        } );
+    }
+}
+
+if ( ! function_exists( 'wp_app_enqueue_script' ) ) {
+    /**
+     * Enqueue a script for app pages
+     */
+    function wp_app_enqueue_script( $handle, $src = '', $deps = [], $ver = false, $in_footer = true ) {
+        $hook = $in_footer ? 'wp_app_body_close' : 'wp_app_head_scripts';
+
+        add_action( $hook, function() use ( $handle, $src, $deps, $ver ) {
+            if ( $src ) {
+                $url = $src;
+                if ( $ver ) {
+                    $url .= '?ver=' . esc_attr( $ver );
+                }
+                echo '<script id="' . esc_attr( $handle ) . '-js" src="' . esc_url( $url ) . '"></script>' . "\n";
+            }
+        } );
+    }
+}
+
+if ( ! function_exists( 'wp_app_add_inline_style' ) ) {
+    /**
+     * Add inline CSS for app pages
+     */
+    function wp_app_add_inline_style( $handle, $css ) {
+        add_action( 'wp_app_head_styles', function() use ( $handle, $css ) {
+            echo '<style id="' . esc_attr( $handle ) . '-inline-css">' . "\n";
+            echo $css . "\n";
+            echo '</style>' . "\n";
+        } );
+    }
+}
+
+if ( ! function_exists( 'wp_app_add_inline_script' ) ) {
+    /**
+     * Add inline JavaScript for app pages
+     */
+    function wp_app_add_inline_script( $handle, $js, $in_footer = true ) {
+        $hook = $in_footer ? 'wp_app_body_close' : 'wp_app_head_scripts';
+
+        add_action( $hook, function() use ( $handle, $js ) {
+            echo '<script id="' . esc_attr( $handle ) . '-inline-js">' . "\n";
+            echo $js . "\n";
+            echo '</script>' . "\n";
+        } );
+    }
+}
+
+if ( ! function_exists( 'wp_app_sanitize_css_color' ) ) {
+    /**
+     * Sanitize a CSS color value for inline custom properties.
+     */
+    function wp_app_sanitize_css_color( $color, $fallback ) {
+        if ( function_exists( 'sanitize_hex_color' ) ) {
+            $sanitized = sanitize_hex_color( $color );
+
+            if ( $sanitized ) {
+                return $sanitized;
+            }
+        } elseif ( is_string( $color ) && preg_match( '/^#([A-Fa-f0-9]{3}){1,2}$/', $color ) ) {
+            return $color;
+        }
+
+        return $fallback;
+    }
+}
+
+if ( ! function_exists( 'wp_app_get_admin_color_scheme' ) ) {
+    /**
+     * Get the current user's WordPress admin color scheme as normalized tokens.
+     *
+     * @param int $user_id Optional user ID. Defaults to the current user.
+     * @return array Normalized admin color scheme data.
+     */
+    function wp_app_get_admin_color_scheme( $user_id = 0 ) {
+        $fallback = [
+            'slug'        => 'fresh',
+            'name'        => 'Default',
+            'colors'      => [ '#23282d', '#32373c', '#0073aa', '#00a0d2' ],
+            'icon_colors' => [
+                'base'    => '#a7aaad',
+                'focus'   => '#72aee6',
+                'current' => '#fff',
+            ],
+        ];
+
+        if ( ! function_exists( 'get_user_option' ) ) {
+            return $fallback;
+        }
+
+        $user_id = $user_id ? $user_id : ( function_exists( 'get_current_user_id' ) ? get_current_user_id() : 0 );
+        $slug    = get_user_option( 'admin_color', $user_id );
+
+        if ( ! $slug ) {
+            $slug = 'fresh';
+        }
+
+        global $_wp_admin_css_colors;
+
+        if ( empty( $_wp_admin_css_colors ) && defined( 'ABSPATH' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/misc.php';
+
+            if ( function_exists( 'register_admin_color_schemes' ) ) {
+                register_admin_color_schemes();
+            }
+        }
+
+        if ( empty( $_wp_admin_css_colors[ $slug ] ) ) {
+            $fallback['slug'] = $slug;
+            return function_exists( 'apply_filters' ) ? apply_filters( 'wp_app_admin_color_scheme', $fallback, $user_id, $slug ) : $fallback;
+        }
+
+        $scheme      = $_wp_admin_css_colors[ $slug ];
+        $colors      = isset( $scheme->colors ) && is_array( $scheme->colors ) ? array_values( $scheme->colors ) : $fallback['colors'];
+        $icon_colors = isset( $scheme->icon_colors ) && is_array( $scheme->icon_colors ) ? $scheme->icon_colors : $fallback['icon_colors'];
+        $colors      = array_pad( $colors, 4, end( $colors ) );
+
+        $admin_color_scheme = [
+            'slug'        => $slug,
+            'name'        => isset( $scheme->name ) ? $scheme->name : $fallback['name'],
+            'colors'      => [
+                wp_app_sanitize_css_color( $colors[0], $fallback['colors'][0] ),
+                wp_app_sanitize_css_color( $colors[1], $fallback['colors'][1] ),
+                wp_app_sanitize_css_color( $colors[2], $fallback['colors'][2] ),
+                wp_app_sanitize_css_color( $colors[3], $fallback['colors'][3] ),
+            ],
+            'icon_colors' => [
+                'base'    => wp_app_sanitize_css_color( isset( $icon_colors['base'] ) ? $icon_colors['base'] : '', $fallback['icon_colors']['base'] ),
+                'focus'   => wp_app_sanitize_css_color( isset( $icon_colors['focus'] ) ? $icon_colors['focus'] : '', $fallback['icon_colors']['focus'] ),
+                'current' => wp_app_sanitize_css_color( isset( $icon_colors['current'] ) ? $icon_colors['current'] : '', $fallback['icon_colors']['current'] ),
+            ],
+        ];
+
+        return function_exists( 'apply_filters' ) ? apply_filters( 'wp_app_admin_color_scheme', $admin_color_scheme, $user_id, $slug ) : $admin_color_scheme;
+    }
+}
+
+if ( ! function_exists( 'wp_app_get_admin_color_scheme_css' ) ) {
+    /**
+     * Get CSS custom properties for the current user's admin color scheme.
+     *
+     * @param string $selector CSS selector for the variables.
+     * @param int    $user_id Optional user ID. Defaults to the current user.
+     * @return string CSS custom properties block.
+     */
+    function wp_app_get_admin_color_scheme_css( $selector = ':root, body.wp-app-body', $user_id = 0 ) {
+        $scheme   = wp_app_get_admin_color_scheme( $user_id );
+        $selector = trim( preg_replace( '/[^a-zA-Z0-9\-_#\.\:\[\]=~\*"\'\(\), >\+]/', '', $selector ) );
+
+        if ( '' === $selector ) {
+            $selector = ':root, body.wp-app-body';
+        }
+
+        return sprintf(
+            "%s {\n" .
+            "\t--wp-app-admin-color-background: %s;\n" .
+            "\t--wp-app-admin-color-subtle: %s;\n" .
+            "\t--wp-app-admin-color-primary: %s;\n" .
+            "\t--wp-app-admin-color-accent: %s;\n" .
+            "\t--wp-app-admin-icon-color-base: %s;\n" .
+            "\t--wp-app-admin-icon-color-focus: %s;\n" .
+            "\t--wp-app-admin-icon-color-current: %s;\n" .
+            "\t--wp-app-color-primary: var(--wp-app-admin-color-primary);\n" .
+            "\t--wp-app-color-primary-hover: var(--wp-app-admin-color-accent);\n" .
+            "\t--wp-app-color-accent: var(--wp-app-admin-color-accent);\n" .
+            "\t--wp-app-color-background: #f6f7f7;\n" .
+            "\t--wp-app-color-surface: #fff;\n" .
+            "\t--wp-app-color-surface-alt: #f0f0f1;\n" .
+            "\t--wp-app-color-text: #1d2327;\n" .
+            "\t--wp-app-color-muted: #646970;\n" .
+            "\t--wp-app-color-border: #dcdcde;\n" .
+            "\t--wp-app-color-link: var(--wp-app-admin-color-primary);\n" .
+            "\t--wp-app-color-link-hover: var(--wp-app-admin-color-accent);\n" .
+            "\t--wp-app-color-focus: var(--wp-app-admin-color-accent);\n" .
+            "\t--wp-app-color-secondary: var(--wp-app-color-surface-alt);\n" .
+            "\t--wp-app-color-secondary-hover: var(--wp-app-color-border);\n" .
+            "\t--wp-app-color-secondary-text: var(--wp-app-color-text);\n" .
+            "\t--wp-app-masterbar-background: var(--wp-app-admin-color-background);\n" .
+            "\t--wp-app-masterbar-highlight: var(--wp-app-admin-color-accent);\n" .
+            "\t--wp-app-masterbar-text: #eee;\n" .
+            "}\n",
+            $selector,
+            $scheme['colors'][0],
+            $scheme['colors'][1],
+            $scheme['colors'][2],
+            $scheme['colors'][3],
+            $scheme['icon_colors']['base'],
+            $scheme['icon_colors']['focus'],
+            $scheme['icon_colors']['current']
+        );
+    }
+}
+
+if ( ! function_exists( 'wp_app_get_default_color_styles' ) ) {
+    /**
+     * Get default app styles that consume the admin color scheme tokens.
+     *
+     * @return string CSS defaults for app pages.
+     */
+    function wp_app_get_default_color_styles() {
+        return '
+body.wp-app-body {
+	background: var(--wp-app-color-background);
+	color: var(--wp-app-color-text);
+}
+
+body.wp-app-body a {
+	color: var(--wp-app-color-link);
+}
+
+body.wp-app-body a:hover,
+body.wp-app-body a:focus {
+	color: var(--wp-app-color-link-hover);
+}
+
+body.wp-app-body :focus-visible {
+	outline: 2px solid var(--wp-app-color-focus);
+	outline-offset: 2px;
+}
+
+body.wp-app-body ::selection {
+	background: var(--wp-app-color-primary);
+	color: #fff;
+}
+
+body.wp-app-body .button-primary,
+body.wp-app-body .button.button-primary,
+body.wp-app-body button.button-primary,
+body.wp-app-body input[type="submit"].button-primary {
+	background: var(--wp-app-color-primary);
+	border-color: var(--wp-app-color-primary);
+	color: #fff;
+}
+
+body.wp-app-body .button-primary:hover,
+body.wp-app-body .button-primary:focus,
+body.wp-app-body .button.button-primary:hover,
+body.wp-app-body .button.button-primary:focus,
+body.wp-app-body button.button-primary:hover,
+body.wp-app-body button.button-primary:focus,
+body.wp-app-body input[type="submit"].button-primary:hover,
+body.wp-app-body input[type="submit"].button-primary:focus {
+	background: var(--wp-app-color-primary-hover);
+	border-color: var(--wp-app-color-primary-hover);
+	color: #fff;
+}
+
+body.wp-app-body .button:not(.button-primary),
+body.wp-app-body .button-secondary {
+	background: var(--wp-app-color-secondary);
+	border-color: var(--wp-app-color-border);
+	color: var(--wp-app-color-secondary-text);
+}
+
+body.wp-app-body .button:not(.button-primary):hover,
+body.wp-app-body .button:not(.button-primary):focus,
+body.wp-app-body .button-secondary:hover,
+body.wp-app-body .button-secondary:focus {
+	background: var(--wp-app-color-secondary-hover);
+	color: var(--wp-app-color-secondary-text);
+}
+';
+    }
+}
+
+if ( ! function_exists( 'wp_app_output_admin_color_scheme' ) ) {
+    /**
+     * Output CSS custom properties for the current user's admin color scheme.
+     */
+    function wp_app_output_admin_color_scheme() {
+        $should_output = function_exists( 'apply_filters' ) ? apply_filters( 'wp_app_output_admin_color_scheme', true ) : true;
+
+        if ( ! $should_output ) {
+            return;
+        }
+
+        echo '<style id="wp-app-admin-color-scheme">' . "\n";
+        echo wp_app_get_admin_color_scheme_css();
+
+        $should_output_default_styles = function_exists( 'apply_filters' ) ? apply_filters( 'wp_app_output_default_color_styles', true ) : true;
+
+        if ( $should_output_default_styles ) {
+            echo wp_app_get_default_color_styles();
+        }
+
+        echo '</style>' . "\n";
+    }
+}
+
+if ( ! function_exists( 'wp_app_dequeue_theme_assets' ) ) {
+    /**
+     * Remove theme styles and scripts from app pages
+     */
+    function wp_app_dequeue_theme_assets() {
+        global $wp_styles, $wp_scripts;
+
+        // Only run on app pages
+        if ( ! get_query_var( 'wp_app_request' ) ) {
+            return;
+        }
+
+        if ( ! $wp_styles ) {
+            return;
+        }
+
+        // Get all enqueued styles
+        $enqueued_styles = $wp_styles->queue;
+
+        // Whitelist of styles to keep (WordPress core and essential plugins)
+        $keep_styles = [
+            'admin-bar',
+            'dashicons',
+            'debug-bar',
+            'query-monitor',
+            'qm-',
+        ];
+
+        foreach ( $enqueued_styles as $handle ) {
+            $should_keep = false;
+
+            // Check if this style should be kept
+            foreach ( $keep_styles as $keep ) {
+                if ( $handle === $keep || strpos( $handle, $keep ) === 0 ) {
+                    $should_keep = true;
+                    break;
+                }
+            }
+
+            // Dequeue if not in whitelist
+            if ( ! $should_keep ) {
+                wp_dequeue_style( $handle );
+            }
+        }
+
+        // Also dequeue scripts we don't need (but keep admin bar and debugging tools)
+        if ( $wp_scripts ) {
+            $enqueued_scripts = $wp_scripts->queue;
+
+            $keep_scripts = [
+                'admin-bar',
+                'query-monitor',
+                'qm-',
+            ];
+
+            foreach ( $enqueued_scripts as $handle ) {
+                $should_keep = false;
+
+                foreach ( $keep_scripts as $keep ) {
+                    if ( $handle === $keep || strpos( $handle, $keep ) === 0 ) {
+                        $should_keep = true;
+                        break;
+                    }
+                }
+
+                if ( ! $should_keep ) {
+                    wp_dequeue_script( $handle );
+                }
+            }
+        }
+    }
+}
+
+// Hook app styles and asset isolation when WordPress hooks are available.
+if ( function_exists( 'add_action' ) ) {
+	add_action( 'wp_app_head', 'wp_app_output_admin_color_scheme', 5 );
+	add_action( 'wp_enqueue_scripts', 'wp_app_dequeue_theme_assets', 999 );
+}
+
+if ( ! function_exists( 'wp_app_get_route_var' ) ) {
+    /**
+     * Get a route parameter value (WordPress-style global function)
+     *
+     * @param string $var Parameter name
+     * @param mixed $default Default value if parameter doesn't exist
+     * @return mixed Parameter value
+     */
+    function wp_app_get_route_var( $var, $default = '' ) {
+        return get_query_var( $var, $default );
+    }
+}
