@@ -37,7 +37,7 @@ class PersonalCrm {
 
         $this->app = new \WpApp\WpApp(
             __DIR__ . '/../',
-            'crm',
+            'personal-crm',
             [
                 'show_masterbar_for_anonymous' => false,
                 'show_wp_logo' => true,
@@ -75,11 +75,11 @@ class PersonalCrm {
             $this->app->init();
         }
 
-        wp_app_enqueue_style( 'personal-crm-style', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/style.css' );
-        wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.css' );
-        wp_app_enqueue_script( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.js', [ 'jquery' ], '1.0', true );
-        wp_app_enqueue_script( 'personal-crm-script', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/script.js', [ 'jquery' ], '1.0', true );
-        wp_app_enqueue_script( 'personal-crm-local-llm', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/local-llm.js', [], '1.0', true );
+        wp_app_enqueue_style( 'personal-crm-style', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/style.css', [], '1.0', 'personal-crm' );
+        wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.css', [], '1.0', 'personal-crm' );
+        wp_app_enqueue_script( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.js', [ 'jquery' ], '1.0', true, 'personal-crm' );
+        wp_app_enqueue_script( 'personal-crm-script', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/script.js', [ 'jquery' ], '1.0', true, 'personal-crm' );
+        wp_app_enqueue_script( 'personal-crm-local-llm', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/local-llm.js', [], '1.0', true, 'personal-crm' );
 
         // Register core tables for export/import before firing the loaded action
         $this->register_core_export_tables();
@@ -153,15 +153,15 @@ class PersonalCrm {
 
     private function setup_menu() {
         // Main navigation - Personal CRM focused
-        $this->app->add_menu_item( 'people', 'People', home_url( '/crm/people' ) );
-        $this->app->add_menu_item( 'events', 'Events', home_url( '/crm/events' ) );
-        $this->app->add_menu_item( 'select', 'Select Group', home_url( '/crm/select' ) );
-        $this->app->add_menu_item( 'assign-groups', 'Assign Groups', home_url( '/crm/assign-groups' ) );
-        $this->app->add_menu_item( 'welcome', 'Welcome', home_url( '/crm/welcome' ) );
+        $this->app->add_menu_item( 'people', 'People', home_url( '/personal-crm/people' ) );
+        $this->app->add_menu_item( 'events', 'Events', home_url( '/personal-crm/events' ) );
+        $this->app->add_menu_item( 'select', 'Select Group', home_url( '/personal-crm/select' ) );
+        $this->app->add_menu_item( 'assign-groups', 'Assign Groups', home_url( '/personal-crm/assign-groups' ) );
+        $this->app->add_menu_item( 'welcome', 'Welcome', home_url( '/personal-crm/welcome' ) );
 
         // Admin menu items (only for administrators)
         if ( current_user_can( 'manage_options' ) ) {
-            $this->app->add_menu_item( 'export', 'Export', home_url( '/crm/admin/export' ) );
+            $this->app->add_menu_item( 'export', 'Export', home_url( '/personal-crm/admin/export' ) );
             $this->app->add_menu_item( 'settings', 'Plugin Settings', admin_url( 'options-general.php?page=personal-crm-settings' ) );
         }
 
@@ -171,7 +171,7 @@ class PersonalCrm {
             $this->app->add_user_menu_item(
                 'my-profile',
                 'My Profile',
-                home_url( '/crm/person/' . $current_user->user_login )
+                home_url( '/personal-crm/person/' . $current_user->user_login )
             );
         }
     }
@@ -288,7 +288,7 @@ class PersonalCrm {
                 </option>
             <?php endforeach; ?>
         </select>
-        <p class="description">Select the default team to redirect to from /crm/.</p>
+        <p class="description">Select the default team to redirect to from /personal-crm/.</p>
         <?php
     }
 
@@ -573,7 +573,7 @@ class PersonalCrm {
 
         // Handle case where group doesn't exist on a group page - redirect to select page
         $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-        $is_group_page = ( preg_match( '#/crm/group/[^/]+#', $request_uri ) && strpos( $request_uri, '/admin/' ) === false );
+        $is_group_page = ( preg_match( '#/personal-crm/group/[^/]+#', $request_uri ) && strpos( $request_uri, '/admin/' ) === false );
         if ( ! $group_data && $is_group_page ) {
             header( 'Location: ' . $crm->build_url( 'index.php', array( 'not_found' => $current_group ) ) );
             exit;
@@ -1014,12 +1014,12 @@ class PersonalCrm {
                     unset( $additional_params['team'] );
                 }
 
-                $url = home_url( '/crm/person/' . $username );
+                $url = home_url( '/personal-crm/person/' . $username );
             } elseif ( $route === 'admin/person' && isset( $additional_params['person'] ) ) {
                 $username = $additional_params['person'];
                 unset( $additional_params['person'] );
 
-                $url = home_url( '/crm/admin/person/' . $username );
+                $url = home_url( '/personal-crm/admin/person/' . $username );
             } elseif ( $route === 'admin' || $route === 'admin/index' ) {
                 if ( isset( $additional_params['group'] ) ) {
                     $group = $additional_params['group'];
@@ -1044,9 +1044,9 @@ class PersonalCrm {
                 }
 
                 if ( $group ) {
-                    $url = home_url( '/crm/admin/group/' . $group . $suffix );
+                    $url = home_url( '/personal-crm/admin/group/' . $group . $suffix );
                 } else {
-                    $url = home_url( '/crm/admin' );
+                    $url = home_url( '/personal-crm/admin' );
                 }
             } elseif ( $route === 'group-history' ) {
                 if ( isset( $additional_params['group'] ) ) {
@@ -1059,7 +1059,7 @@ class PersonalCrm {
                     $group = $this->current_group;
                 }
 
-                $url = home_url( '/crm/group/' . $group . '/history' );
+                $url = home_url( '/personal-crm/group/' . $group . '/history' );
             } elseif ( $route === '' && ( isset( $additional_params['group'] ) || isset( $additional_params['team'] ) ) ) {
                 // Index page with group parameter
                 if ( isset( $additional_params['group'] ) ) {
@@ -1070,9 +1070,9 @@ class PersonalCrm {
                     unset( $additional_params['team'] );
                 }
 
-                $url = home_url( '/crm/group/' . $group );
+                $url = home_url( '/personal-crm/group/' . $group );
             } else {
-                $url = home_url( '/crm/' . ltrim( $route, '/' ) );
+                $url = home_url( '/personal-crm/' . ltrim( $route, '/' ) );
             }
 
             // Allow plugins to modify the URL and parameters before adding query string
@@ -1221,28 +1221,28 @@ class PersonalCrm {
         }
 
         $ajax_url = admin_url( 'admin-ajax.php' );
-        $base_url = home_url( '/crm/' );
+        $base_url = home_url( '/personal-crm/' );
 
         $pages = array(
             array(
                 'name' => 'Assign Groups',
                 'icon' => '🏷️',
-                'url'  => home_url( '/crm/assign-groups' ),
+                'url'  => home_url( '/personal-crm/assign-groups' ),
             ),
             array(
                 'name' => 'People',
                 'icon' => '👥',
-                'url'  => home_url( '/crm/people' ),
+                'url'  => home_url( '/personal-crm/people' ),
             ),
             array(
                 'name' => 'Events',
                 'icon' => '📅',
-                'url'  => home_url( '/crm/events' ),
+                'url'  => home_url( '/personal-crm/events' ),
             ),
             array(
                 'name' => 'Welcome',
                 'icon' => '👋',
-                'url'  => home_url( '/crm/welcome' ),
+                'url'  => home_url( '/personal-crm/welcome' ),
             ),
         );
 
@@ -1250,7 +1250,7 @@ class PersonalCrm {
             $pages[] = array(
                 'name' => 'Export',
                 'icon' => '📤',
-                'url'  => home_url( '/crm/admin/export' ),
+                'url'  => home_url( '/personal-crm/admin/export' ),
             );
         }
         ?>

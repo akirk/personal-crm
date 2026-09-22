@@ -599,7 +599,7 @@ function search_people_by_query( $raw ) {
 		return array(
 			'username'      => $row['username'],
 			'name'          => $row['name'],
-			'url'           => home_url( '/crm/person/' . $row['username'] ),
+			'url'           => home_url( '/personal-crm/person/' . $row['username'] ),
 			'email'         => $row['email'],
 			'role'          => $row['role'],
 			'match_quality' => $row['match_quality'],
@@ -670,8 +670,8 @@ function ability_get_person( $input ) {
 	return array(
 		'username'        => $person->username,
 		'name'            => $person->name,
-		'url'             => home_url( '/crm/person/' . $person->username ),
-		'edit_url'        => home_url( '/crm/admin/person/' . $person->username ),
+		'url'             => home_url( '/personal-crm/person/' . $person->username ),
+		'edit_url'        => home_url( '/personal-crm/admin/person/' . $person->username ),
 		'email'           => $person->email ?? '',
 		'role'            => $person->role ?? '',
 		'location'        => $person->location ?? '',
@@ -782,13 +782,13 @@ function ability_add_people( $input ) {
 			: generate_crm_username( $name, $storage );
 
 		if ( $storage->get_person( $username ) ) {
-			$results[] = array( 'username' => $username, 'name' => $name, 'created' => false, 'url' => home_url( '/crm/person/' . $username ) );
+			$results[] = array( 'username' => $username, 'name' => $name, 'created' => false, 'url' => home_url( '/personal-crm/person/' . $username ) );
 			continue;
 		}
 
 		$person_data = build_empty_person_data( $name, $entry );
 		if ( $storage->save_person( $username, $person_data ) === false ) {
-			$results[] = array( 'username' => $username, 'name' => $name, 'created' => false, 'url' => home_url( '/crm/person/' . $username ) );
+			$results[] = array( 'username' => $username, 'name' => $name, 'created' => false, 'url' => home_url( '/personal-crm/person/' . $username ) );
 			continue;
 		}
 
@@ -807,7 +807,7 @@ function ability_add_people( $input ) {
 			}
 		}
 
-		$results[] = array( 'username' => $username, 'name' => $name, 'created' => true, 'url' => home_url( '/crm/person/' . $username ) );
+		$results[] = array( 'username' => $username, 'name' => $name, 'created' => true, 'url' => home_url( '/personal-crm/person/' . $username ) );
 	}
 
 	return $results;
@@ -866,7 +866,7 @@ function ability_update_person( $input ) {
 	return array(
 		'success'  => true,
 		'username' => $username,
-		'url'      => home_url( '/crm/person/' . $username ),
+		'url'      => home_url( '/personal-crm/person/' . $username ),
 	);
 }
 
@@ -886,7 +886,7 @@ function ability_add_note( $input ) {
 	}
 
 	global $wpdb;
-	return array( 'success' => true, 'note_id' => $wpdb->insert_id, 'url' => home_url( '/crm/person/' . $input['username'] ) );
+	return array( 'success' => true, 'note_id' => $wpdb->insert_id, 'url' => home_url( '/personal-crm/person/' . $input['username'] ) );
 }
 
 function ability_edit_note( $input ) {

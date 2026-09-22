@@ -1,5 +1,5 @@
 {
-	"landingPage": "/crm",
+	"landingPage": "/personal-crm",
 	"steps": [
 		{
 			"step": "installPlugin",

@@ -12,12 +12,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/akirk/wp-app.git",
-                "reference": "110f51d2df9cdb4cd055ae0ef52ed48c5d3900b5"
+                "reference": "ac406460418b5d9da2123468254321a5b3bc527e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/akirk/wp-app/zipball/110f51d2df9cdb4cd055ae0ef52ed48c5d3900b5",
-                "reference": "110f51d2df9cdb4cd055ae0ef52ed48c5d3900b5",
+                "url": "https://api.github.com/repos/akirk/wp-app/zipball/ac406460418b5d9da2123468254321a5b3bc527e",
+                "reference": "ac406460418b5d9da2123468254321a5b3bc527e",
                 "shasum": ""
             },
             "require": {
@@ -32,13 +32,20 @@
             "type": "library",
             "autoload": {
                 "files": [
+                    "src/bootstrap.php",
+                    "src/class-openstation.php",
                     "src/class-registry.php",
+                    "src/class-settings.php",
+                    "src/class-pwa.php",
                     "src/class-router.php",
                     "src/class-masterbar.php",
+                    "src/class-themes.php",
                     "src/class-wpapp.php",
+                    "src/class-client-encrypted-fields.php",
                     "src/BaseStorage.php",
                     "src/abstract-baseapp.php",
-                    "src/functions.php"
+                    "src/functions.php",
+                    "src/rest/class-access.php"
                 ]
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -50,12 +57,12 @@
                     "name": "Alex Kirk"
                 }
             ],
-            "description": "A lightweight framework for building web applications on WordPress with routing, admin bar integration, and theme isolation",
+            "description": "A framework to build frontend apps on WordPress with routing, admin bar integration, and theme isolation",
             "support": {
                 "issues": "https://github.com/akirk/wp-app/issues",
-                "source": "https://github.com/akirk/wp-app/tree/v1.2.0"
+                "source": "https://github.com/akirk/wp-app/tree/main"
             },
-            "time": "2026-05-11T10:57:00+00:00"
+            "time": "2026-09-22T09:21:17+00:00"
         }
     ],
     "packages-dev": [

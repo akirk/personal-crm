@@ -67,7 +67,7 @@ $ungrouped_people = $exporter->get_ungrouped_people();
 $download_url = add_query_arg(
     'nonce',
     wp_create_nonce( 'personal_crm_export' ),
-    home_url( '/crm/admin/export?download=1' )
+    home_url( '/personal-crm/admin/export?download=1' )
 );
 
 ?>
@@ -557,13 +557,13 @@ $download_url = add_query_arg(
                 <p>
                     Exports include selected groups, people, and all their related data (notes, events, links).
                     Parent groups are automatically included to preserve hierarchy. Format: JSONL (JSON Lines).
-                    To restore, use the Import function on the <a href="<?php echo home_url( '/crm/welcome' ); ?>">Welcome page</a>.
+                    To restore, use the Import function on the <a href="<?php echo home_url( '/personal-crm/welcome' ); ?>">Welcome page</a>.
                 </p>
             </div>
         </div>
 
         <div class="back-link">
-            <a href="<?php echo home_url( '/crm/' ); ?>">← Back to Dashboard</a>
+            <a href="<?php echo home_url( '/personal-crm/' ); ?>">← Back to Dashboard</a>
         </div>
     </div>
 
