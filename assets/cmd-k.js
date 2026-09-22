@@ -21,7 +21,7 @@ window.CmdK = {
         this.searchIndex = searchIndex || [];
         this.pages = pages || [];
         this.ajaxUrl = ajaxUrl;
-        this.baseUrl = baseUrl || '/crm/';
+        this.baseUrl = baseUrl || '/personal-crm/';
         this.bindEvents();
     },
 
@@ -297,7 +297,7 @@ window.CmdK = {
     },
 
     buildPersonUrl(teamSlug, username) {
-        // Use the route format: /crm/person/{person}
+        // Use the route format: /personal-crm/person/{person}
         return `${this.baseUrl}person/${username}`;
     },
 

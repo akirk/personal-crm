@@ -61,14 +61,14 @@ function render_browse_section( $crm ) {
 	?>
 	<div class="welcome-section-content">
 		<div class="browse-links">
-			<a href="<?php echo home_url( '/crm/select' ); ?>" class="browse-link">
+			<a href="<?php echo home_url( '/personal-crm/select' ); ?>" class="browse-link">
 				<span class="browse-link-icon">📁</span>
 				<span class="browse-link-text">
 					<strong>Groups</strong>
 					<span><?php echo count( $groups ); ?> group<?php echo count( $groups ) !== 1 ? 's' : ''; ?></span>
 				</span>
 			</a>
-			<a href="<?php echo home_url( '/crm/people' ); ?>" class="browse-link">
+			<a href="<?php echo home_url( '/personal-crm/people' ); ?>" class="browse-link">
 				<span class="browse-link-icon">👥</span>
 				<span class="browse-link-text">
 					<strong>People</strong>
@@ -137,7 +137,7 @@ function render_import_section( $crm ) {
 			<?php endif; ?>
 		<?php endif; ?>
 
-		<p>Upload a JSONL export file to restore your data. You can export your current data from the <a href="<?php echo home_url( '/crm/admin/export' ); ?>">Export page</a>.</p>
+		<p>Upload a JSONL export file to restore your data. You can export your current data from the <a href="<?php echo home_url( '/personal-crm/admin/export' ); ?>">Export page</a>.</p>
 
 		<form method="post" enctype="multipart/form-data" class="import-form">
 			<?php wp_nonce_field( 'personal_crm_import', 'import_nonce' ); ?>

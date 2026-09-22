@@ -62,7 +62,7 @@ function personal_crm_activate() {
 	// Initialize WpApp to register rewrite rules, then flush them
 	$app = new \WpApp\WpApp(
 		__DIR__ . '/',
-		'crm',
+		'personal-crm',
 		array(
 			'show_masterbar_for_anonymous' => false,
 			'show_wp_logo'                 => true,
@@ -97,7 +97,7 @@ function personal_crm_activate() {
 	// Initialize to register the rewrite rules
 	$app->init();
 
-	// Now flush rewrite rules so WordPress recognizes the new /crm endpoint
+	// Now flush rewrite rules so WordPress recognizes the new /personal-crm endpoint
 	flush_rewrite_rules();
 }
 
@@ -149,7 +149,7 @@ if ( defined( 'WPINC' ) ) {
 add_filter( 'my_apps_plugins', function( $apps ) {
     $apps['personal-crm'] = array(
         'name'            => 'Personal CRM',
-        'url'             => home_url( '/crm/' ),
+        'url'             => home_url( '/personal-crm/' ),
         'dashicon'        => 'dashicons-id-alt',
         'icon_background' => 'linear-gradient(135deg, #4776e6, #8e54e9)',
         'icon_color'      => '#fff',
@@ -171,7 +171,7 @@ add_filter( 'my_apps_plugins', function( $apps ) {
                     $icon = $group->display_icon ?: '';
                     $apps[ $slug ] = array(
                         'name'     => $group->group_name,
-                        'url'      => home_url( '/crm/group/' . $group->slug ),
+                        'url'      => home_url( '/personal-crm/group/' . $group->slug ),
                         'emoji'    => $icon ?: '👥',
                     );
                 }
@@ -185,7 +185,7 @@ add_filter( 'my_apps_plugins', function( $apps ) {
                     }
                     $apps[ $slug ] = array(
                         'name'     => $person->name,
-                        'url'      => home_url( '/crm/person/' . $person->username ),
+                        'url'      => home_url( '/personal-crm/person/' . $person->username ),
                         'icon_url' => $icon_url ?: '',
                         'emoji'    => $icon_url ? '' : '👤',
                     );
@@ -207,7 +207,7 @@ add_action( 'wp_app_admin_bar_menu', function( $wp_admin_bar ) {
     $request_uri = $_SERVER['REQUEST_URI'] ?? '';
 
     // Check if we're on a CRM person page
-    if ( preg_match( '#/crm/person/([^/]+)#', $request_uri, $matches ) ) {
+    if ( preg_match( '#/personal-crm/person/([^/]+)#', $request_uri, $matches ) ) {
         $username = $matches[1];
         $saved_items = get_option( 'personal_crm_my_apps', array() );
         $is_saved = false;
@@ -229,7 +229,7 @@ add_action( 'wp_app_admin_bar_menu', function( $wp_admin_bar ) {
     }
 
     // Check if we're on a CRM group page
-    if ( preg_match( '#/crm/group/([^/]+)#', $request_uri, $matches ) ) {
+    if ( preg_match( '#/personal-crm/group/([^/]+)#', $request_uri, $matches ) ) {
         $group_slug = $matches[1];
         $saved_items = get_option( 'personal_crm_my_apps', array() );
         $is_saved = false;
@@ -254,7 +254,7 @@ add_action( 'wp_app_admin_bar_menu', function( $wp_admin_bar ) {
 // Enqueue JS for my-apps toggle functionality
 add_action( 'wp_head', function() {
     $request_uri = $_SERVER['REQUEST_URI'] ?? '';
-    if ( strpos( $request_uri, '/crm/' ) === false ) {
+    if ( strpos( $request_uri, '/personal-crm/' ) === false ) {
         return;
     }
     ?>

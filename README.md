@@ -47,7 +47,7 @@ A WordPress-based personal CRM for managing your personal and professional relat
 1. Upload the plugin to `/wp-content/plugins/personal-crm`
 2. Run `composer install` in the plugin directory
 3. Activate through the Plugins menu
-4. Visit `/crm` to get started
+4. Visit `/personal-crm` to get started
 
 ## License
 

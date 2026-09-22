@@ -11,9 +11,9 @@ require_once __DIR__ . '/personal-crm.php';
 $crm = PersonalCrm::get_instance();
 $available_teams = $crm->storage->get_available_groups();
 
-// If there's a default team set and we're not explicitly on /crm/select, redirect to it
+// If there's a default team set and we're not explicitly on /personal-crm/select, redirect to it
 $default_team = $crm->storage->get_default_group();
-$is_select_page = strpos( $_SERVER['REQUEST_URI'], '/crm/select' ) !== false;
+$is_select_page = strpos( $_SERVER['REQUEST_URI'], '/personal-crm/select' ) !== false;
 if ( ! $is_select_page && ! empty( $default_team ) && $crm->storage->group_exists( $default_team ) ) {
 	header( 'Location: ' . $crm->build_url( 'group.php', array( 'group' => $default_team ) ) );
 	exit;

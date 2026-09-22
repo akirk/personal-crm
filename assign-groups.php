@@ -3,7 +3,7 @@
  * Group Assignment Utility
  *
  * Batch-assign people to groups with an easy workflow.
- * URL: /crm/assign-groups
+ * URL: /personal-crm/assign-groups
  *
  * Default behavior: Shows people without any group assignment.
  *
@@ -185,7 +185,7 @@ if ( ! empty( $_GET['group'] ) ) {
 function build_nav_url( $crm, $base_params, $index ) {
 	$params = $base_params;
 	$params['index'] = $index;
-	return home_url( '/crm/assign-groups' ) . '?' . http_build_query( $params );
+	return home_url( '/personal-crm/assign-groups' ) . '?' . http_build_query( $params );
 }
 
 ?>
@@ -528,7 +528,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 		<div class="header">
 			<h1>Assign Groups</h1>
 			<div class="navigation">
-				<a href="<?php echo home_url( '/crm/' ); ?>" class="nav-link">← Back to CRM</a>
+				<a href="<?php echo home_url( '/personal-crm/' ); ?>" class="nav-link">← Back to CRM</a>
 			</div>
 		</div>
 
@@ -539,14 +539,14 @@ function build_nav_url( $crm, $base_params, $index ) {
 		<!-- Query Bar -->
 		<div class="query-bar">
 			<span>Load people:</span>
-			<a href="<?php echo home_url( '/crm/assign-groups' ); ?>"
+			<a href="<?php echo home_url( '/personal-crm/assign-groups' ); ?>"
 			   class="query-button <?php echo empty( $_GET['person'] ) && $query_type !== 'in-group' ? 'active' : ''; ?>">
 				Without Groups
 			</a>
 			<select onchange="if(this.value) window.location.href=this.value">
 				<option value="">From Group...</option>
 				<?php foreach ( $all_groups as $group ) : ?>
-					<option value="<?php echo esc_url( home_url( '/crm/assign-groups?query=in-group&group=' . $group['slug'] ) ); ?>">
+					<option value="<?php echo esc_url( home_url( '/personal-crm/assign-groups?query=in-group&group=' . $group['slug'] ) ); ?>">
 						<?php echo esc_html( $group['display_icon'] . ' ' . $group['hierarchical_name'] ); ?>
 					</option>
 				<?php endforeach; ?>
@@ -601,7 +601,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 										<?php endforeach; ?>
 									</div>
 								</div>
-								<a href="<?php echo esc_url( home_url( '/crm/assign-groups' ) . '?person[]=' . urlencode( $person->username ) ); ?>" class="requeue-link">Reassign</a>
+								<a href="<?php echo esc_url( home_url( '/personal-crm/assign-groups' ) . '?person[]=' . urlencode( $person->username ) ); ?>" class="requeue-link">Reassign</a>
 							</div>
 						<?php endforeach; ?>
 					</div>
@@ -662,7 +662,7 @@ function build_nav_url( $crm, $base_params, $index ) {
 				<!-- Right Panel: Groups Selection -->
 				<div class="groups-panel">
 					<?php if ( $current_person ) : ?>
-						<form method="post" action="<?php echo home_url( '/crm/assign-groups' ) . '?' . http_build_query( array_merge( $base_params, array( 'index' => $current_index ) ) ); ?>" id="assign-form">
+						<form method="post" action="<?php echo home_url( '/personal-crm/assign-groups' ) . '?' . http_build_query( array_merge( $base_params, array( 'index' => $current_index ) ) ); ?>" id="assign-form">
 							<input type="hidden" name="action" value="assign_groups">
 							<input type="hidden" name="person_id" value="<?php echo esc_attr( $current_person->id ); ?>">
 

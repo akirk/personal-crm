@@ -71,7 +71,7 @@ $all_groups = $crm->storage->get_all_groups_with_hierarchy();
 
 // Build filter URL helper
 function build_filter_url( $params = array() ) {
-	$base = home_url( '/crm/people' );
+	$base = home_url( '/personal-crm/people' );
 	return empty( $params ) ? $base : $base . '?' . http_build_query( $params );
 }
 
@@ -305,11 +305,11 @@ function build_filter_url( $params = array() ) {
 		<div class="header">
 			<h1>People</h1>
 			<div class="back-nav">
-				<a href="<?php echo home_url( '/crm/' ); ?>">← Back to CRM</a>
+				<a href="<?php echo home_url( '/personal-crm/' ); ?>">← Back to CRM</a>
 			</div>
 		</div>
 
-		<form class="filter-bar" method="get" action="<?php echo home_url( '/crm/people' ); ?>">
+		<form class="filter-bar" method="get" action="<?php echo home_url( '/personal-crm/people' ); ?>">
 			<input type="search" name="search" placeholder="Search by name, username, or location..."
 			       value="<?php echo esc_attr( $search ); ?>">
 			<input type="hidden" name="sort" value="<?php echo esc_attr( $sort_by ); ?>">
