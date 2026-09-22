@@ -75,11 +75,11 @@ class PersonalCrm {
             $this->app->init();
         }
 
-        wp_app_enqueue_style( 'personal-crm-style', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/style.css' );
-        wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.css' );
-        wp_app_enqueue_script( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.js', [ 'jquery' ], '1.0', true );
-        wp_app_enqueue_script( 'personal-crm-script', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/script.js', [ 'jquery' ], '1.0', true );
-        wp_app_enqueue_script( 'personal-crm-local-llm', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/local-llm.js', [], '1.0', true );
+        wp_app_enqueue_style( 'personal-crm-style', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/style.css', [], '1.0', 'crm' );
+        wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.css', [], '1.0', 'crm' );
+        wp_app_enqueue_script( 'personal-crm-cmd-k', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/cmd-k.js', [ 'jquery' ], '1.0', true, 'crm' );
+        wp_app_enqueue_script( 'personal-crm-script', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/script.js', [ 'jquery' ], '1.0', true, 'crm' );
+        wp_app_enqueue_script( 'personal-crm-local-llm', plugin_dir_url( PERSONAL_CRM_PLUGIN_FILE ) . 'assets/local-llm.js', [], '1.0', true, 'crm' );
 
         // Register core tables for export/import before firing the loaded action
         $this->register_core_export_tables();
