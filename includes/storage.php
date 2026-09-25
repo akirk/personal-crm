@@ -20,6 +20,19 @@ if ( class_exists( '\PersonalCRM\Storage' ) ) {
 
 class Storage extends \WpApp\BaseStorage {
 
+	/**
+	 * Update the groups table when new group settings are introduced.
+	 */
+	public function update_groups_schema() {
+		$schema = $this->get_schema();
+		$table_name = $this->wpdb->prefix . 'personal_crm_groups';
+		$charset_collate = $this->wpdb->get_charset_collate();
+
+		return $this->dbdelta( array(
+			"CREATE TABLE $table_name (\n{$schema['personal_crm_groups']}\n) $charset_collate;",
+		) );
+	}
+
     /**
      * Get database schema
      */
@@ -34,6 +47,7 @@ class Storage extends \WpApp\BaseStorage {
                 type varchar(50) DEFAULT 'team',
                 display_icon varchar(10) DEFAULT '',
                 sort_order int DEFAULT 0,
+                include_events_in_parent tinyint(1) DEFAULT 1,
                 is_default tinyint(1) DEFAULT 0,
                 created_at datetime DEFAULT CURRENT_TIMESTAMP,
                 updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -702,6 +716,18 @@ class Storage extends \WpApp\BaseStorage {
      */
     public function save_group( $group_id, $config ) {
         $group_name = $config['group_name'] ?? $config['team_name'] ?? '';
+		$include_events_in_parent = 1;
+		if ( array_key_exists( 'include_events_in_parent', $config ) ) {
+			$include_events_in_parent = (int) (bool) $config['include_events_in_parent'];
+		} elseif ( $group_id ) {
+			$stored_value = $this->wpdb->get_var( $this->wpdb->prepare(
+				"SELECT include_events_in_parent FROM {$this->wpdb->prefix}personal_crm_groups WHERE id = %d",
+				$group_id
+			) );
+			if ( $stored_value !== null ) {
+				$include_events_in_parent = (int) $stored_value;
+			}
+		}
 
         // Generate slug from name
         $base_slug = sanitize_title( $group_name );
@@ -748,6 +774,7 @@ class Storage extends \WpApp\BaseStorage {
             'parent_id' => $parent_id,
             'display_icon' => $config['display_icon'] ?? '',
             'sort_order' => $config['sort_order'] ?? 0,
+            'include_events_in_parent' => $include_events_in_parent,
             'is_default' => $config['default'] ?? 0,
             'updated_at' => current_time( 'mysql' )
         );
@@ -779,7 +806,7 @@ class Storage extends \WpApp\BaseStorage {
                 $this->wpdb->prefix . 'personal_crm_groups',
                 $group_data,
                 array( 'id' => $group_id ),
-                array( '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%d', '%s' ),
+                array( '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%d', '%d', '%s' ),
                 array( '%d' )
             );
         } else {
@@ -788,7 +815,7 @@ class Storage extends \WpApp\BaseStorage {
             $this->wpdb->insert(
                 $this->wpdb->prefix . 'personal_crm_groups',
                 $group_data,
-                array( '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%d', '%s', '%s' )
+                array( '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%d', '%d', '%s', '%s' )
             );
             $group_id = $this->wpdb->insert_id;
         }
@@ -812,6 +839,7 @@ class Storage extends \WpApp\BaseStorage {
             'type' => $group_type,
             'display_icon' => '',
             'sort_order' => 0,
+            'include_events_in_parent' => 1,
             'default' => empty( $existing_groups ) ? 1 : 0
         );
 
