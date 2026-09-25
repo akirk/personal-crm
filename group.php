@@ -29,8 +29,8 @@ do_action( 'personal_crm_team_dashboard_init', $group_data, $current_group );
 	<title><?php echo function_exists( '\wp_app_title' ) ? \wp_app_title( $crm->get_group_display_title( $current_group, 'Management' ) ) : htmlspecialchars( $crm->get_group_display_title( $current_group, 'Management' ) ); ?></title>
 	<?php
 	if ( function_exists( '\wp_app_enqueue_style' ) ) {
-		wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
-		wp_app_enqueue_style( 'a8c-hr-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css' );
+		wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css', array(), '1.0', 'personal-crm' );
+		wp_app_enqueue_style( 'a8c-hr-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css', array(), '1.0', 'personal-crm' );
 	} else {
 		echo '<link rel="stylesheet" href="assets/style.css">';
 		echo '<link rel="stylesheet" href="assets/cmd-k.css">';

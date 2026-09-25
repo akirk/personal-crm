@@ -85,8 +85,8 @@ function build_filter_url( $params = array() ) {
 	<title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( 'People' ) : 'People'; ?></title>
 	<?php
 	if ( function_exists( 'wp_app_enqueue_style' ) ) {
-		wp_app_enqueue_style( 'personal-crm-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
-		wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css' );
+		wp_app_enqueue_style( 'personal-crm-style', plugin_dir_url( __FILE__ ) . 'assets/style.css', array(), '1.0', 'personal-crm' );
+		wp_app_enqueue_style( 'personal-crm-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css', array(), '1.0', 'personal-crm' );
 	} else {
 		echo '<link rel="stylesheet" href="' . plugin_dir_url( __FILE__ ) . 'assets/style.css">';
 		echo '<link rel="stylesheet" href="' . plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css">';

@@ -178,8 +178,8 @@ $available_teams = $crm->storage->get_available_groups();
     <title><?php echo function_exists( 'wp_app_title' ) ? wp_app_title( htmlspecialchars( $group_data->group_name ) . ' Audit' ) : htmlspecialchars( $group_data->group_name ) . ' Audit'; ?></title>
     <?php
     if ( function_exists( 'wp_app_enqueue_style' ) ) {
-        wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
-        wp_app_enqueue_style( 'a8c-hr-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css' );
+        wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css', array(), '1.0', 'personal-crm' );
+        wp_app_enqueue_style( 'a8c-hr-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css', array(), '1.0', 'personal-crm' );
     } else {
         echo '<link rel="stylesheet" href="' . plugin_dir_url( __FILE__ ) . 'assets/style.css">';
         echo '<link rel="stylesheet" href="' . plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css">';

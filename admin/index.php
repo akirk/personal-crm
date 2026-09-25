@@ -1151,9 +1151,9 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
     
     <?php
     if ( function_exists( 'wp_app_enqueue_script' ) ) {
-        wp_app_enqueue_script( 'personal-crm-admin-js', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/admin.js' );
-        wp_app_enqueue_script( 'personal-crm-script-js', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/script.js' );
-        wp_app_enqueue_script( 'personal-crm-paste-handler-js', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/paste-handler.js' );
+        wp_app_enqueue_script( 'personal-crm-admin-js', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/admin.js', array(), '1.0', true, 'personal-crm' );
+        wp_app_enqueue_script( 'personal-crm-script-js', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/script.js', array(), '1.0', true, 'personal-crm' );
+        wp_app_enqueue_script( 'personal-crm-paste-handler-js', plugin_dir_url( dirname( __FILE__ ) ) . 'assets/paste-handler.js', array(), '1.0', true, 'personal-crm' );
     } else {
         echo '<script src="' . plugin_dir_url( dirname( __FILE__ ) ) . 'assets/admin.js"></script>';
         echo '<script src="' . plugin_dir_url( dirname( __FILE__ ) ) . 'assets/script.js"></script>';

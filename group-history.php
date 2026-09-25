@@ -27,7 +27,7 @@ $current_count = count( $current_members );
 	<title><?php echo function_exists( '\wp_app_title' ) ? \wp_app_title( $crm->get_group_display_title( $current_group, 'History' ) ) : htmlspecialchars( $crm->get_group_display_title( $current_group, 'History' ) ); ?></title>
 	<?php
 	if ( function_exists( '\wp_app_enqueue_style' ) ) {
-		wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
+		wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css', array(), '1.0', 'personal-crm' );
 	} else {
 		echo '<link rel="stylesheet" href="assets/style.css">';
 	}
