@@ -4,6 +4,8 @@
  */
 namespace PersonalCRM;
 
+use DateTime;
+
 if ( class_exists( '\PersonalCRM\Person' ) ) {
     return;
 }
@@ -96,6 +98,25 @@ class Person {
 	 */
 	public function get_username() {
 		return $this->username;
+	}
+
+	/**
+	 * Check whether the person currently belongs to an alumni group.
+	 */
+	public function is_alumni() {
+		foreach ( $this->groups as $group ) {
+			if ( ! empty( $group['group_left_date'] ) ) {
+				continue;
+			}
+
+			$slug = $group['slug'] ?? '';
+			$name = $group['group_name'] ?? '';
+			if ( stripos( $slug, 'alumni' ) !== false || stripos( $name, 'alumni' ) !== false ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -201,7 +222,7 @@ class Person {
 		}
 
 		// Company anniversary
-		if ( ! empty( $this->company_anniversary ) ) {
+		if ( ! empty( $this->company_anniversary ) && ! $this->is_alumni() ) {
 			$anniversary_date = DateTime::createFromFormat( 'Y-m-d', $this->company_anniversary );
 			if ( $anniversary_date ) {
 				$anniversary_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $anniversary_date->format( 'm-d' ) );
@@ -524,7 +545,7 @@ class Person {
 		}
 
 		// Always include company anniversary - find the next occurrence
-		if ( ! empty( $this->company_anniversary ) ) {
+		if ( ! empty( $this->company_anniversary ) && ! $this->is_alumni() ) {
 			$anniversary_date = DateTime::createFromFormat( 'Y-m-d', $this->company_anniversary );
 			if ( $anniversary_date ) {
 				$anniversary_this_year = DateTime::createFromFormat( 'Y-m-d', $current_year . '-' . $anniversary_date->format( 'm-d' ) );

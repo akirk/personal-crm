@@ -4,6 +4,8 @@
  */
 namespace PersonalCRM;
 
+use DateTime;
+
 if ( class_exists( '\PersonalCRM\Event' ) ) {
     return;
 }
