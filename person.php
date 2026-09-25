@@ -63,8 +63,8 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 	?></title>
 	<?php
 	if ( function_exists( 'wp_app_enqueue_style' ) ) {
-		wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css' );
-		wp_app_enqueue_style( 'a8c-hr-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css' );
+		wp_app_enqueue_style( 'a8c-hr-style', plugin_dir_url( __FILE__ ) . 'assets/style.css', array(), '1.0', 'personal-crm' );
+		wp_app_enqueue_style( 'a8c-hr-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.css', array(), '1.0', 'personal-crm' );
 	} else {
 		echo '<link rel="stylesheet" href="assets/style.css">';
 		echo '<link rel="stylesheet" href="assets/cmd-k.css">';
@@ -697,9 +697,9 @@ $is_alumni = ! empty( $person_data->category ) && stripos( $person_data->categor
 
 	<?php
 	if ( function_exists( '\wp_app_enqueue_script' ) ) {
-		wp_app_enqueue_script( 'personal-crm-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js' );
-		wp_app_enqueue_script( 'personal-crm-script', plugin_dir_url( __FILE__ ) . 'assets/script.js' );
-		wp_app_enqueue_script( 'personal-crm-paste-handler', plugin_dir_url( __FILE__ ) . 'assets/paste-handler.js' );
+		wp_app_enqueue_script( 'personal-crm-cmd-k', plugin_dir_url( __FILE__ ) . 'assets/cmd-k.js', array(), '1.0', true, 'personal-crm' );
+		wp_app_enqueue_script( 'personal-crm-script', plugin_dir_url( __FILE__ ) . 'assets/script.js', array(), '1.0', true, 'personal-crm' );
+		wp_app_enqueue_script( 'personal-crm-paste-handler', plugin_dir_url( __FILE__ ) . 'assets/paste-handler.js', array(), '1.0', true, 'personal-crm' );
 	} else {
 		echo '<script src="assets/cmd-k.js"></script>';
 		echo '<script src="assets/script.js"></script>';
