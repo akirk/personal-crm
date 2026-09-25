@@ -828,6 +828,9 @@ class PersonalCrm {
             if ( $group_data ) {
                 $child_groups = $group_data->get_child_groups();
                 foreach ( $child_groups as $child ) {
+					if ( ! $filter_person && ! $child->include_events_in_parent ) {
+						continue;
+					}
                     $all_people = array_merge( $all_people, $child->get_members() );
                 }
             }
@@ -1293,6 +1296,9 @@ class PersonalCrm {
         if ( $group_data ) {
             $child_groups = $group_data->get_child_groups();
             foreach ( $child_groups as $child ) {
+				if ( ! $child->include_events_in_parent ) {
+					continue;
+				}
                 $all_people = array_merge( $all_people, $child->get_members() );
             }
         }
@@ -1349,6 +1355,9 @@ class PersonalCrm {
         if ( $group_data ) {
             $child_groups = $group_data->get_child_groups();
             foreach ( $child_groups as $child ) {
+				if ( ! $child->include_events_in_parent ) {
+					continue;
+				}
                 $all_people = array_merge( $all_people, $child->get_members() );
             }
         }
@@ -1385,22 +1394,17 @@ class PersonalCrm {
         $cutoff_date = clone $current_date;
         $cutoff_date->add( new \DateInterval( 'P3M' ) );
 
-        $include_alumni = isset( $_GET['alumni'] ) && $_GET['alumni'] === '1';
-
         // Collect all people from direct members
         $all_people = array();
         if ( $group_data ) {
             $all_people = array_merge( $all_people, $group_data->get_members() );
         }
 
-        // Add people from child groups (optionally excluding alumni)
+        // Add people from child groups that contribute events to their parent.
         if ( $group_data ) {
             $child_groups = $group_data->get_child_groups();
             foreach ( $child_groups as $child ) {
-                $is_alumni = stripos( $child->slug, 'alumni' ) !== false || stripos( $child->group_name, 'alumni' ) !== false;
-
-                // Skip alumni groups if not explicitly included
-                if ( $is_alumni && ! $include_alumni ) {
+				if ( ! $child->include_events_in_parent ) {
                     continue;
                 }
 

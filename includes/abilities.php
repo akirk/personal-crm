@@ -721,6 +721,7 @@ function ability_create_group( $input ) {
 		'parent_id'           => $parent_id,
 		'activity_url_prefix' => '',
 		'sort_order'          => 0,
+		'include_events_in_parent' => 1,
 		'default'             => 0,
 	);
 

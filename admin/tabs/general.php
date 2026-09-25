@@ -56,6 +56,16 @@ $group_obj = $crm->storage->get_group( $current_group );
             <small class="text-small-muted">Lower numbers appear first in navigation</small>
         </div>
 
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-weight: 600;">
+                <input type="checkbox" id="include_events_in_parent" name="include_events_in_parent" value="1" <?php echo $group_obj->include_events_in_parent ? 'checked' : ''; ?> style="width: auto;">
+                <span>Include upcoming events in parent group</span>
+            </label>
+            <small class="text-small-muted" style="margin-left: 20px;">
+                When this is a subgroup, include its members' upcoming events on the parent group's dashboard and calendar.
+            </small>
+        </div>
+
         <?php
         // Allow plugins to add fields after the name field
         do_action( 'personal_crm_admin_team_general_fields', $group_obj, $current_group );

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Personal CRM
  * Description: WordPress-based personal CRM tool for managing contacts, teams, and relationships with extensible architecture
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: Alex Kirk
  * Author URI: https://alex.kirk.at/
  * Requires at least: 5.0
@@ -16,7 +16,7 @@
 namespace PersonalCRM;
 
 // Define constants
-define( 'PERSONAL_CRM_PLUGIN_VERSION', '1.1.1' );
+define( 'PERSONAL_CRM_PLUGIN_VERSION', '1.1.2' );
 define( 'PERSONAL_CRM_PLUGIN_FILE', __FILE__ );
 
 // Register activation/deactivation hooks at plugin file level
@@ -135,6 +135,10 @@ if ( defined( 'WPINC' ) ) {
     add_action( 'plugins_loaded', function() {
         global $wpdb;
         $storage = new Storage( $wpdb );
+        if ( get_option( 'personal_crm_version' ) !== PERSONAL_CRM_PLUGIN_VERSION ) {
+            $storage->update_groups_schema();
+            update_option( 'personal_crm_version', PERSONAL_CRM_PLUGIN_VERSION );
+        }
         PersonalCrm::set_storage( $storage );
         PersonalCrm::get_instance();
         \PersonalCRM\register_abilities();
@@ -449,4 +453,3 @@ add_action( 'wp_ajax_personal_crm_quick_update', function() {
         wp_send_json_error( array( 'message' => 'Failed to save' ) );
     }
 } );
-

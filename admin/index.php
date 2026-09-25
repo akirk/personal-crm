@@ -170,6 +170,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
 		'type' => sanitize_text_field( $_POST['team_type'] ?? 'team' ),
 		'display_icon' => sanitize_text_field( $_POST['display_icon'] ?? '' ),
 		'sort_order' => intval( $_POST['sort_order'] ?? 0 ),
+		'include_events_in_parent' => isset( $_POST['include_events_in_parent'] ) ? 1 : 0,
 	);
 
 	// Handle parent group
@@ -196,6 +197,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['action'] ) && $_POS
 						'type' => $other_group->type,
 						'display_icon' => $other_group->display_icon,
 						'sort_order' => $other_group->sort_order,
+						'include_events_in_parent' => $other_group->include_events_in_parent,
 						'parent_id' => $other_group->parent_id,
 						'default' => false
 					);

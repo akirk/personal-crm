@@ -20,6 +20,7 @@ class Group {
 	public $activity_url_prefix;
 	public $display_icon;
 	public $sort_order;
+	public $include_events_in_parent;
 	public $is_default;
 	public $links;
 
@@ -52,6 +53,7 @@ class Group {
 		$this->activity_url_prefix = $data['activity_url_prefix'] ?? '';
 		$this->display_icon = $data['display_icon'] ?? '';
 		$this->sort_order = $data['sort_order'] ?? 0;
+		$this->include_events_in_parent = (bool) ( $data['include_events_in_parent'] ?? true );
 		$this->is_default = (bool) ( $data['is_default'] ?? false );
 		$this->links = $data['links'] ?? array();
 	}
