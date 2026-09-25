@@ -39,6 +39,9 @@ if ( ! function_exists( '__' ) ) {
 if ( ! function_exists( 'add_action' ) ) {
 	function add_action( $hook, $callback ) {}
 }
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( $hook, $value ) { return $value; }
+}
 if ( ! function_exists( 'wp_register_ability_category' ) ) {
 	function wp_register_ability_category( $slug, $args ) {}
 }
