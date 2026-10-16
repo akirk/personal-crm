@@ -46,7 +46,7 @@ if ( ! function_exists( 'wp_register_ability_category' ) ) {
 	function wp_register_ability_category( $slug, $args ) {}
 }
 if ( ! function_exists( 'wp_register_ability' ) ) {
-	function wp_register_ability( $slug, $args ) {}
+	function wp_register_ability( $slug, $args ) { $GLOBALS['test_registered_abilities'][ $slug ] = $args; }
 }
 
 // WP_Error stub

@@ -41,6 +41,70 @@ function register_ability_categories() {
 	) );
 }
 
+/**
+ * Explicit allowlist shared by profile schemas, serialization, and writes.
+ * Internal IDs and collections managed by other abilities are excluded.
+ */
+function ability_profile_fields() {
+	return array(
+		'name' => array( 'schema' => array( 'type' => 'string', 'minLength' => 1 ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'nickname' => array( 'schema' => array( 'type' => 'string' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'email' => array( 'schema' => array( 'type' => 'string' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_email' ),
+		'role' => array( 'schema' => array( 'type' => 'string', 'description' => 'Job title or role' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'location' => array( 'schema' => array( 'type' => 'string' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'timezone' => array( 'schema' => array( 'type' => 'string', 'description' => 'IANA timezone identifier, e.g. Europe/Vienna. Empty if unknown; pass an empty string to clear when updating.' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'birthday' => array( 'schema' => array( 'type' => 'string', 'description' => 'YYYY-MM-DD or MM-DD' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'company_anniversary' => array( 'schema' => array( 'type' => 'string', 'description' => 'Company start date in YYYY-MM-DD format. Used for recurring company anniversaries. Pass an empty string to clear.', 'pattern' => '^(\d{4}-\d{2}-\d{2})?$' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'github' => array( 'schema' => array( 'type' => 'string' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'linkedin' => array( 'schema' => array( 'type' => 'string' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'wordpress' => array( 'schema' => array( 'type' => 'string' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'website' => array( 'schema' => array( 'type' => 'string' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'deceased' => array( 'schema' => array( 'type' => 'boolean', 'description' => 'Set to true if the person has passed away' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'boolval' ),
+		'deceased_date' => array( 'schema' => array( 'type' => 'string', 'description' => 'Date of passing in YYYY-MM-DD format', 'pattern' => '^(\d{4}-\d{2}-\d{2})?$' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'partner' => array( 'schema' => array( 'type' => 'string', 'description' => 'Partner or spouse name' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'partner_birthday' => array( 'schema' => array( 'type' => 'string', 'description' => 'YYYY-MM-DD or MM-DD; empty to clear' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'linear' => array( 'schema' => array( 'type' => 'string', 'description' => 'Linear ID' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'new_company' => array( 'schema' => array( 'type' => 'string', 'description' => 'New company name for alumni' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'new_company_website' => array( 'schema' => array( 'type' => 'string' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'sanitize_text_field' ),
+		'left_company' => array( 'schema' => array( 'type' => 'boolean', 'description' => 'Whether the person has left the company' ), 'read' => true, 'create' => true, 'update' => true, 'sanitize' => 'boolval' ),
+	);
+}
+
+function ability_profile_schema( $operation ) {
+	$properties = array();
+	foreach ( ability_profile_fields() as $field => $definition ) {
+		if ( $definition[ $operation ] ) {
+			$properties[ $field ] = $definition['schema'];
+			if ( $operation === 'read' ) {
+				unset( $properties[ $field ]['pattern'], $properties[ $field ]['minLength'] );
+			}
+		}
+	}
+	return $properties;
+}
+
+function ability_profile_data( $person ) {
+	$data = array();
+	foreach ( ability_profile_fields() as $field => $definition ) {
+		if ( $definition['read'] ) {
+			$data[ $field ] = $definition['schema']['type'] === 'boolean'
+				? (bool) ( $person->$field ?? false )
+				: (string) ( $person->$field ?? '' );
+		}
+	}
+	return $data;
+}
+
+function ability_profile_input( $input, $operation ) {
+	$data = array();
+	foreach ( ability_profile_fields() as $field => $definition ) {
+		if ( $definition[ $operation ] && isset( $input[ $field ] ) ) {
+			$data[ $field ] = call_user_func( $definition['sanitize'], $input[ $field ] );
+		}
+	}
+	return $data;
+}
+
 function register_crm_abilities() {
 	wp_register_ability( 'personal-crm/list-people', array(
 		'label'       => __( 'List People', 'personal-crm' ),
@@ -135,19 +199,10 @@ function register_crm_abilities() {
 		),
 		'output_schema' => array(
 			'type'       => 'object',
-			'properties' => array(
+			'properties' => array_merge( ability_profile_schema( 'read' ), array(
 				'username'        => array( 'type' => 'string' ),
-				'name'            => array( 'type' => 'string' ),
 				'url'             => array( 'type' => 'string', 'description' => 'Link to this person\'s profile in the CRM' ),
 				'edit_url'        => array( 'type' => 'string', 'description' => 'Link to edit this person\'s profile' ),
-				'email'           => array( 'type' => 'string' ),
-				'role'            => array( 'type' => 'string' ),
-				'location'        => array( 'type' => 'string' ),
-				'birthday'        => array( 'type' => 'string' ),
-				'github'          => array( 'type' => 'string' ),
-				'linkedin'        => array( 'type' => 'string' ),
-				'wordpress'       => array( 'type' => 'string' ),
-				'website'         => array( 'type' => 'string' ),
 				'groups'          => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
 				'recent_notes'    => array(
 					'type'        => 'array',
@@ -162,14 +217,14 @@ function register_crm_abilities() {
 					),
 				),
 				'personal_events' => array( 'type' => 'array', 'items' => array( 'type' => 'object' ), 'description' => 'Past meetings and events' ),
-			),
+			) ),
 		),
 		'execute_callback'    => __NAMESPACE__ . '\ability_get_person',
 		'permission_callback' => __NAMESPACE__ . '\ability_permission_read',
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Use to disambiguate between multiple search results: compare role and recent_notes to determine which person matches your source text. Also use before adding notes or meetings to check whether the same information was already recorded. Always include the returned "url" as a markdown link when mentioning the person. Use "edit_url" if the user wants to make changes themselves.',
+				'instructions' => 'Use to disambiguate between multiple search results: compare role and recent_notes to determine which person matches your source text. Use company_anniversary to check the stored company start date before updating it. Also use before adding notes or meetings to check whether the same information was already recorded. Always include the returned "url" as a markdown link when mentioning the person. Use "edit_url" if the user wants to make changes themselves.',
 				'readonly'     => true,
 				'destructive'  => false,
 			),
@@ -255,7 +310,7 @@ function register_crm_abilities() {
 			'properties' => array(
 				'username'   => array( 'type' => 'string', 'description' => 'Username of the person', 'minLength' => 1 ),
 				'group_slug' => array( 'type' => 'string', 'description' => 'Slug of the group (from list-groups or create-group)', 'minLength' => 1 ),
-				'joined_date' => array( 'type' => 'string', 'description' => 'Optional join date in YYYY-MM-DD format', 'pattern' => '^\d{4}-\d{2}-\d{2}$' ),
+				'joined_date' => array( 'type' => 'string', 'description' => 'Optional join date in YYYY-MM-DD format', 'pattern' => '^(\d{4}-\d{2}-\d{2})?$' ),
 			),
 			'required'             => array( 'username', 'group_slug' ),
 			'additionalProperties' => false,
@@ -292,19 +347,15 @@ function register_crm_abilities() {
 					'minItems' => 1,
 					'items'    => array(
 						'type'       => 'object',
-						'properties' => array(
-							'name'     => array( 'type' => 'string', 'description' => 'Full name', 'minLength' => 1 ),
+						'properties' => array_merge( ability_profile_schema( 'create' ), array(
 							'username' => array( 'type' => 'string', 'description' => 'Optional. Auto-generated from name if omitted.' ),
-							'email'    => array( 'type' => 'string', 'description' => 'Email address' ),
-							'role'     => array( 'type' => 'string', 'description' => 'Job title or role' ),
-							'location' => array( 'type' => 'string', 'description' => 'City or country' ),
 							'note'     => array( 'type' => 'string', 'description' => 'Initial note to attach' ),
 							'groups'   => array(
 								'type'        => 'array',
 								'description' => 'Group slugs to assign this person to (from list-groups or create-group)',
 								'items'       => array( 'type' => 'string' ),
 							),
-						),
+						) ),
 						'required'             => array( 'name' ),
 						'additionalProperties' => false,
 					),
@@ -344,22 +395,10 @@ function register_crm_abilities() {
 		'category'    => 'personal-crm',
 		'input_schema' => array(
 			'type'       => 'object',
-			'properties' => array(
+			'properties' => array_merge( ability_profile_schema( 'update' ), array(
 				'username'        => array( 'type' => 'string', 'description' => 'Username of the person to update', 'minLength' => 1 ),
 				'new_username'    => array( 'type' => 'string', 'description' => 'Rename the person to this new username. Must be unique.', 'minLength' => 1 ),
-				'name'            => array( 'type' => 'string' ),
-				'nickname'        => array( 'type' => 'string' ),
-				'email'           => array( 'type' => 'string' ),
-				'role'            => array( 'type' => 'string', 'description' => 'Job title or role' ),
-				'location'        => array( 'type' => 'string' ),
-				'birthday'        => array( 'type' => 'string', 'description' => 'YYYY-MM-DD or MM-DD' ),
-				'github'          => array( 'type' => 'string' ),
-				'linkedin'        => array( 'type' => 'string' ),
-				'wordpress'       => array( 'type' => 'string' ),
-				'website'         => array( 'type' => 'string' ),
-				'deceased'        => array( 'type' => 'boolean', 'description' => 'Set to true if the person has passed away' ),
-				'deceased_date'   => array( 'type' => 'string', 'description' => 'Date of passing in YYYY-MM-DD format', 'pattern' => '^\d{4}-\d{2}-\d{2}$' ),
-			),
+			) ),
 			'required'             => array( 'username' ),
 			'additionalProperties' => false,
 		),
@@ -376,7 +415,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Use to change profile fields on an existing person — for example marking someone as deceased, correcting a name, adding a missing email, or renaming via new_username. Only supply the fields you want to change. To add a note use add-note instead. Always include the returned "url" as a markdown link when mentioning the person.',
+				'instructions' => 'Use to change profile fields on an existing person — for example marking someone as deceased, correcting a name, adding a missing email, or renaming via new_username. Only supply the fields you want to change. Use company_anniversary for a company start date so the CRM can generate recurring anniversary events; do not save it only as a note. To add a note use add-note instead. Always include the returned "url" as a markdown link when mentioning the person.',
 				'readonly'     => false,
 				'destructive'  => false,
 				'idempotent'   => true,
@@ -667,23 +706,14 @@ function ability_get_person( $input ) {
 		}
 	}
 
-	return array(
+	return array_merge( ability_profile_data( $person ), array(
 		'username'        => $person->username,
-		'name'            => $person->name,
 		'url'             => home_url( '/personal-crm/person/' . $person->username ),
 		'edit_url'        => home_url( '/personal-crm/admin/person/' . $person->username ),
-		'email'           => $person->email ?? '',
-		'role'            => $person->role ?? '',
-		'location'        => $person->location ?? '',
-		'birthday'        => $person->birthday ?? '',
-		'github'          => $person->github ?? '',
-		'linkedin'        => $person->linkedin ?? '',
-		'wordpress'       => $person->wordpress ?? '',
-		'website'         => $person->website ?? '',
 		'groups'          => $groups,
 		'recent_notes'    => $recent_notes,
 		'personal_events' => $person->personal_events ?? array(),
-	);
+	) );
 }
 
 function ability_create_group( $input ) {
@@ -837,16 +867,10 @@ function ability_update_person( $input ) {
 		$username                = $new_username;
 	}
 
-	foreach ( array( 'name', 'nickname', 'email', 'role', 'location', 'birthday', 'github', 'linkedin', 'wordpress', 'website', 'deceased_date' ) as $field ) {
-		if ( isset( $input[ $field ] ) ) {
-			$update_data[ $field ] = sanitize_text_field( $input[ $field ] );
-			$update_format[]       = '%s';
-		}
-	}
-
-	if ( isset( $input['deceased'] ) ) {
-		$update_data['deceased'] = $input['deceased'] ? 1 : 0;
-		$update_format[]         = '%d';
+	foreach ( ability_profile_input( $input, 'update' ) as $field => $value ) {
+		$is_boolean = ability_profile_fields()[ $field ]['schema']['type'] === 'boolean';
+		$update_data[ $field ] = $is_boolean ? (int) $value : $value;
+		$update_format[] = $is_boolean ? '%d' : '%s';
 	}
 
 	if ( ! empty( $update_data ) ) {
@@ -950,32 +974,18 @@ function person_object_to_data( $person ) {
  * Build a blank person data array for a new contact.
  */
 function build_empty_person_data( $name, $input ) {
-	return array(
-		'name'                => $name,
-		'nickname'            => '',
-		'role'                => sanitize_text_field( $input['role'] ?? '' ),
-		'email'               => sanitize_email( $input['email'] ?? '' ),
-		'location'            => sanitize_text_field( $input['location'] ?? '' ),
-		'timezone'            => '',
-		'birthday'            => '',
-		'company_anniversary' => '',
-		'partner'             => '',
-		'partner_birthday'    => '',
-		'github'              => '',
-		'linear'              => '',
-		'wordpress'           => '',
-		'linkedin'            => '',
-		'website'             => '',
-		'new_company'         => '',
-		'new_company_website' => '',
-		'deceased_date'       => '',
-		'left_company'        => 0,
-		'deceased'            => 0,
-		'kids'                => array(),
-		'github_repos'        => array(),
-		'personal_events'     => array(),
-		'links'               => array(),
-	);
+	$defaults = array();
+	foreach ( ability_profile_fields() as $field => $definition ) {
+		if ( $definition['create'] ) {
+			$defaults[ $field ] = $definition['schema']['type'] === 'boolean' ? false : '';
+		}
+	}
+	return array_merge( $defaults, array(
+		'kids'            => array(),
+		'github_repos'    => array(),
+		'personal_events' => array(),
+		'links'           => array(),
+	), ability_profile_input( $input, 'create' ), array( 'name' => $name ) );
 }
 
 /**

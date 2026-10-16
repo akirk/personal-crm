@@ -105,6 +105,100 @@ class AbilitiesTest extends TestCase {
 		$this->assertArrayHasKey( 'edit_url', $result );
 	}
 
+	public function test_get_person_company_anniversary() {
+		$this->mock_storage->people['jane-doe'] = $this->make_person( array( 'company_anniversary' => '2020-09-15' ) );
+		$result = PersonalCRM\ability_get_person( array( 'username' => 'jane-doe' ) );
+		$this->assertSame( '2020-09-15', $result['company_anniversary'] );
+
+		unset( $this->mock_storage->people['jane-doe']->company_anniversary );
+		$result = PersonalCRM\ability_get_person( array( 'username' => 'jane-doe' ) );
+		$this->assertSame( '', $result['company_anniversary'] );
+	}
+
+	public function test_update_person_sets_and_clears_company_anniversary_without_changing_other_fields() {
+		global $wpdb;
+		$wpdb = new class {
+			public $prefix = 'wp_';
+			public $data;
+			public function update( $table, $data, $where, $format, $where_format ) {
+				$this->data = $data;
+				return 1;
+			}
+		};
+		$this->mock_storage->people['jane-doe'] = $this->make_person();
+		foreach ( array( '2020-09-15', '' ) as $date ) {
+			$result = PersonalCRM\ability_update_person( array( 'username' => 'jane-doe', 'company_anniversary' => $date ) );
+			$this->assertTrue( $result['success'] );
+			$this->assertSame( array( 'company_anniversary' => $date ), $wpdb->data );
+		}
+	}
+
+	public function test_get_person_timezone() {
+		$this->mock_storage->people['jane-doe'] = $this->make_person( array( 'timezone' => 'Europe/Vienna' ) );
+		$result = PersonalCRM\ability_get_person( array( 'username' => 'jane-doe' ) );
+		$this->assertSame( 'Europe/Vienna', $result['timezone'] );
+
+		unset( $this->mock_storage->people['jane-doe']->timezone );
+		$result = PersonalCRM\ability_get_person( array( 'username' => 'jane-doe' ) );
+		$this->assertSame( '', $result['timezone'] );
+	}
+
+	public function test_update_person_sets_and_clears_timezone_without_changing_other_fields() {
+		global $wpdb;
+		$wpdb = new class {
+			public $prefix = 'wp_';
+			public $data;
+			public function update( $table, $data, $where, $format, $where_format ) {
+				$this->data = $data;
+				return 1;
+			}
+		};
+		$this->mock_storage->people['jane-doe'] = $this->make_person();
+		foreach ( array( 'Europe/Vienna', '' ) as $timezone ) {
+			$result = PersonalCRM\ability_update_person( array( 'username' => 'jane-doe', 'timezone' => $timezone ) );
+			$this->assertTrue( $result['success'] );
+			$this->assertSame( array( 'timezone' => $timezone ), $wpdb->data );
+		}
+	}
+
+	public function test_new_person_timezone_is_optional_and_sanitized() {
+		$data = PersonalCRM\build_empty_person_data( 'Jane Doe', array( 'timezone' => ' Europe/Vienna ' ) );
+		$this->assertSame( 'Europe/Vienna', $data['timezone'] );
+		$data = PersonalCRM\build_empty_person_data( 'Jane Doe', array() );
+		$this->assertSame( '', $data['timezone'] );
+	}
+
+	public function test_profile_schemas_share_fields_and_keep_internal_fields_private() {
+		PersonalCRM\register_crm_abilities();
+		$abilities = $GLOBALS['test_registered_abilities'];
+		$read = $abilities['personal-crm/get-person']['output_schema']['properties'];
+		$update = $abilities['personal-crm/update-person']['input_schema']['properties'];
+		$create = $abilities['personal-crm/add-people']['input_schema']['properties']['people']['items'];
+		foreach ( array( 'nickname', 'timezone', 'company_anniversary', 'partner', 'partner_birthday', 'linear', 'left_company', 'new_company', 'new_company_website', 'deceased', 'deceased_date' ) as $field ) {
+			$this->assertArrayHasKey( $field, $read );
+			$this->assertArrayHasKey( $field, $update );
+			$this->assertArrayHasKey( $field, $create['properties'] );
+		}
+		$this->assertSame( array( 'name' ), $create['required'] );
+		$this->assertSame( 1, $create['properties']['name']['minLength'] );
+		foreach ( array( 'id', 'updated_at', 'groups', 'notes', 'personal_events' ) as $field ) {
+			$this->assertArrayNotHasKey( $field, PersonalCRM\ability_profile_schema( 'update' ) );
+		}
+	}
+
+	public function test_shared_profile_input_preserves_false_and_ignores_unknown_fields() {
+		$input = array( 'partner' => ' Jane ', 'left_company' => false, 'id' => 42, 'notes' => array() );
+		$this->assertSame( array( 'partner' => 'Jane', 'left_company' => false ), PersonalCRM\ability_profile_input( $input, 'update' ) );
+		$data = PersonalCRM\build_empty_person_data( 'Jane', array( 'partner' => ' Sam ', 'left_company' => true, 'company_anniversary' => '2020-09-15' ) );
+		$this->assertSame( 'Sam', $data['partner'] );
+		$this->assertTrue( $data['left_company'] );
+		$this->assertSame( '2020-09-15', $data['company_anniversary'] );
+		$this->mock_storage->people['jane-doe'] = $this->make_person( array( 'deceased' => 0, 'left_company' => 1 ) );
+		$result = PersonalCRM\ability_get_person( array( 'username' => 'jane-doe' ) );
+		$this->assertFalse( $result['deceased'] );
+		$this->assertTrue( $result['left_company'] );
+	}
+
 	public function test_get_person_notes_are_objects() {
 		$this->mock_storage->people['jane-doe'] = $this->make_person( array(
 			'notes' => array(
