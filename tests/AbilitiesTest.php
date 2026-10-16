@@ -133,6 +133,41 @@ class AbilitiesTest extends TestCase {
 		}
 	}
 
+	public function test_get_person_timezone() {
+		$this->mock_storage->people['jane-doe'] = $this->make_person( array( 'timezone' => 'Europe/Vienna' ) );
+		$result = PersonalCRM\ability_get_person( array( 'username' => 'jane-doe' ) );
+		$this->assertSame( 'Europe/Vienna', $result['timezone'] );
+
+		unset( $this->mock_storage->people['jane-doe']->timezone );
+		$result = PersonalCRM\ability_get_person( array( 'username' => 'jane-doe' ) );
+		$this->assertSame( '', $result['timezone'] );
+	}
+
+	public function test_update_person_sets_and_clears_timezone_without_changing_other_fields() {
+		global $wpdb;
+		$wpdb = new class {
+			public $prefix = 'wp_';
+			public $data;
+			public function update( $table, $data, $where, $format, $where_format ) {
+				$this->data = $data;
+				return 1;
+			}
+		};
+		$this->mock_storage->people['jane-doe'] = $this->make_person();
+		foreach ( array( 'Europe/Vienna', '' ) as $timezone ) {
+			$result = PersonalCRM\ability_update_person( array( 'username' => 'jane-doe', 'timezone' => $timezone ) );
+			$this->assertTrue( $result['success'] );
+			$this->assertSame( array( 'timezone' => $timezone ), $wpdb->data );
+		}
+	}
+
+	public function test_new_person_timezone_is_optional_and_sanitized() {
+		$data = PersonalCRM\build_empty_person_data( 'Jane Doe', array( 'timezone' => ' Europe/Vienna ' ) );
+		$this->assertSame( 'Europe/Vienna', $data['timezone'] );
+		$data = PersonalCRM\build_empty_person_data( 'Jane Doe', array() );
+		$this->assertSame( '', $data['timezone'] );
+	}
+
 	public function test_get_person_notes_are_objects() {
 		$this->mock_storage->people['jane-doe'] = $this->make_person( array(
 			'notes' => array(

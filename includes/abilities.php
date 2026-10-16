@@ -143,6 +143,7 @@ function register_crm_abilities() {
 				'email'           => array( 'type' => 'string' ),
 				'role'            => array( 'type' => 'string' ),
 				'location'        => array( 'type' => 'string' ),
+				'timezone'        => array( 'type' => 'string', 'description' => 'IANA timezone identifier, e.g. Europe/Vienna. Empty if unknown; pass an empty string to clear when updating.' ),
 				'birthday'        => array( 'type' => 'string' ),
 				'company_anniversary' => array( 'type' => 'string', 'description' => 'Company start date in YYYY-MM-DD format, or empty if unknown' ),
 				'github'          => array( 'type' => 'string' ),
@@ -299,6 +300,7 @@ function register_crm_abilities() {
 							'email'    => array( 'type' => 'string', 'description' => 'Email address' ),
 							'role'     => array( 'type' => 'string', 'description' => 'Job title or role' ),
 							'location' => array( 'type' => 'string', 'description' => 'City or country' ),
+							'timezone' => array( 'type' => 'string', 'description' => 'IANA timezone identifier, e.g. Europe/Vienna' ),
 							'note'     => array( 'type' => 'string', 'description' => 'Initial note to attach' ),
 							'groups'   => array(
 								'type'        => 'array',
@@ -353,6 +355,7 @@ function register_crm_abilities() {
 				'email'           => array( 'type' => 'string' ),
 				'role'            => array( 'type' => 'string', 'description' => 'Job title or role' ),
 				'location'        => array( 'type' => 'string' ),
+				'timezone'        => array( 'type' => 'string', 'description' => 'IANA timezone identifier, e.g. Europe/Vienna. Empty if unknown; pass an empty string to clear when updating.' ),
 				'birthday'        => array( 'type' => 'string', 'description' => 'YYYY-MM-DD or MM-DD' ),
 				'company_anniversary' => array( 'type' => 'string', 'description' => 'Company start date in YYYY-MM-DD format. Used for recurring company anniversaries. Pass an empty string to clear.', 'pattern' => '^(\d{4}-\d{2}-\d{2})?$' ),
 				'github'          => array( 'type' => 'string' ),
@@ -677,6 +680,7 @@ function ability_get_person( $input ) {
 		'email'           => $person->email ?? '',
 		'role'            => $person->role ?? '',
 		'location'        => $person->location ?? '',
+		'timezone'        => $person->timezone ?? '',
 		'birthday'        => $person->birthday ?? '',
 		'company_anniversary' => $person->company_anniversary ?? '',
 		'github'          => $person->github ?? '',
@@ -840,7 +844,7 @@ function ability_update_person( $input ) {
 		$username                = $new_username;
 	}
 
-	foreach ( array( 'name', 'nickname', 'email', 'role', 'location', 'birthday', 'company_anniversary', 'github', 'linkedin', 'wordpress', 'website', 'deceased_date' ) as $field ) {
+	foreach ( array( 'name', 'nickname', 'email', 'role', 'location', 'timezone', 'birthday', 'company_anniversary', 'github', 'linkedin', 'wordpress', 'website', 'deceased_date' ) as $field ) {
 		if ( isset( $input[ $field ] ) ) {
 			$update_data[ $field ] = sanitize_text_field( $input[ $field ] );
 			$update_format[]       = '%s';
@@ -959,7 +963,7 @@ function build_empty_person_data( $name, $input ) {
 		'role'                => sanitize_text_field( $input['role'] ?? '' ),
 		'email'               => sanitize_email( $input['email'] ?? '' ),
 		'location'            => sanitize_text_field( $input['location'] ?? '' ),
-		'timezone'            => '',
+		'timezone'            => sanitize_text_field( $input['timezone'] ?? '' ),
 		'birthday'            => '',
 		'company_anniversary' => '',
 		'partner'             => '',
