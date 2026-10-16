@@ -144,6 +144,7 @@ function register_crm_abilities() {
 				'role'            => array( 'type' => 'string' ),
 				'location'        => array( 'type' => 'string' ),
 				'birthday'        => array( 'type' => 'string' ),
+				'company_anniversary' => array( 'type' => 'string', 'description' => 'Company start date in YYYY-MM-DD format, or empty if unknown' ),
 				'github'          => array( 'type' => 'string' ),
 				'linkedin'        => array( 'type' => 'string' ),
 				'wordpress'       => array( 'type' => 'string' ),
@@ -169,7 +170,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Use to disambiguate between multiple search results: compare role and recent_notes to determine which person matches your source text. Also use before adding notes or meetings to check whether the same information was already recorded. Always include the returned "url" as a markdown link when mentioning the person. Use "edit_url" if the user wants to make changes themselves.',
+				'instructions' => 'Use to disambiguate between multiple search results: compare role and recent_notes to determine which person matches your source text. Use company_anniversary to check the stored company start date before updating it. Also use before adding notes or meetings to check whether the same information was already recorded. Always include the returned "url" as a markdown link when mentioning the person. Use "edit_url" if the user wants to make changes themselves.',
 				'readonly'     => true,
 				'destructive'  => false,
 			),
@@ -353,6 +354,7 @@ function register_crm_abilities() {
 				'role'            => array( 'type' => 'string', 'description' => 'Job title or role' ),
 				'location'        => array( 'type' => 'string' ),
 				'birthday'        => array( 'type' => 'string', 'description' => 'YYYY-MM-DD or MM-DD' ),
+				'company_anniversary' => array( 'type' => 'string', 'description' => 'Company start date in YYYY-MM-DD format. Used for recurring company anniversaries. Pass an empty string to clear.', 'pattern' => '^(\d{4}-\d{2}-\d{2})?$' ),
 				'github'          => array( 'type' => 'string' ),
 				'linkedin'        => array( 'type' => 'string' ),
 				'wordpress'       => array( 'type' => 'string' ),
@@ -376,7 +378,7 @@ function register_crm_abilities() {
 		'meta' => array(
 			'show_in_rest' => true,
 			'annotations'  => array(
-				'instructions' => 'Use to change profile fields on an existing person — for example marking someone as deceased, correcting a name, adding a missing email, or renaming via new_username. Only supply the fields you want to change. To add a note use add-note instead. Always include the returned "url" as a markdown link when mentioning the person.',
+				'instructions' => 'Use to change profile fields on an existing person — for example marking someone as deceased, correcting a name, adding a missing email, or renaming via new_username. Only supply the fields you want to change. Use company_anniversary for a company start date so the CRM can generate recurring anniversary events; do not save it only as a note. To add a note use add-note instead. Always include the returned "url" as a markdown link when mentioning the person.',
 				'readonly'     => false,
 				'destructive'  => false,
 				'idempotent'   => true,
@@ -676,6 +678,7 @@ function ability_get_person( $input ) {
 		'role'            => $person->role ?? '',
 		'location'        => $person->location ?? '',
 		'birthday'        => $person->birthday ?? '',
+		'company_anniversary' => $person->company_anniversary ?? '',
 		'github'          => $person->github ?? '',
 		'linkedin'        => $person->linkedin ?? '',
 		'wordpress'       => $person->wordpress ?? '',
@@ -837,7 +840,7 @@ function ability_update_person( $input ) {
 		$username                = $new_username;
 	}
 
-	foreach ( array( 'name', 'nickname', 'email', 'role', 'location', 'birthday', 'github', 'linkedin', 'wordpress', 'website', 'deceased_date' ) as $field ) {
+	foreach ( array( 'name', 'nickname', 'email', 'role', 'location', 'birthday', 'company_anniversary', 'github', 'linkedin', 'wordpress', 'website', 'deceased_date' ) as $field ) {
 		if ( isset( $input[ $field ] ) ) {
 			$update_data[ $field ] = sanitize_text_field( $input[ $field ] );
 			$update_format[]       = '%s';

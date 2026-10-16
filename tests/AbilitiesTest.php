@@ -105,6 +105,34 @@ class AbilitiesTest extends TestCase {
 		$this->assertArrayHasKey( 'edit_url', $result );
 	}
 
+	public function test_get_person_company_anniversary() {
+		$this->mock_storage->people['jane-doe'] = $this->make_person( array( 'company_anniversary' => '2020-09-15' ) );
+		$result = PersonalCRM\ability_get_person( array( 'username' => 'jane-doe' ) );
+		$this->assertSame( '2020-09-15', $result['company_anniversary'] );
+
+		unset( $this->mock_storage->people['jane-doe']->company_anniversary );
+		$result = PersonalCRM\ability_get_person( array( 'username' => 'jane-doe' ) );
+		$this->assertSame( '', $result['company_anniversary'] );
+	}
+
+	public function test_update_person_sets_and_clears_company_anniversary_without_changing_other_fields() {
+		global $wpdb;
+		$wpdb = new class {
+			public $prefix = 'wp_';
+			public $data;
+			public function update( $table, $data, $where, $format, $where_format ) {
+				$this->data = $data;
+				return 1;
+			}
+		};
+		$this->mock_storage->people['jane-doe'] = $this->make_person();
+		foreach ( array( '2020-09-15', '' ) as $date ) {
+			$result = PersonalCRM\ability_update_person( array( 'username' => 'jane-doe', 'company_anniversary' => $date ) );
+			$this->assertTrue( $result['success'] );
+			$this->assertSame( array( 'company_anniversary' => $date ), $wpdb->data );
+		}
+	}
+
 	public function test_get_person_notes_are_objects() {
 		$this->mock_storage->people['jane-doe'] = $this->make_person( array(
 			'notes' => array(
