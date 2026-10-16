@@ -168,6 +168,37 @@ class AbilitiesTest extends TestCase {
 		$this->assertSame( '', $data['timezone'] );
 	}
 
+	public function test_profile_schemas_share_fields_and_keep_internal_fields_private() {
+		PersonalCRM\register_crm_abilities();
+		$abilities = $GLOBALS['test_registered_abilities'];
+		$read = $abilities['personal-crm/get-person']['output_schema']['properties'];
+		$update = $abilities['personal-crm/update-person']['input_schema']['properties'];
+		$create = $abilities['personal-crm/add-people']['input_schema']['properties']['people']['items'];
+		foreach ( array( 'nickname', 'timezone', 'company_anniversary', 'partner', 'partner_birthday', 'linear', 'left_company', 'new_company', 'new_company_website', 'deceased', 'deceased_date' ) as $field ) {
+			$this->assertArrayHasKey( $field, $read );
+			$this->assertArrayHasKey( $field, $update );
+			$this->assertArrayHasKey( $field, $create['properties'] );
+		}
+		$this->assertSame( array( 'name' ), $create['required'] );
+		$this->assertSame( 1, $create['properties']['name']['minLength'] );
+		foreach ( array( 'id', 'updated_at', 'groups', 'notes', 'personal_events' ) as $field ) {
+			$this->assertArrayNotHasKey( $field, PersonalCRM\ability_profile_schema( 'update' ) );
+		}
+	}
+
+	public function test_shared_profile_input_preserves_false_and_ignores_unknown_fields() {
+		$input = array( 'partner' => ' Jane ', 'left_company' => false, 'id' => 42, 'notes' => array() );
+		$this->assertSame( array( 'partner' => 'Jane', 'left_company' => false ), PersonalCRM\ability_profile_input( $input, 'update' ) );
+		$data = PersonalCRM\build_empty_person_data( 'Jane', array( 'partner' => ' Sam ', 'left_company' => true, 'company_anniversary' => '2020-09-15' ) );
+		$this->assertSame( 'Sam', $data['partner'] );
+		$this->assertTrue( $data['left_company'] );
+		$this->assertSame( '2020-09-15', $data['company_anniversary'] );
+		$this->mock_storage->people['jane-doe'] = $this->make_person( array( 'deceased' => 0, 'left_company' => 1 ) );
+		$result = PersonalCRM\ability_get_person( array( 'username' => 'jane-doe' ) );
+		$this->assertFalse( $result['deceased'] );
+		$this->assertTrue( $result['left_company'] );
+	}
+
 	public function test_get_person_notes_are_objects() {
 		$this->mock_storage->people['jane-doe'] = $this->make_person( array(
 			'notes' => array(
